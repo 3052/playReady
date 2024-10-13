@@ -43,3 +43,21 @@ result:
 Windows.Media.Protection.PlayReady.dll
 Windows.Media.Protection.PlayReady.pdb
 ~~~
+
+## history
+
+- <https://security-explorations.com/samples/mspr_leak_screenshot3.png>
+- https://reddit.com/r/ReverseEngineering/comments/1dnicyh
+- https://seclists.org/fulldisclosure/2024/Jun/7
+- https://security-explorations.com/microsoft-warbird-pmp.html
+
+> We also verified that Microsoft Symbol Server didn’t block request for PDB file
+> corresponding to Microsoft internal warbird.dll binary (another leak / bug at
+> Microsoft end).
+
+https://files.catbox.moe/8iz2qk.pdb
+
+## ICE\_REPRO.zip
+
+- <http://4a.si/dir/ICE_REPRO.zip>
+- <http://web.archive.org/sendvsfeedback2-download.azurewebsites.net/api/fileBlob/file?name=B0cde770200a945109437927ba3fe4d67638537352993712632_ICE_REPRO.zip&tid=0cde770200a945109437927ba3fe4d67638537352993712632>
