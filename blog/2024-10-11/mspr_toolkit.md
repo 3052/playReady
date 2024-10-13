@@ -2,12 +2,6 @@
 
 <https://security-explorations.com/materials/mspr_toolkit_README.md.txt>
 
-we will know if we have the right file if it contains:
-
-~~~
-__img_zgp_end
-~~~
-
 > You want to look for known devices or apps that license PR, like the Amazon
 > Prime app for Android. And look for any .so that could match this name, but
 > then again they're not implemented/used the same way.
