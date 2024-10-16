@@ -146,16 +146,8 @@ public class Device {
  }
 
  public void print() {
-  PaddedPrinter pp=Shell.get_pp();
-
-  pp.println("Device");
-  pp.pad(2,"");
-  pp.println("serial: "+get_serial());
-  pp.println("mac:    "+get_mac());
-  pp.printhex("uniqueid",get_uniqueid());
   sign_key.print("sign key");
   enc_key.print("enc key");
-  pp.leave();
  }
 
  static void gen_fake_group_cert() {
@@ -221,8 +213,6 @@ public class Device {
  public BCert.Certificate get_cert() {
   if ((cert==null)||changed()||((cert!=null)&&(cert.get_seclevel()!=cur_SL()))) {
    cert=new BCert.Certificate();
-
-   Shell.out.println("generating new cert, device changed or not initialized");  
 
    if (MSPR.fixed_identity()) {
     byte random[]=Utils.parse_hex_string("bee27cbf64aac0c94cd60ff28a05e1b4");

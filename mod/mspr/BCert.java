@@ -588,15 +588,6 @@ public abstract class BCert {
   }
 
   public void print(boolean debug) {
-   if (debug) {
-    for(int i=0;i<attributes.size();i++) {
-     CertAttr attr=attributes.elementAt(i);
-
-     attr.print();
-    }
-
-   }
-
    String names[]=get_names();
 
    byte random[]=get_random();
