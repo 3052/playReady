@@ -194,8 +194,6 @@ public class Vars {
     val+="<not set>";
    }
 
-   String s=Utils.padded_string("- "+p,MAXVARNAME)+" = "+val;
-   Shell.println(s);
   }
  }
 }

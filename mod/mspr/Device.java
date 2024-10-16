@@ -145,11 +145,6 @@ public class Device {
   return enc_key;
  }
 
- public void print() {
-  sign_key.print("sign key");
-  enc_key.print("enc key");
- }
-
  static void gen_fake_group_cert() {
   //generate new root key
   ECC.ECKey root_sign_key=new ECC.ECKey();
