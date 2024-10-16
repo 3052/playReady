@@ -96,14 +96,10 @@ public class Vars {
   int type=-1;
 
   if (known_var(name)) {
-   String s="error: "+name+" is already defined";
-   Shell.println(s);
   } else {
    type=str2type(stype);
 
    if (type==-1) {
-    String s="error: unknown type "+stype;
-    Shell.println(s);
    } else {
     switch(type) {
      case VAR_INT:
@@ -123,15 +119,13 @@ public class Vars {
   }
  }
 
- public static void set(String name,int val) {
-  if (!known_var(name)) {
-   declare(new Proto(name,VAR_INT));
-  }
-
-  Var v=get_var(name);
-
-  v.set(new Integer(val));
- }
+   public static void set(String name,int val) {
+      if (!known_var(name)) {
+         declare(new Proto(name,VAR_INT));
+      }
+      Var v=get_var(name);
+      v.set(Integer.valueOf(val));
+   }
 
  public static void set(String name,String val) {
   if (!known_var(name)) {

@@ -117,7 +117,6 @@ public class Crypto {
 
    public static byte[] ecdsa(byte data[],BigInteger prvkey) {
       byte digest[]=SHA256(data);
-      Utils.print_buf(0,"ecdsa digest",digest);
       ECC.ECSignature ecsig=ECC.ECSignature.get(digest,prvkey);
       byte signature[]=ecsig.bytes();
       return signature;

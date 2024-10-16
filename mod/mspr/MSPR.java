@@ -488,8 +488,6 @@ public class MSPR {
   byte nonce[]=new byte[NONCE_SIZE];
   System.arraycopy(data,0,nonce,0,NONCE_SIZE);
 
-  Utils.print_buf(0,"nonce",nonce);
-
   return Crypto.base64_encode(nonce);  
  }
 

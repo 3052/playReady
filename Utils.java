@@ -182,11 +182,6 @@ public class Utils {
   return s;
  }
 
- public static void print_buf(int pad,String s,byte tab[]) {
-  outputln(pad(pad)+s);  
-  print_mem(pad+2,0,tab);
- }
-
  public static String[] tokenize(String s,String token) {
   s=s.trim();
 
