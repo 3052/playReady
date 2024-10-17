@@ -6,6 +6,42 @@ import (
    "strings"
 )
 
+const sl2000 = 2000
+
+const tag_ids = 0x00010001
+
+type cert_attr struct {
+   data []byte
+   tag int
+}
+
+func (c certificate) lookup_tag(tag int) *cert_attr {
+   for _, attr := range c.attributes {
+      if attr.tag == tag {
+         return &attr
+      }
+   }
+   return nil
+}
+
+type certificate struct {
+   attributes []cert_attr
+   sec_level uint32
+   source string
+}
+
+func (c certificate) get_seclevel() int {
+   if c.source != "" {
+      if c.sec_level == 0 {
+         attr := c.lookup_tag(tag_ids)
+         if attr != nil {
+            c.sec_level = binary.BigEndian.Uint32(attr.data[0x10:])
+         }
+      }
+   }
+   return c.sec_level
+}
+
 func acquire_license_header_start() string {
    var b strings.Builder
    b.WriteString(`<AcquireLicense xmlns="http://schemas.microsoft.com/DRM/2007/03/protocols">`)

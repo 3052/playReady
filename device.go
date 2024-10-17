@@ -14,7 +14,7 @@ func (d device) get_cert() certificate {
       if d.changed() {
          return true
       }
-      if d.cert.get_seclevel() != cur_SL() {
+      if d.cert.get_seclevel() != sl2000 {
          return true
       }
       return false
