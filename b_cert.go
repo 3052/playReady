@@ -1,16 +1,37 @@
 package playReady
 
-type certificate struct{}
+type cert_attr struct {
+   tag int
+}
 
-int get_seclevel() {
-   if ((source!=null)&&(seclevel==0)) {
-      CertAttr attr=lookup_tag(TAG_IDS);
-      if (attr!=null) {
-         byte data[]=attr.data();
-         ByteInput bi=new ByteInput(data);
-         bi.set_pos(0x10);
-         seclevel=bi.read_4();
+type certificate struct {
+   attributes []cert_attr
+   sec_level int
+   source string
+}
+
+func (c certificate) lookup_tag(tag int) *cert_attr {
+   for _, attr := range c.attributes {
+      if attr.tag == tag {
+         return &attr
       }
    }
-   return seclevel;
+   return nil
+}
+
+///
+
+func (c certificate) get_seclevel() int {
+   if c.source != "" {
+      if c.sec_level == 0 {
+         cert_attr attr=lookup_tag(TAG_IDS);
+         if (attr!=null) {
+            byte data[]=attr.data();
+            ByteInput bi=new ByteInput(data);
+            bi.set_pos(0x10);
+            c.sec_level=bi.read_4();
+         }
+      }
+   }
+   return c.sec_level
 }

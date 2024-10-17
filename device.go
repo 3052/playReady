@@ -6,26 +6,6 @@ import (
    "strings"
 )
 
-type device struct {
-   cert certificate
-   cur_dev *device
-   mac string
-   serial string
-}
-
-func (d device) changed() bool {
-   if d.cur_dev == nil {
-      return true
-   }
-   if d.cur_dev.mac != d.mac {
-      return true
-   }
-   if d.cur_dev.serial != d.serial {
-      return true
-   }
-   return false
-}
-
 func (d device) get_cert() certificate {
    set := func() bool {
       if d.cert == nil {
@@ -53,6 +33,7 @@ func (d device) get_cert() certificate {
 }
 
 func (d device) build_signature(data string) string {
+   //////////////////////////////////////////////////////////////////////////////
    BCert.Certificate cert=d.get_cert();
    byte prvkey_sign[]=cert.get_prvkey_for_signing();
    BigInteger prv_sign_key=ECC.make_bi(prvkey_sign,0,0x20);
