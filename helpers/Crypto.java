@@ -115,12 +115,19 @@ public class Crypto {
   }
  }
 
-   public static byte[] ecdsa(byte data[],BigInteger prvkey) {
-      byte digest[]=SHA256(data);
-      ECC.ECSignature ecsig=ECC.ECSignature.get(digest,prvkey);
-      byte signature[]=ecsig.bytes();
-      return signature;
-   }
+ public static byte[] ecdsa(byte data[],BigInteger prvkey) {
+  byte digest[]=SHA256(data);
+
+Utils.print_buf(0,"ecdsa digest",digest);
+
+  ECC.ECSignature ecsig=ECC.ECSignature.get(digest,prvkey);
+
+  ecsig.print("signature");
+
+  byte signature[]=ecsig.bytes();
+
+  return signature;
+ }
 
  public static byte[] ecc_encrypt(byte input[],ECC.ECPoint pubkey) {
   if (input.length!=0x20) return null;

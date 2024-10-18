@@ -129,6 +129,16 @@ public class MSPR {
    return aes_key;
   }
 
+  public void print() {
+   PaddedPrinter pp=Shell.get_pp();
+
+   pp.println("XML key (AES/CBC)");
+   pp.pad(2,"");
+   pp.printhex("iv ",aes_iv());
+   pp.printhex("key",aes_key());
+   pp.leave();
+  }
+
   public byte[] bytes() {
    byte data[]=new byte[2*AES_KEY_SIZE];
    System.arraycopy(aes_iv(),0,data,0,AES_KEY_SIZE);
@@ -383,6 +393,8 @@ public class MSPR {
  }
 
  public static String build_signature(Device dev,String data) throws Throwable {
+  PaddedPrinter pp=Shell.get_pp();
+
   BCert.Certificate cert=dev.get_cert();
 
   byte prvkey_sign[]=cert.get_prvkey_for_signing();
@@ -392,9 +404,20 @@ public class MSPR {
 
   String signature=Crypto.base64_encode(signature_bytes);
 
+  pp.println("XML SIGNATURE");
+  pp.pad(2,"");
+  pp.println(signature);
+  pp.leave();
+
   byte pubkey_sign[]=cert.get_pubkey_for_signing();
 
   String pubkey=Crypto.base64_encode(pubkey_sign);
+
+  pp.println("PUBKEY");
+  pp.pad(2,"");
+  pp.println(pubkey);
+  pp.leave();
+
 
   String xml_req="";
   xml_req+=SIGNATURE(signature);
@@ -405,6 +428,8 @@ public class MSPR {
  }
 
  public static String build_license_request(Device dev,String wrmheader,String nonce,String keydata,String cipherdata) throws Throwable {
+  PaddedPrinter pp=Shell.get_pp();
+
   String xml_req="";
 
   xml_req+=XML_HEADER_START();
@@ -416,6 +441,11 @@ public class MSPR {
 
   byte digest_bytes[]=Crypto.SHA256(digest_content.getBytes());
   String digest=Crypto.base64_encode(digest_bytes);
+
+  pp.println("XML DIGEST");
+  pp.pad(2,"");
+  pp.println(digest);
+  pp.leave();
 
   xml_req+=SIGNATURE_START();  
 
@@ -488,6 +518,8 @@ public class MSPR {
   byte nonce[]=new byte[NONCE_SIZE];
   System.arraycopy(data,0,nonce,0,NONCE_SIZE);
 
+  Utils.print_buf(0,"nonce",nonce);
+
   return Crypto.base64_encode(nonce);  
  }
 
@@ -529,6 +561,7 @@ public class MSPR {
  }
 
  public static String get_license_request(Device dev,String wrmheader) throws Throwable {
+  PaddedPrinter pp=Shell.get_pp();
 
   XmlKey xkey=new MSPR.XmlKey();
 
@@ -537,6 +570,8 @@ public class MSPR {
    xkey.set_aes_key(Utils.parse_hex_string("577c79adfd93be07c3d909e92787ed8a"));
   }
 
+  xkey.print();
+
   if (fixed_identity()) {
    //random for nonce
    BigInteger r=ECC.make_bi("6d51282ad8c51aa7cc342f031c894534");
@@ -544,6 +579,10 @@ public class MSPR {
   }
 
   String nonce=get_nonce();
+  pp.println("NONCE");
+  pp.pad(2,"");
+  pp.println(nonce);
+  pp.leave();
 
   if (fixed_identity()) {
    //random k for ECC encryption
@@ -552,6 +591,10 @@ public class MSPR {
   }
 
   String keydata=get_keydata(dev,xkey);
+  pp.println("KEYDATA");
+  pp.pad(2,"");
+  pp.println(keydata);
+  pp.leave();
 
   if (fixed_identity()) {
    //random k for ECC signing (BCert generation)
@@ -560,6 +603,10 @@ public class MSPR {
   }
 
   String cipherdata=get_cipherdata(dev,xkey);
+  pp.println("CIPHERDATA");
+  pp.pad(2,"");
+  pp.println(cipherdata);
+  pp.leave();
 
   String xml_req=build_license_request(dev,wrmheader,nonce,keydata,cipherdata);
 

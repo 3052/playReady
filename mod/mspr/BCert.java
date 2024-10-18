@@ -109,6 +109,11 @@ public abstract class BCert {
    return pos;
   }
 
+  public void print() {
+   PaddedPrinter pp=Shell.get_pp();
+   pp.println("attr: "+Utils.hex_value(tag,8));
+   pp.printhex("data",data());
+  }
  }
 
  public static class CertificateChain extends BCert {
@@ -172,11 +177,18 @@ public abstract class BCert {
   }
 
   public void print(boolean debug) {
+   PaddedPrinter pp=Shell.get_pp();
+
+   pp.println("CERT CHAIN: "+source);
+   pp.pad(2,"");
+
    for(int i=0;i<cert_cnt;i++) {
     Certificate cert=certs.elementAt(i);
 
     cert.print();
    }
+
+   pp.leave();
   }
 
   public byte[] body() {
@@ -588,21 +600,79 @@ public abstract class BCert {
   }
 
   public void print(boolean debug) {
+   PaddedPrinter pp=Shell.get_pp();
+
+   pp.println("### CERT");
+   if (debug) {
+    pp.pad(2,"");
+
+    for(int i=0;i<attributes.size();i++) {
+     CertAttr attr=attributes.elementAt(i);
+
+     attr.print();
+    }
+
+    pp.leave();
+   }
+
+   pp.pad(2,"- ");
+
    String names[]=get_names();
+
+   if (names!=null) {
+    pp.println("names");
+
+    pp.pad(2,"* ");
+
+    for(int i=0;i<names.length;i++) {
+     pp.println(names[i]);
+    }   
+    pp.leave();
+   }
 
    byte random[]=get_random();
    
+   if (random!=null) {
+    pp.printhex("- random",random);
+   }
+
+   pp.println("seclevel "+get_seclevel());
+ 
    byte uniqueid[]=get_uniqueid();
+
+   if (uniqueid!=null) {
+    pp.printhex("- uniqueid",uniqueid);
+   }
 
    byte pubkey_sign[]=get_pubkey_for_signing();
   
+   if (pubkey_sign!=null) {
+    pp.printhex("- pubkey_sign",pubkey_sign);
+   }
+
    byte pubkey_enc[]=get_pubkey_for_encryption();
+
+   if (pubkey_enc!=null) {
+    pp.printhex("- pubkey_enc",pubkey_enc);
+   }
 
    byte digest[]=get_digest();
    
+   if (digest!=null) {
+    pp.printhex("- digest",digest);
+   }
+
    byte signature[]=get_signature();
 
+   if (signature!=null) {
+    pp.printhex("- signature",signature);
+   }
+
    byte signkey[]=get_signkey();
+
+   if (signkey!=null) {
+    pp.printhex("- signkey",signkey);
+   }
 
    if ((signature!=null)&&(signkey!=null)) {
     boolean status=verify_signature();
@@ -612,8 +682,10 @@ public abstract class BCert {
     if (status) sig_status+="OK";
      else sig_status+="BAD SIGNATURE";
    
+    pp.println(sig_status);
    }
 
+   pp.leave();
   }
 
   public CertAttr lookup_tag(int tag) {
@@ -872,6 +944,8 @@ public abstract class BCert {
  public abstract byte[] body();
 
  public void print() {
+  PaddedPrinter pp=Shell.get_pp();
+
   print(false);
  }
 }

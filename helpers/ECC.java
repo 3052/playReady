@@ -96,6 +96,12 @@ public class ECC {
  //whether EC points are mapped to affine space
  public static boolean modular;
 
+ public static void print(String s,BigInteger bi) {
+  PaddedPrinter pp=Shell.get_pp();
+
+  pp.println(s+": "+bi.toString(16));
+ }
+
  public static void modular(boolean flag) {
   modular=flag;
  }
@@ -214,6 +220,16 @@ public class ECC {
 
   public boolean equals(ECPoint p) {
    return (x().equals(p.x()))&&(y().equals(p.y()));
+  }
+
+  public void print(String s) {
+   PaddedPrinter pp=Shell.get_pp();
+
+   pp.println(s);
+   pp.pad(2,"");
+   ECC.print("X",x);
+   ECC.print("Y",y);
+   pp.leave();
   }
 
   public BigInteger lambda_same(ECPoint p) {
@@ -385,6 +401,13 @@ public class ECC {
    return pub.bytes();
   }
 
+  public void print(String s) {
+   PaddedPrinter pp=Shell.get_pp();
+
+   pp.println(s);
+   ECC.print("- prv",prv);
+   pub.print("- pub:");
+  }
  }
 
  public static class ECSignature {
@@ -451,6 +474,14 @@ public class ECC {
    BigInteger px=p.x();
 
    return px.equals(r);
+  }
+
+  public void print(String str) {
+   PaddedPrinter pp=Shell.get_pp();
+
+   pp.println(str);
+   ECC.print("- r",r);
+   ECC.print("- s",s);
   }
 
   public byte[] bytes() {
