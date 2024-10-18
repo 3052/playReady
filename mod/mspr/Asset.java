@@ -29,23 +29,6 @@ public class Asset {
   String attvat;
   String url;
 
-  public void print() {
-   PaddedPrinter pp=Shell.get_pp();
-
-   if (attprice!=null) pp.println("TVOD ASSET");
-    else pp.println("ASSET");
-   pp.pad(2,"");
-   pp.println("id:             "+attid);
-   pp.println("title:          "+atttitle);
-   pp.println("title_original: "+atttitle_original);
-   pp.println("allow:          "+attallow);
-   pp.println("year:           "+attyear);
-   pp.println("duration:       "+attduration);
-   if (attprice!=null) pp.println("price:          "+attprice+" "+CURRENCY);
-   if (attvat!=null)   pp.println("vat:            "+attvat);
-   pp.println("url:            "+url);
-   pp.leave();
-  }  
  }
 
  public static final String ISM_EXTENSION   = ".ism/";
@@ -445,7 +428,6 @@ public class Asset {
   }
 
   String hdr="Processing (decrypt / append) "+total_frags+" fragments";
-  ProgressPrinter pp=new ProgressPrinter(hdr,total_frags);
 
   int pos=0;
   long total_size=0;
@@ -459,7 +441,6 @@ public class Asset {
 
     pos++;
 
-    pp.update(pos);
    } else break;
   }
 
@@ -508,8 +489,6 @@ public class Asset {
   int total_frags=end_idx-start_idx+1;
 
   String hdr="Downloading "+total_frags+" fragments";
-  ProgressPrinter pp=new ProgressPrinter(hdr,total_frags);
-
   int pos=0;
 
   String audio_qdir=FileCache.audio_qdir(id,sd.audio_name(),sd.audio_quality());
@@ -542,7 +521,6 @@ public class Asset {
    CDN.download_content(curdev.get_serial(),audio_url,audio_filename);
    CDN.download_content(curdev.get_serial(),video_url,video_filename);
 
-   pp.update(pos);
   }
 
   return true;
