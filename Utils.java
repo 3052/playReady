@@ -182,6 +182,66 @@ public class Utils {
   return s;
  }
 
+
+ public static void outputln(String line) {
+  Shell.println(line);
+  //out.flush();
+ }
+
+ public static void output_buf(String s,byte data[]) throws Throwable {
+  if (s!=null) {
+   Shell.print(s+": ");
+  }
+
+  for(int i=0;i<data.length;i++) {
+   Shell.print(Utils.hex_value((data[i]&0xff),2)+" ");
+  }
+     
+  Shell.println("");
+ }
+
+ private static void print_line(int pad,int addr,byte tab[],int pos) {
+  String str=pad(pad)+hex_value(addr+pos,4)+": ";
+
+  int size=tab.length-pos;
+   
+  if (size>LINESIZE) size=LINESIZE;
+
+  for(int i=pos;i<(pos+size);i++) {
+   str+=" "+hex_value((int)tab[i],2);
+  }
+
+  if (size<LINESIZE) {
+   for(int i=0;i<(LINESIZE-size);i++) {
+    str+="   ";
+   }
+  }
+
+  str+="  ";  
+
+  for(int i=pos;i<(pos+size);i++) {
+   str+=Utils.char_value((char)tab[i]);
+  }
+
+  outputln(str);
+ }
+
+ public static void print_mem(int pad,int addr,byte tab[]) {
+  try {
+   int pos=0;
+  
+   while(pos<tab.length) {
+    print_line(pad,addr,tab,pos);
+    pos+=LINESIZE;
+   }
+  } catch(Throwable t) {}
+ }
+
+ public static void print_buf(int pad,String s,byte tab[]) {
+  outputln(pad(pad)+s);  
+  print_mem(pad+2,0,tab);
+ }
+
  public static String[] tokenize(String s,String token) {
   s=s.trim();
 

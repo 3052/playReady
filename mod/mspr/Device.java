@@ -13,6 +13,7 @@ import agsecres.helper.*;
 import java.lang.*;
 import java.io.*;
 import java.math.*;
+import java.util.HexFormat;
 
 public class Device {
  public static final int DEFAULT_SL = MSPR.SL2000;
@@ -145,18 +146,16 @@ public class Device {
   return enc_key;
  }
 
- public void print() {
-  PaddedPrinter pp=Shell.get_pp();
-
-  pp.println("Device");
-  pp.pad(2,"");
-  pp.println("serial: "+get_serial());
-  pp.println("mac:    "+get_mac());
-  pp.printhex("uniqueid",get_uniqueid());
-  sign_key.print("sign key");
-  enc_key.print("enc key");
-  pp.leave();
- }
+   public void print() {
+      System.out.println("Device");
+      System.out.println("serial: "+get_serial());
+      System.out.println("mac:    "+get_mac());
+      System.out.printf(
+         "uniqueid %s\n", HexFormat.of().formatHex(get_uniqueid())
+      );
+      sign_key.print("sign key");
+      enc_key.print("enc key");
+   }
 
  static void gen_fake_group_cert() {
   //generate new root key
@@ -218,41 +217,30 @@ public class Device {
   return device_changed;
  }
 
- public BCert.Certificate get_cert() {
-  if ((cert==null)||changed()||((cert!=null)&&(cert.get_seclevel()!=cur_SL()))) {
-   cert=new BCert.Certificate();
-
-   Shell.out.println("generating new cert, device changed or not initialized");  
-
-   if (MSPR.fixed_identity()) {
-    byte random[]=Utils.parse_hex_string("bee27cbf64aac0c94cd60ff28a05e1b4");
-    cert.set_random(random);
-
-    cert.set_seclevel(cur_SL());
-
-    cert.set_uniqueid(get_uniqueid());
-
-    cert.set_prvkey_sign(sign_key.prv_bytes());
-    cert.set_pubkey_sign(sign_key.pub_bytes());
-
-    cert.set_pubkey_enc(enc_key.pub_bytes());
-   } else {
-    byte random[]=ECC.bi_bytes(ECC.random(128));
-    cert.set_random(random);
-
-    cert.set_seclevel(cur_SL());
-
-    cert.set_uniqueid(get_uniqueid());
-
-    cert.set_prvkey_sign(sign_key.prv_bytes());
-    cert.set_pubkey_sign(sign_key.pub_bytes());
-
-    cert.set_pubkey_enc(enc_key.pub_bytes());
+   public BCert.Certificate get_cert() {
+      if ((cert==null)||changed()||((cert!=null)&&(cert.get_seclevel()!=cur_SL()))) {
+         cert=new BCert.Certificate();
+         System.out.println("generating new cert, device changed or not initialized");  
+         if (MSPR.fixed_identity()) {
+            byte random[]=Utils.parse_hex_string("bee27cbf64aac0c94cd60ff28a05e1b4");
+            cert.set_random(random);
+            cert.set_seclevel(cur_SL());
+            cert.set_uniqueid(get_uniqueid());
+            cert.set_prvkey_sign(sign_key.prv_bytes());
+            cert.set_pubkey_sign(sign_key.pub_bytes());
+            cert.set_pubkey_enc(enc_key.pub_bytes());
+         } else {
+            byte random[]=ECC.bi_bytes(ECC.random(128));
+            cert.set_random(random);
+            cert.set_seclevel(cur_SL());
+            cert.set_uniqueid(get_uniqueid());
+            cert.set_prvkey_sign(sign_key.prv_bytes());
+            cert.set_pubkey_sign(sign_key.pub_bytes());
+            cert.set_pubkey_enc(enc_key.pub_bytes());
+         }
+      }
+      return cert;
    }
-  }
-
-  return cert;
- }
 
  public BCert.CertificateChain get_cert_chain() {
   if ((cert_chain==null)||changed()||((cert!=null)&&(cert.get_seclevel()!=cur_SL()))) {

@@ -109,11 +109,12 @@ public abstract class BCert {
    return pos;
   }
 
-  public void print() {
-   PaddedPrinter pp=Shell.get_pp();
-   pp.println("attr: "+Utils.hex_value(tag,8));
-   pp.printhex("data",data());
-  }
+   public void print() {
+      System.out.println("attr: "+Utils.hex_value(tag,8));
+      System.out.printf(
+         "data %s\n", HexFormat.of().formatHex(data())
+      );
+   }
  }
 
  public static class CertificateChain extends BCert {
@@ -177,18 +178,11 @@ public abstract class BCert {
   }
 
   public void print(boolean debug) {
-   PaddedPrinter pp=Shell.get_pp();
-
    pp.println("CERT CHAIN: "+source);
-   pp.pad(2,"");
-
    for(int i=0;i<cert_cnt;i++) {
     Certificate cert=certs.elementAt(i);
-
     cert.print();
    }
-
-   pp.leave();
   }
 
   public byte[] body() {
@@ -600,34 +594,24 @@ public abstract class BCert {
   }
 
   public void print(boolean debug) {
-   PaddedPrinter pp=Shell.get_pp();
-
    pp.println("### CERT");
    if (debug) {
-    pp.pad(2,"");
-
     for(int i=0;i<attributes.size();i++) {
      CertAttr attr=attributes.elementAt(i);
 
      attr.print();
     }
 
-    pp.leave();
    }
-
-   pp.pad(2,"- ");
 
    String names[]=get_names();
 
    if (names!=null) {
     pp.println("names");
 
-    pp.pad(2,"* ");
-
     for(int i=0;i<names.length;i++) {
      pp.println(names[i]);
     }   
-    pp.leave();
    }
 
    byte random[]=get_random();
@@ -685,7 +669,6 @@ public abstract class BCert {
     pp.println(sig_status);
    }
 
-   pp.leave();
   }
 
   public CertAttr lookup_tag(int tag) {
@@ -944,8 +927,6 @@ public abstract class BCert {
  public abstract byte[] body();
 
  public void print() {
-  PaddedPrinter pp=Shell.get_pp();
-
   print(false);
  }
 }
