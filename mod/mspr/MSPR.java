@@ -130,13 +130,13 @@ public class MSPR {
   }
 
   public void print() {
-   PaddedPrinter pp=Shell.get_pp();
-
-   pp.println("XML key (AES/CBC)");
-   pp.pad(2,"");
-   pp.printhex("iv ",aes_iv());
-   pp.printhex("key",aes_key());
-   pp.leave();
+   System.out.println("XML key (AES/CBC)");
+   System.out.printf(
+      "iv %s\n", HexFormat.of().formatHex(aes_iv())
+   );
+   System.out.printf(
+      "key %s\n", HexFormat.of().formatHex(aes_key())
+   );
   }
 
   public byte[] bytes() {
@@ -392,44 +392,26 @@ public class MSPR {
   return xml_req;
  }
 
- public static String build_signature(Device dev,String data) throws Throwable {
-  PaddedPrinter pp=Shell.get_pp();
-
-  BCert.Certificate cert=dev.get_cert();
-
-  byte prvkey_sign[]=cert.get_prvkey_for_signing();
-  BigInteger prv_sign_key=ECC.make_bi(prvkey_sign,0,0x20);
-
-  byte signature_bytes[]=Crypto.ecdsa(data.getBytes(),prv_sign_key);
-
-  String signature=Crypto.base64_encode(signature_bytes);
-
-  pp.println("XML SIGNATURE");
-  pp.pad(2,"");
-  pp.println(signature);
-  pp.leave();
-
-  byte pubkey_sign[]=cert.get_pubkey_for_signing();
-
-  String pubkey=Crypto.base64_encode(pubkey_sign);
-
-  pp.println("PUBKEY");
-  pp.pad(2,"");
-  pp.println(pubkey);
-  pp.leave();
-
-
-  String xml_req="";
-  xml_req+=SIGNATURE(signature);
-  xml_req+=PUBLIC_KEY(pubkey);
-  xml_req+=SIGNATURE_END();
-
-  return xml_req;
- }
+   public static String build_signature(Device dev,String data) throws Throwable {
+      BCert.Certificate cert=dev.get_cert();
+      byte prvkey_sign[]=cert.get_prvkey_for_signing();
+      BigInteger prv_sign_key=ECC.make_bi(prvkey_sign,0,0x20);
+      byte signature_bytes[]=Crypto.ecdsa(data.getBytes(),prv_sign_key);
+      String signature=Crypto.base64_encode(signature_bytes);
+      System.out.println("XML SIGNATURE");
+      System.out.println(signature);
+      byte pubkey_sign[]=cert.get_pubkey_for_signing();
+      String pubkey=Crypto.base64_encode(pubkey_sign);
+      System.out.println("PUBKEY");
+      System.out.println(pubkey);
+      String xml_req="";
+      xml_req+=SIGNATURE(signature);
+      xml_req+=PUBLIC_KEY(pubkey);
+      xml_req+=SIGNATURE_END();
+      return xml_req;
+   }
 
  public static String build_license_request(Device dev,String wrmheader,String nonce,String keydata,String cipherdata) throws Throwable {
-  PaddedPrinter pp=Shell.get_pp();
-
   String xml_req="";
 
   xml_req+=XML_HEADER_START();
@@ -442,10 +424,8 @@ public class MSPR {
   byte digest_bytes[]=Crypto.SHA256(digest_content.getBytes());
   String digest=Crypto.base64_encode(digest_bytes);
 
-  pp.println("XML DIGEST");
-  pp.pad(2,"");
-  pp.println(digest);
-  pp.leave();
+  System.out.println("XML DIGEST");
+  System.out.println(digest);
 
   xml_req+=SIGNATURE_START();  
 
@@ -560,58 +540,40 @@ public class MSPR {
   return Crypto.base64_encode(encrypted);
  }
 
- public static String get_license_request(Device dev,String wrmheader) throws Throwable {
-  PaddedPrinter pp=Shell.get_pp();
-
-  XmlKey xkey=new MSPR.XmlKey();
-
-  if (fixed_identity()) {
-   xkey.set_aes_iv(Utils.parse_hex_string("4869b8f5a3dc1cee30ea2c045dde6ec5"));
-   xkey.set_aes_key(Utils.parse_hex_string("577c79adfd93be07c3d909e92787ed8a"));
-  }
-
-  xkey.print();
-
-  if (fixed_identity()) {
-   //random for nonce
-   BigInteger r=ECC.make_bi("6d51282ad8c51aa7cc342f031c894534");
-   ECC.set_random(r);
-  }
-
-  String nonce=get_nonce();
-  pp.println("NONCE");
-  pp.pad(2,"");
-  pp.println(nonce);
-  pp.leave();
-
-  if (fixed_identity()) {
-   //random k for ECC encryption
-   BigInteger r=ECC.make_bi(Utils.reverse_hex_string("bf2aea21c2547e71342a09ead1cc27971342424e32e88c3140942cb11b5b0cfd"));
-   ECC.set_random(r);
-  }
-
-  String keydata=get_keydata(dev,xkey);
-  pp.println("KEYDATA");
-  pp.pad(2,"");
-  pp.println(keydata);
-  pp.leave();
-
-  if (fixed_identity()) {
-   //random k for ECC signing (BCert generation)
-   BigInteger r=ECC.make_bi(Utils.reverse_hex_string("062dd035241da79eedbc2abc9d99ab5b159788bb78d56aedcc3b603018ec02f7"));
-   ECC.set_random(r);
-  }
-
-  String cipherdata=get_cipherdata(dev,xkey);
-  pp.println("CIPHERDATA");
-  pp.pad(2,"");
-  pp.println(cipherdata);
-  pp.leave();
-
-  String xml_req=build_license_request(dev,wrmheader,nonce,keydata,cipherdata);
-
-  return xml_req;
- }
+   public static String get_license_request(Device dev,String wrmheader) throws Throwable {
+      XmlKey xkey=new MSPR.XmlKey();
+      if (fixed_identity()) {
+      xkey.set_aes_iv(Utils.parse_hex_string("4869b8f5a3dc1cee30ea2c045dde6ec5"));
+      xkey.set_aes_key(Utils.parse_hex_string("577c79adfd93be07c3d909e92787ed8a"));
+      }
+      xkey.print();
+      if (fixed_identity()) {
+      //random for nonce
+      BigInteger r=ECC.make_bi("6d51282ad8c51aa7cc342f031c894534");
+      ECC.set_random(r);
+      }
+      String nonce=get_nonce();
+      System.out.println("NONCE");
+      System.out.println(nonce);
+      if (fixed_identity()) {
+      //random k for ECC encryption
+      BigInteger r=ECC.make_bi(Utils.reverse_hex_string("bf2aea21c2547e71342a09ead1cc27971342424e32e88c3140942cb11b5b0cfd"));
+      ECC.set_random(r);
+      }
+      String keydata=get_keydata(dev,xkey);
+      System.out.println("KEYDATA");
+      System.out.println(keydata);
+      if (fixed_identity()) {
+      //random k for ECC signing (BCert generation)
+      BigInteger r=ECC.make_bi(Utils.reverse_hex_string("062dd035241da79eedbc2abc9d99ab5b159788bb78d56aedcc3b603018ec02f7"));
+      ECC.set_random(r);
+      }
+      String cipherdata=get_cipherdata(dev,xkey);
+      System.out.println("CIPHERDATA");
+      System.out.println(cipherdata);
+      String xml_req=build_license_request(dev,wrmheader,nonce,keydata,cipherdata);
+      return xml_req;
+   }
 
  public static ECC.ECPoint getWMRMpubkey() {
   return WMRMpubkey;
