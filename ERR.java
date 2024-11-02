@@ -11,8 +11,8 @@ package agsecres.tool;
 import java.lang.*;
 
 public class ERR {
- public static void log(String s) {
-  System.out.println("ERROR: "+s);
-  System.exit(1);
- }
+   public static void log(String s) {
+      System.out.println("ERROR: "+s);
+      System.exit(1);
+   }
 }
