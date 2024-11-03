@@ -48,6 +48,21 @@ public class ISMManifest {
          return (long)(duration / timescale);
       }
 
+      public String duration_str() {
+         return MP4File.duration_str(real_duration());
+      }
+
+      public void print() {
+         PaddedPrinter pp = Shell.get_pp();
+
+         pp.println("SmoothStreamingMedia");
+         pp.pad(2, "");
+         pp.println("MajorVersion: " + attMajorVersion);
+         pp.println("MinorVersion: " + attMinorVersion);
+         pp.println("TimeScale:    " + attTimeScale);
+         pp.println("Duration:     " + attDuration + " [" + duration_str() + "]");
+         pp.leave();
+      }
    }
 
    public static class ProtectionHeader {
@@ -381,8 +396,8 @@ public class ISMManifest {
       }
    }
 
-   public static final String BITRATE_VAR = "{bitrate}";
-   public static final String STARTTIME_VAR = "{start time}";
+   //public static final String BITRATE_VAR = "{bitrate}";
+   //public static final String STARTTIME_VAR = "{start time}";
 
    String path;
    byte data[];
@@ -391,17 +406,17 @@ public class ISMManifest {
 
    SmoothStreamingMedia ssm;
    ProtectionHeader ph;
-   Vector < StreamIndex > streams;
+   Vector<StreamIndex> streams;
 
-   public int stream_cnt() {
-      return streams.size();
-   }
+   //public int stream_cnt() {
+   //   return streams.size();
+   //}
 
-   public StreamIndex get_stream(int i) {
-      if (i < stream_cnt()) return streams.elementAt(i);
+   //public StreamIndex get_stream(int i) {
+   //   if (i < stream_cnt()) return streams.elementAt(i);
 
-      return null;
-   }
+   //   return null;
+   //}
 
    public ISMManifest(String path, byte data[]) throws Throwable {
       this.path = path;
@@ -484,47 +499,47 @@ public class ISMManifest {
       return ph.wrmhdr_data();
    }
 
-   public WRMHeader get_wrmhdr() {
-      return ph.wrmhdr();
-   }
+   //public WRMHeader get_wrmhdr() {
+   //   return ph.wrmhdr();
+   //}
 
-   public StreamIndex get_stream(String type, String name) {
-      for (int i = 0; i < stream_cnt(); i++) {
-         StreamIndex si = get_stream(i);
+   //public StreamIndex get_stream(String type, String name) {
+   //   for (int i = 0; i < stream_cnt(); i++) {
+   //      StreamIndex si = get_stream(i);
 
-         if (si.Type().equals(type)) {
-            if (name == null) return si;
+   //      if (si.Type().equals(type)) {
+   //         if (name == null) return si;
 
-            if (si.Name().equals(name)) return si;
-         }
-      }
+   //         if (si.Name().equals(name)) return si;
+   //      }
+   //   }
 
-      return null;
-   }
+   //   return null;
+   //}
 
-   public StreamIndex get_stream(String type) {
-      return get_stream(type, null);
-   }
+   //public StreamIndex get_stream(String type) {
+   //   return get_stream(type, null);
+   //}
 
-   public StreamIndex get_audio_stream(String name) {
-      return get_stream("audio", name);
-   }
+   //public StreamIndex get_audio_stream(String name) {
+   //   return get_stream("audio", name);
+   //}
 
-   public StreamIndex get_video_stream() {
-      return get_stream("video");
-   }
+   //public StreamIndex get_video_stream() {
+   //   return get_stream("video");
+   //}
 
-   public long duration() {
-      return Utils.long_value(ssm.Duration());
-   }
+   //public long duration() {
+   //   return Utils.long_value(ssm.Duration());
+   //}
 
-   public int timescale() {
-      return Utils.int_value(ssm.TimeScale());
-   }
+   //public int timescale() {
+   //   return Utils.int_value(ssm.TimeScale());
+   //}
 
-   public long real_duration() {
-      return ssm.real_duration();
-   }
+   //public long real_duration() {
+   //   return ssm.real_duration();
+   //}
 
    public static ISMManifest from_file(String path) throws Throwable {
       byte data[] = Utils.load_file(path);
@@ -536,62 +551,107 @@ public class ISMManifest {
       return null;
    }
 
-   public AudioQualityLevel get_audio_ql(String name, String quality_idx) {
-      StreamIndex si = get_stream("audio", name);
+   //public AudioQualityLevel get_audio_ql(String name, String quality_idx) {
+   //   StreamIndex si = get_stream("audio", name);
 
-      if (si != null) {
-         for (int i = 0; i < si.ql_cnt(); i++) {
-            QualityLevel ql = si.get_ql(i);
+   //   if (si != null) {
+   //      for (int i = 0; i < si.ql_cnt(); i++) {
+   //         QualityLevel ql = si.get_ql(i);
 
-            String index = ql.Index();
+   //         String index = ql.Index();
 
-            if (index.equals(quality_idx)) return (AudioQualityLevel) ql;
-         }
-      }
+   //         if (index.equals(quality_idx)) return (AudioQualityLevel) ql;
+   //      }
+   //   }
 
-      return null;
-   }
+   //   return null;
+   //}
 
-   public VideoQualityLevel get_video_ql(String quality_idx) {
-      StreamIndex si = get_stream("video");
+   //public VideoQualityLevel get_video_ql(String quality_idx) {
+   //   StreamIndex si = get_stream("video");
 
-      if (si != null) {
-         for (int i = 0; i < si.ql_cnt(); i++) {
-            QualityLevel ql = si.get_ql(i);
+   //   if (si != null) {
+   //      for (int i = 0; i < si.ql_cnt(); i++) {
+   //         QualityLevel ql = si.get_ql(i);
 
-            String index = ql.Index();
+   //         String index = ql.Index();
 
-            if (index.equals(quality_idx)) return (VideoQualityLevel) ql;
-         }
-      }
+   //         if (index.equals(quality_idx)) return (VideoQualityLevel) ql;
+   //      }
+   //   }
 
-      return null;
-   }
+   //   return null;
+   //}
 
-   private static String build_frag_url(String url, long start_time, String bitrate) {
+   //private static String build_frag_url(String url, long start_time, String bitrate) {
 
-      if (url.contains(STARTTIME_VAR)) {
-         url = url.replace(STARTTIME_VAR, "" + start_time);
-      }
+   //   if (url.contains(STARTTIME_VAR)) {
+   //      url = url.replace(STARTTIME_VAR, "" + start_time);
+   //   }
 
-      if (url.contains(BITRATE_VAR)) {
-         url = url.replace(BITRATE_VAR, bitrate);
-      }
+   //   if (url.contains(BITRATE_VAR)) {
+   //      url = url.replace(BITRATE_VAR, bitrate);
+   //   }
 
-      return url;
-   }
+   //   return url;
+   //}
 
-   public String get_video_frag_url(int idx, String quality) {
-      ISMManifest.StreamIndex video_stream = get_stream("video");
-      ISMManifest.VideoQualityLevel vql = get_video_ql(quality);
+   //public String get_video_frag_url(int idx, String quality) {
+   //   ISMManifest.StreamIndex video_stream = get_stream("video");
+   //   ISMManifest.VideoQualityLevel vql = get_video_ql(quality);
 
-      Chunk chunk = video_stream.get_chunk(idx);
-      long start_time = chunk.start_time_val();
+   //   Chunk chunk = video_stream.get_chunk(idx);
+   //   long start_time = chunk.start_time_val();
 
-      String base_url = video_stream.Url();
-      String bitrate = vql.Bitrate();
+   //   String base_url = video_stream.Url();
+   //   String bitrate = vql.Bitrate();
 
-      return build_frag_url(base_url, start_time, bitrate);
-   }
+   //   return build_frag_url(base_url, start_time, bitrate);
+   //}
 
+   //public String get_frag_url(int idx, MP4Builder.StreamsDesc sd, boolean video) {
+   //   if (video) {
+   //      ISMManifest.StreamIndex video_stream = get_stream("video");
+   //      ISMManifest.VideoQualityLevel vql = get_video_ql(sd.video_quality());
+
+   //      Chunk chunk = video_stream.get_chunk(idx);
+   //      long start_time = chunk.start_time_val();
+
+   //      String base_url = video_stream.Url();
+   //      String bitrate = vql.Bitrate();
+
+   //      return build_frag_url(base_url, start_time, bitrate);
+   //   } else {
+   //      ISMManifest.StreamIndex audio_stream = get_stream("audio", sd.audio_name());
+   //      ISMManifest.AudioQualityLevel aql = get_audio_ql(sd.audio_name(), sd.audio_quality());
+
+   //      Chunk chunk = audio_stream.get_chunk(idx);
+   //      long start_time = chunk.start_time_val();
+
+   //      String base_url = audio_stream.Url();
+   //      String bitrate = aql.Bitrate();
+
+   //      return build_frag_url(base_url, start_time, bitrate);
+   //   }
+   //}
+
+   //public void print() {
+   //   PaddedPrinter pp = Shell.get_pp();
+
+   //   pp.println("MANIFEST: " + path);
+   //   pp.pad(2, "");
+   //   ssm.print();
+   //   pp.leave();
+
+   //   pp.pad(2, "");
+   //   ph.print();
+   //   pp.leave();
+
+   //   for (int i = 0; i < stream_cnt(); i++) {
+   //      pp.pad(2, "");
+   //      StreamIndex si = get_stream(i);
+   //      si.print();
+   //      pp.leave();
+   //   }
+   //}
 }
