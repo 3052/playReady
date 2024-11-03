@@ -123,16 +123,6 @@ public class Vars {
   }
  }
 
- public static void set(String name,int val) {
-  if (!known_var(name)) {
-   declare(new Proto(name,VAR_INT));
-  }
-
-  Var v=get_var(name);
-
-  v.set(new Integer(val));
- }
-
  public static void set(String name,String val) {
   if (!known_var(name)) {
    declare(new Proto(name,VAR_STR));

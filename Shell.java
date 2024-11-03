@@ -268,48 +268,6 @@ public class Shell {
    else return false;
  }
 
- public static Integer parse_hex_value(String s) {
-  Long res=null;
-
-  try {
-   res=Long.decode(s);
-  } catch(Throwable t) {}
-
-  if (res!=null) return new Integer(res.intValue());
-   else return null;
- }
-
- public static String resolve_var(String var) {
-  Integer ival=parse_hex_value(var);
-
-  if (ival!=null) {
-   //variable indicating script argument
-   int id=ival.intValue();
-
-   return scrcontext.get_arg(id);   
-  } else {
-   //"standard" variable
-   Vars.Var v=Vars.get_var(var);
-
-   if (v==null) {
-    Shell.report_error("unknown variable: "+var);
-    return ScriptArgs.EMPTY_ARG;
-   }
-
-   //regardless of Var proto and its usage, string representation
-   //gets returned
-   return ""+v.val();
-  }  
- }
-
- public static String resolve_arg(String arg) {
-  if (arg.startsWith("$")) {
-   return resolve_var(arg.substring(1));
-  }
-
-  return arg;
- }
-
  public static Option getopt(Option options[],char opt) {
   for(int i=0;i<options.length;i++) {
    Option o=options[i];
@@ -342,83 +300,6 @@ public class Shell {
   } catch(Throwable t) {}
 
   return line;
- }
-
- private static String[] get_tokens(String line) {
-  Vector v=new Vector();
-  boolean quoted=false;
-  int tbegin=-1;
-  int tend=-1;
- 
-  for(int i=0;i<line.length();i++) {
-   char c=line.charAt(i);
-
-   if (quoted) {
-    if (c=='"') {
-     quoted=false;
-
-     if (i<(line.length()-1)) {
-      char next=line.charAt(i+1);
-      if (!Character.isWhitespace(next)) {
-       err_string="no whitespace after closing quote";
-       return null;
-      }
-     }
-
-     tend=i;
-     String token=line.substring(tbegin+1,tend);
-     v.addElement(token);
-     tbegin=-1;
-     tend=-1;
-    }
-
-   } else {
-    if (c=='"') {
-     if (tbegin!=-1) {
-      err_string="unexpected quote inside a token";
-      return null;
-     }
-     quoted=true;
-     tbegin=i;
-    } else
-
-    if (!Character.isWhitespace(c)) {
-     if (tbegin==-1) {
-      tbegin=i;
-     }
-    } else {
-     if (tbegin!=-1) {
-      tend=i;
-      String token=line.substring(tbegin,tend);
-      v.addElement(token);
-      tbegin=-1;
-      tend=-1;
-     }     
-    }
-   }
-  }
-
-  if (tbegin!=-1) {
-   if (quoted) {
-    err_string="no closing quote";
-    return null;
-   }
-
-   tend=line.length();
-   String token=line.substring(tbegin,tend);
-      
-   v.addElement(token);
-   tbegin=-1;
-   tend=-1;
-  }
-
-  String tokens[]=new String[v.size()];
-
-  for(int i=0;i<v.size();i++) {
-   tokens[i]=(String)v.elementAt(i);
-  }  
-
-  return tokens;
  }
 
  private static boolean is_comment(String line) {
