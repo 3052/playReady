@@ -594,23 +594,4 @@ public class ISMManifest {
       return build_frag_url(base_url, start_time, bitrate);
    }
 
-   public void print() {
-      PaddedPrinter pp = Shell.get_pp();
-
-      pp.println("MANIFEST: " + path);
-      pp.pad(2, "");
-      ssm.print();
-      pp.leave();
-
-      pp.pad(2, "");
-      ph.print();
-      pp.leave();
-
-      for (int i = 0; i < stream_cnt(); i++) {
-         pp.pad(2, "");
-         StreamIndex si = get_stream(i);
-         si.print();
-         pp.leave();
-      }
-   }
 }

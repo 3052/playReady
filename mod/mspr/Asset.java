@@ -10,6 +10,7 @@ package mod.mspr;
 
 import agsecres.tool.*;
 import agsecres.helper.*;
+import mod.cdn.*;
 import java.lang.*;
 import java.util.*;
 import java.io.*;
@@ -71,21 +72,11 @@ public class Asset {
    }
 
    public ISMManifest manifest() throws Throwable {
-      if (ism == null) {
-         String manpath = FileCache.manifest_filename(id);
-
-         if (!Utils.file_exists(manpath)) {
-            Device curdev = Device.cur_device();
-
-            Shell.println("- downloading manifest");
-            CDN.download_content(curdev.get_serial(), url(), manpath);
-         } else {
-            Shell.println("- loading cached manifest");
-         }
-
-         ism = ISMManifest.from_file(manpath);
-      }
-
+      String manpath = "manpath";
+      Device curdev = Device.cur_device();
+      Shell.println("- downloading manifest");
+      CDN.download_content(curdev.get_serial(), url(), manpath);
+      ism = ISMManifest.from_file(manpath);
       return ism;
    }
 
