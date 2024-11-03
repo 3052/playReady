@@ -30,21 +30,17 @@ public class Asset {
       String url;
 
       public void print() {
-         PaddedPrinter pp = Shell.get_pp();
-
-         if (attprice != null) pp.println("TVOD ASSET");
-         else pp.println("ASSET");
-         pp.pad(2, "");
-         pp.println("id:             " + attid);
-         pp.println("title:          " + atttitle);
-         pp.println("title_original: " + atttitle_original);
-         pp.println("allow:          " + attallow);
-         pp.println("year:           " + attyear);
-         pp.println("duration:       " + attduration);
-         if (attprice != null) pp.println("price:          " + attprice + " " + CURRENCY);
-         if (attvat != null) pp.println("vat:            " + attvat);
-         pp.println("url:            " + url);
-         pp.leave();
+         if (attprice != null) System.out.println("TVOD ASSET");
+         else System.out.println("ASSET");
+         System.out.println("id:             " + attid);
+         System.out.println("title:          " + atttitle);
+         System.out.println("title_original: " + atttitle_original);
+         System.out.println("allow:          " + attallow);
+         System.out.println("year:           " + attyear);
+         System.out.println("duration:       " + attduration);
+         if (attprice != null) System.out.println("price:          " + attprice + " " + CURRENCY);
+         if (attvat != null) System.out.println("vat:            " + attvat);
+         System.out.println("url:            " + url);
       }
    }
 
@@ -371,100 +367,6 @@ public class Asset {
       MP4File genmp4 = MP4Builder.mp4file_av(path, creation_time, timescale, duration, track_num, audio_track, video_track);
 
       return genmp4;
-   }
-
-   public boolean make_mp4() throws Throwable {
-      ISMManifest ism = manifest();
-
-      if (ism == null) {
-         Shell.err_string = "missing Manifest file";
-         return false;
-      }
-
-      ISMManifest.StreamIndex audio_stream = ism.get_stream("audio", sd.audio_name());
-      ISMManifest.StreamIndex video_stream = ism.get_stream("video");
-
-      if (audio_stream.chunk_cnt() != video_stream.chunk_cnt()) {
-         Shell.err_string = "inconsistent chunk count present in Manifest file for audio and video streams";
-         return false;
-      }
-
-      long start_time = td.start_time();
-      long duration = td.duration();
-
-      //duration 0 implicates whole movie
-      if (duration == 0) {
-         duration = ism.real_duration();
-      }
-
-      long end_time = start_time + duration;
-
-      //find starting and ending chunk indices for given time description, use vide stream as a base
-      int start_idx = video_stream.chunk_idx_by_time(start_time * video_stream.timescale_val());
-      int end_idx = video_stream.chunk_idx_by_time(end_time * video_stream.timescale_val());
-
-      //enum duration of given fragments
-      duration = video_stream.fragment_duration(start_idx, end_idx);
-
-      //verify that at least fragments for start_idx are present
-      String vfragpath = FileCache.video_filename(id, sd.video_quality(), start_idx);
-      String afragpath = FileCache.audio_filename(id, sd.audio_name(), sd.audio_quality(), start_idx);
-
-      if (!Utils.file_exists(vfragpath)) {
-         Shell.err_string = "required video fragment file is not present [" + vfragpath + "]";
-         return false;
-      }
-
-      if (!Utils.file_exists(afragpath)) {
-         Shell.err_string = "required audio fragment file is not present [" + afragpath + "]";
-         return false;
-      }
-
-      //get track ids
-      MP4File video_mp4 = MP4File.from_file(vfragpath);
-      MP4File audio_mp4 = MP4File.from_file(afragpath);
-
-      int video_track_id = video_mp4.get_trackid();
-      int audio_track_id = audio_mp4.get_trackid();
-
-      Shell.println("  audio track id:   " + audio_track_id);
-      Shell.println("  video_track_id:   " + video_track_id);
-
-      //create empty (with no data) mp4 with all required boxes
-      MP4File mp4 = create_mp4file(sd.audio_name(), sd.audio_quality(), sd.video_quality(), audio_track_id, video_track_id, duration);
-      mp4.save();
-
-      byte content_key[] = content_key();
-
-      int total_frags = fragment_cnt(sd.audio_name(), sd.audio_quality(), sd.video_quality(), start_idx, end_idx);
-
-      if (total_frags == 0) {
-         Shell.err_string = "no fragment data to process";
-         return false;
-      }
-
-      String hdr = "Processing (decrypt / append) " + total_frags + " fragments";
-      ProgressPrinter pp = new ProgressPrinter(hdr, total_frags);
-
-      int pos = 0;
-      long total_size = 0;
-
-      for (int frag_idx = start_idx; frag_idx <= end_idx; frag_idx++) {
-         MP4File[] frag_data = get_fragment(sd.audio_name(), sd.audio_quality(), sd.video_quality(), frag_idx);
-
-         if (frag_data != null) {
-            total_size += mp4.append_fragment(frag_data[0]);
-            total_size += mp4.append_fragment(frag_data[1]);
-
-            pos++;
-
-            pp.update(pos);
-         } else break;
-      }
-
-      Shell.println("total A/V data: " + total_size);
-
-      return true;
    }
 
    public boolean download_mp4_internal() throws Throwable {
