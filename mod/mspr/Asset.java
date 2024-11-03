@@ -208,6 +208,7 @@ public class Asset {
       Utils.save_file(keyfile, keydata.getBytes());
    }
 
+   // KEEP
    public License get_license() throws Throwable {
       if (license == null) {
          String license_file = FileCache.local_license_filename(id);
@@ -467,86 +468,6 @@ public class Asset {
       return true;
    }
 
-   public boolean download_mp4_internal() throws Throwable {
-      Device curdev = Device.cur_device();
-
-      ISMManifest ism = manifest();
-
-      if (ism == null) {
-         Shell.err_string = "missing Manifest file";
-         return false;
-      }
-
-      ISMManifest.StreamIndex audio_stream = ism.get_stream("audio", sd.audio_name());
-      ISMManifest.StreamIndex video_stream = ism.get_stream("video");
-
-      if (audio_stream.chunk_cnt() != video_stream.chunk_cnt()) {
-         Shell.err_string = "inconsistent chunk count present in Manifest file for audio and video streams";
-         return false;
-      }
-
-      long start_time = td.start_time();
-      long duration = td.duration();
-
-      //duration 0 implicates whole movie
-      if (duration == 0) {
-         duration = ism.real_duration();
-      }
-
-      long end_time = start_time + duration;
-
-      //find starting and ending chunk indices for given time description, use vide stream as a base
-      int start_idx = video_stream.chunk_idx_by_time(start_time * video_stream.timescale_val());
-      int end_idx = video_stream.chunk_idx_by_time(end_time * video_stream.timescale_val());
-
-      if ((start_idx < 0) || (end_idx < 0)) {
-         Shell.err_string = "invalid time description";
-         return false;
-      }
-
-      int total_frags = end_idx - start_idx + 1;
-
-      String hdr = "Downloading " + total_frags + " fragments";
-      ProgressPrinter pp = new ProgressPrinter(hdr, total_frags);
-
-      int pos = 0;
-
-      String audio_qdir = FileCache.audio_qdir(id, sd.audio_name(), sd.audio_quality());
-      String video_qdir = FileCache.video_qdir(id, sd.video_quality());
-
-      Utils.mkdir(audio_qdir);
-      Utils.mkdir(video_qdir);
-
-      String base_url = download_url();
-
-      if (base_url == null) {
-         Shell.err_string = "cannot establish base URL for fragments download";
-         return false;
-      }
-
-      for (int frag_idx = start_idx; frag_idx <= end_idx; frag_idx++) {
-         pos++;
-
-         //output files
-         String audio_filename = FileCache.audio_filename(id, sd.audio_name(), sd.audio_quality(), frag_idx);
-         String video_filename = FileCache.video_filename(id, sd.video_quality(), frag_idx);
-
-         //frag urls
-         String audio_frag_url = ism.get_frag_url(frag_idx, sd, false);
-         String video_frag_url = ism.get_frag_url(frag_idx, sd, true);
-
-         String audio_url = download_url + audio_frag_url;
-         String video_url = download_url + video_frag_url;
-
-         CDN.download_content(curdev.get_serial(), audio_url, audio_filename);
-         CDN.download_content(curdev.get_serial(), video_url, video_filename);
-
-         pp.update(pos);
-      }
-
-      return true;
-   }
-
    public boolean download_mp4() throws Throwable {
       for (int i = 0; i < 5; i++) {
          if (download_mp4_internal()) return true;
@@ -555,57 +476,4 @@ public class Asset {
       return false;
    }
 
-   public boolean check_watermark(int frag_idx, String quality) {
-      String video_qdir = FileCache.video_qdir(id, quality);
-      String base_url = download_url();
-
-      if (base_url == null) {
-         Shell.err_string = "cannot establish base URL for fragments download";
-         return false;
-      }
-
-      boolean likely_watermark = false;
-
-      String frag_filename1 = FileCache.tmp_filename("1");
-      String frag_filename2 = FileCache.tmp_filename("2");
-
-      String video_frag_url = ism.get_video_frag_url(frag_idx, quality);
-      String video_url = download_url + video_frag_url;
-
-      Shell.println("- downloading video fragment " + frag_idx);
-      Shell.println("  url: " + video_url);
-
-      Device curdev = Device.cur_device();
-
-      String serial1 = curdev.get_serial();
-      String serial2 = curdev.get_reverted_serial();
-
-      long size1 = CDN.download_content(serial1, video_url, frag_filename1);
-      Shell.println(" download res for serial " + serial1 + " : " + size1 + " bytes");
-
-      long size2 = CDN.download_content(serial2, video_url, frag_filename2);
-      Shell.println(" download res for serial " + serial2 + " : " + size2 + " bytes");
-
-      if ((size1 < 0) || (size2 < 0)) {
-         Shell.err_string = "cannot download all fragments";
-         return false;
-      }
-
-      byte data1[] = Utils.load_file(frag_filename1);
-      byte data2[] = Utils.load_file(frag_filename2);
-
-      likely_watermark = Arrays.equals(data1, data2);
-
-      String msg = "";
-
-      if (likely_watermark) {
-         msg = "- same data [LIKELY NO WATERMARK]";
-      } else {
-         msg = "- different data [LIKELY WATERMARK]";
-      }
-
-      Shell.println(msg);
-
-      return true;
-   }
 }
