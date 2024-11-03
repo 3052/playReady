@@ -97,9 +97,7 @@ public class ECC {
    public static boolean modular;
 
    public static void print(String s, BigInteger bi) {
-      PaddedPrinter pp = Shell.get_pp();
-
-      pp.println(s + ": " + bi.toString(16));
+      System.out.println(s + ": " + bi.toString(16));
    }
 
    public static void modular(boolean flag) {
@@ -223,13 +221,9 @@ public class ECC {
       }
 
       public void print(String s) {
-         PaddedPrinter pp = Shell.get_pp();
-
-         pp.println(s);
-         pp.pad(2, "");
+         System.out.println(s);
          ECC.print("X", x);
          ECC.print("Y", y);
-         pp.leave();
       }
 
       public BigInteger lambda_same(ECPoint p) {
@@ -402,9 +396,7 @@ public class ECC {
       }
 
       public void print(String s) {
-         PaddedPrinter pp = Shell.get_pp();
-
-         pp.println(s);
+         System.out.println(s);
          ECC.print("- prv", prv);
          pub.print("- pub:");
       }
@@ -477,9 +469,7 @@ public class ECC {
       }
 
       public void print(String str) {
-         PaddedPrinter pp = Shell.get_pp();
-
-         pp.println(str);
+         System.out.println(str);
          ECC.print("- r", r);
          ECC.print("- s", s);
       }

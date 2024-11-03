@@ -178,7 +178,7 @@ public abstract class BCert {
       }
 
       public void print(boolean debug) {
-         pp.println("CERT CHAIN: " + source);
+         System.out.println("CERT CHAIN: " + source);
          for (int i = 0; i < cert_cnt; i++) {
             Certificate cert = certs.elementAt(i);
             cert.print();
@@ -594,7 +594,7 @@ public abstract class BCert {
       }
 
       public void print(boolean debug) {
-         pp.println("### CERT");
+         System.out.println("### CERT");
          if (debug) {
             for (int i = 0; i < attributes.size(); i++) {
                CertAttr attr = attributes.elementAt(i);
@@ -607,55 +607,69 @@ public abstract class BCert {
          String names[] = get_names();
 
          if (names != null) {
-            pp.println("names");
+            System.out.println("names");
 
             for (int i = 0; i < names.length; i++) {
-               pp.println(names[i]);
+               System.out.println(names[i]);
             }
          }
 
          byte random[] = get_random();
 
          if (random != null) {
-            pp.printhex("- random", random);
+            System.out.println(
+               "- random" + HexFormat.of().formatHex(random)
+            );
          }
 
-         pp.println("seclevel " + get_seclevel());
+         System.out.println("seclevel " + get_seclevel());
 
          byte uniqueid[] = get_uniqueid();
 
          if (uniqueid != null) {
-            pp.printhex("- uniqueid", uniqueid);
+            System.out.println(
+               "- uniqueid" + HexFormat.of().formatHex(uniqueid)
+            );
          }
 
          byte pubkey_sign[] = get_pubkey_for_signing();
 
          if (pubkey_sign != null) {
-            pp.printhex("- pubkey_sign", pubkey_sign);
+            System.out.println(
+               "- pubkey_sign" + HexFormat.of().formatHex(pubkey_sign)
+            );
          }
 
          byte pubkey_enc[] = get_pubkey_for_encryption();
 
          if (pubkey_enc != null) {
-            pp.printhex("- pubkey_enc", pubkey_enc);
+            System.out.println(
+               "- pubkey_enc" + HexFormat.of().formatHex(pubkey_enc)
+            );
          }
 
          byte digest[] = get_digest();
 
          if (digest != null) {
-            pp.printhex("- digest", digest);
+            System.out.println(
+               "- digest" + HexFormat.of().formatHex(digest)
+            );
          }
 
          byte signature[] = get_signature();
 
          if (signature != null) {
-            pp.printhex("- signature", signature);
+            System.out.println(
+               "- signature" + HexFormat.of().formatHex(signature)
+            );
          }
 
          byte signkey[] = get_signkey();
 
          if (signkey != null) {
-            pp.printhex("- signkey", signkey);
+            System.out.println(
+               "- signkey" + HexFormat.of().formatHex(signkey)
+            );
          }
 
          if ((signature != null) && (signkey != null)) {
@@ -666,7 +680,7 @@ public abstract class BCert {
             if (status) sig_status += "OK";
             else sig_status += "BAD SIGNATURE";
 
-            pp.println(sig_status);
+            System.out.println(sig_status);
          }
 
       }
