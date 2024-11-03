@@ -510,43 +510,6 @@ public class Shell {
    else return false;
  }
 
- private static void parse_line(String line) throws Throwable {
-  if (is_comment(line)) return;
-
-  String tokens[]=get_tokens(line);
-
-  if (tokens==null) {
-   report_error(err_string);
-   return;
-  }
-
-  if (tokens.length==0) return;
-
-  CmdDesc desc=Interpreter.lookup_cmd(tokens[0]);
-
-  if (desc==null) {
-   report_error("unknown command");
-   return;
-  }
-
-  if ((tokens.length>1)&&(desc.no_options())) {
-   report_error("unexpected arguments to command");
-   return;
-  }
-
-  Cmd cmd=parse_cmd(desc,tokens);
-
-  if (cmd==null) {
-   report_error(err_string);
-   return;
-  }
-
-  if (!Interpreter.run_cmd(cmd)) {
-   report_error(err_string);
-   return;
-  }
- }
-
  public static void print(String line) {
   getOutput().print(line);
   getOutput().flush();
@@ -653,45 +616,6 @@ public class Shell {
   }
  }
 
- public static void run_script(String filename,ScriptArgs args) {
-  BufferedReader script=null;
-
-  scrcontext.push(args);
-
-  try {
-   if (!Utils.file_exists(filename)) {
-    filename=DEFAULT_SCRIPTS_DIR+"\\"+filename;
-   }
-
-   if (Utils.file_exists(filename)) {
-    FileInputStream fis=new FileInputStream(filename);
-    script=new BufferedReader(new InputStreamReader(fis,"utf-8"));
-   }
-  } catch(Throwable t) {}
-
-  if (script==null) {
-   report_error("cannot open script file");
-   return;
-  }
-
-  try {
-   boolean script_running=true;
-
-   while(script_running&&assert_status()) {
-    String line=read_line(script);
-    if (line==null) break;
-
-    if (echo) outputln(PROMPT+line);
-
-    parse_line(line);
-   }
-  } catch(Throwable t) {
-   t.printStackTrace();
-  }
-
-  scrcontext.pop();
- }
-
  public static int argnum() {
   return scrcontext.argnum();
  }
@@ -708,10 +632,6 @@ public class Shell {
   run_script(INIT_SCRIPT,new ScriptArgs());
  }
 
- private static Shell.Option[] parse_args(String args[]) {
-  return Shell.parse_options(args_info[0],args,0);
- }
-
  public static void usage() {
   System.out.println("shell "+args_info[1]);
   System.out.println("       where:");
@@ -719,23 +639,4 @@ public class Shell {
   System.exit(1);
  }
 
- public static void main(String args[]) {
-  try {
-   Shell.Option[] options=parse_args(args);
-
-   if (options==null) {
-    usage();
-    Shell.report_error(Shell.err_string);
-    return;
-   }
-
-   if (Shell.getopt(options,'v')!=null) {
-    verbose=true;
-   }
-
-   run();
-  } catch(Throwable t) {
-   t.printStackTrace();
-  }
- }
 }
