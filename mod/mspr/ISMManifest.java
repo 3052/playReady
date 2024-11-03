@@ -609,32 +609,6 @@ public class ISMManifest {
   return build_frag_url(base_url,start_time,bitrate);
  }
 
- public String get_frag_url(int idx,MP4Builder.StreamsDesc sd,boolean video) {
-  if (video) {
-   ISMManifest.StreamIndex video_stream=get_stream("video");
-   ISMManifest.VideoQualityLevel vql=get_video_ql(sd.video_quality());
-
-   Chunk chunk=video_stream.get_chunk(idx);
-   long start_time=chunk.start_time_val();
-
-   String base_url=video_stream.Url();
-   String bitrate=vql.Bitrate();
-
-   return build_frag_url(base_url,start_time,bitrate);
-  } else {
-   ISMManifest.StreamIndex audio_stream=get_stream("audio",sd.audio_name());
-   ISMManifest.AudioQualityLevel aql=get_audio_ql(sd.audio_name(),sd.audio_quality());
-
-   Chunk chunk=audio_stream.get_chunk(idx);
-   long start_time=chunk.start_time_val();
-
-   String base_url=audio_stream.Url();
-   String bitrate=aql.Bitrate();
-
-   return build_frag_url(base_url,start_time,bitrate);
-  }
- }
-
  public void print() {
   PaddedPrinter pp=Shell.get_pp();
 

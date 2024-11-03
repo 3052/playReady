@@ -70,6 +70,25 @@ public class Asset {
       return id;
    }
 
+   public ISMManifest manifest() throws Throwable {
+      if (ism == null) {
+         String manpath = FileCache.manifest_filename(id);
+
+         if (!Utils.file_exists(manpath)) {
+            Device curdev = Device.cur_device();
+
+            Shell.println("- downloading manifest");
+            CDN.download_content(curdev.get_serial(), url(), manpath);
+         } else {
+            Shell.println("- loading cached manifest");
+         }
+
+         ism = ISMManifest.from_file(manpath);
+      }
+
+      return ism;
+   }
+
    public String get_license() throws Throwable {
 
       Device curdev = Device.cur_device();
