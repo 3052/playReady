@@ -66,99 +66,23 @@ public class Asset {
 
    byte content_key[];
 
-   public String download_url() {
-      if (download_url == null) {
-         if (manifest_url() != null) {
-            int idx = manifest_url().indexOf(ISM_EXTENSION);
-
-            if (idx > 0) {
-               download_url = manifest_url().substring(0, idx + ISM_EXTENSION_SIZE);
-            }
-         }
-      }
-
-      return download_url;
-   }
-
    public String id() {
       return id;
    }
 
-   public String manifest_url() {
-      if (manifest_url == null) {
-         Device curdev = Device.cur_device();
+   public String get_license() throws Throwable {
 
-         Web.PathInfo pi = CDN.get_pathinfo(curdev.get_serial(), url());
+      Device curdev = Device.cur_device();
+      ISMManifest ism = manifest();
 
-         if (pi != null) {
-            manifest_url = pi.actual_url();
-         }
+      if (ism != null) {
+         Shell.println("- generating license req");
+
+         String wrmhdr = ism.get_wrmhdr_data();
+         String req = MSPR.get_license_request(curdev, wrmhdr);
+         return req;
       }
 
-      return manifest_url;
-   }
-
-   public void cache_key(byte content_key[]) throws Throwable {
-      String keyfile = FileCache.key_filename(id);
-      String keydata = Utils.construct_hex_string(content_key);
-
-      Utils.save_file(keyfile, keydata.getBytes());
-   }
-
-   // KEEP
-   public License get_license() throws Throwable {
-      if (license == null) {
-         String license_file = FileCache.local_license_filename(id);
-
-         if ((license_file != null) && Utils.file_exists(license_file)) {
-            Shell.println("- using local license [" + license_file + "]");
-
-            byte license_xml[] = Utils.load_file(license_file);
-
-            license = new License(license_xml);
-         } else {
-            Device curdev = Device.cur_device();
-
-            ISMManifest ism = manifest();
-
-            if (ism != null) {
-               Shell.println("- generating license req");
-
-               String wrmhdr = ism.get_wrmhdr_data();
-               String req = MSPR.get_license_request(curdev, wrmhdr);
-
-               String debugfile = FileCache.debug_file(id, "lic_req.txt");
-               Utils.save_file(debugfile, req.getBytes());
-
-               String ls_url = ls_url();
-
-               if (ls_url != null) {
-                  Shell.println("- sending license req to: " + ls_url);
-
-                  String resp = LS.send_license_req(ls_url, curdev, req);
-                  byte license_xml[] = resp.getBytes();
-
-                  debugfile = FileCache.debug_file(id, "lic_resp.txt");
-                  Utils.save_file(debugfile, license_xml);
-
-                  try {
-                     license = new License(license_xml);
-                  } catch (Throwable t) {}
-
-                  if (license == null) {
-                     Shell.report_error("cannot get license, see [" + debugfile + "] for information");
-                  }
-               }
-            } else {
-               String manpath = FileCache.manifest_filename(id);
-               Shell.report_error("invalid assetid or Manifest not present [" + manpath + "]");
-            }
-         }
-      }
-
-      if (license != null) cache_key(license.get_content_key());
-
-      return license;
    }
 
    public static String cur_id() {
