@@ -75,18 +75,6 @@ public class Shell {
   }
  }
 
- public static class Cmd {
-  String name;
-  Option options[];
-  CmdDesc desc;
-
-  public Cmd(String name,Option options[],CmdDesc desc) {
-   this.name=name;
-   this.options=options;
-   this.desc=desc;
-  }
- }
-
  public static class ScriptArgs {
   public static final String EMPTY_ARG = "";
 
@@ -322,78 +310,6 @@ public class Shell {
   return arg;
  }
 
- private static Option parse_typed_option(char type,char opt,String arg,boolean for_option) {
-  Option o=null;
-
-  arg=resolve_arg(arg);
-
-  if (type==OPT_INTEGER) {
-   Integer val=parse_hex_value(arg);
-
-   if (val!=null) {
-    if (for_option) {
-     o=new Option(Option.OPT_INT_ARG,opt,val);       
-    } else {
-     o=new Option(Option.OPT_PURE_ARG,val);       
-    }
-   }
-
-  } else
-
-  if (type==OPT_STRING) {
-   if (for_option) {
-    o=new Option(Option.OPT_STR_ARG,opt,arg);       
-   } else {
-    o=new Option(Option.OPT_PURE_ARG,arg);
-   }
-  }
-
-  return o;
- }
-
- private static int mandatory_args_cnt(CmdDesc desc) {
-  int cnt=0;
-
-  if (desc.no_options()) return cnt;
-
-  int opt_idx=0;
-  String options=desc.opt_string;
-
-  while(opt_idx<options.length()) {
-   char opt=options.charAt(opt_idx);
-
-   if (is_option_type(opt)) {
-    cnt++;
-    opt_idx++;
-   } else break;
-  }
-
-  return cnt;
- }
-
- private static Cmd parse_cmd(CmdDesc desc,String tokens[]) {
-  Cmd res=null;
-
-  String cmd_name=tokens[0];
-
-  String options=desc.opt_string;
-
-  if (options==null) {
-   if (tokens.length>1) {
-    err_string="unexpected arguments";
-   }
-
-   Cmd cmd=new Cmd(cmd_name,new Option[0],desc);
-   return cmd;
-  }
-
-  Option opttab[]=parse_options(options,tokens,1);
-
-  Cmd cmd=new Cmd(cmd_name,opttab,desc);
-
-  return cmd;
- }
-
  public static Option getopt(Option options[],char opt) {
   for(int i=0;i<options.length;i++) {
    Option o=options[i];
@@ -597,25 +513,6 @@ public class Shell {
   return pp;
  }
 
- public static void run() {
-  try {
-   System.out.println(BANNER);
-
-   echo=false;
-   run_init_script();
-   echo=true;
-
-   running=true;
-
-   while(running) {
-    String line=read_line();
-    parse_line(line);
-   }
-  } catch(Throwable t) {
-   t.printStackTrace();
-  }
- }
-
  public static int argnum() {
   return scrcontext.argnum();
  }
@@ -626,10 +523,6 @@ public class Shell {
 
  public static void assert_status(boolean val) {
   scrcontext.assert_status(val);
- }
-
- private static void run_init_script() {
-  run_script(INIT_SCRIPT,new ScriptArgs());
  }
 
  public static void usage() {
