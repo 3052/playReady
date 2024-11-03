@@ -10,7 +10,6 @@ package mod.mspr;
 
 import agsecres.tool.*;
 import agsecres.helper.*;
-import mod.cdn.*;
 import java.lang.*;
 import java.util.*;
 import java.io.*;
@@ -65,50 +64,7 @@ public class Asset {
    //base download url for fragments
    String download_url;
 
-   MP4Builder.StreamsDesc sd;
-   MP4Builder.TimeDesc td;
-
-   ISMManifest ism;
-   License license;
-
    byte content_key[];
-
-   Codec.Audio audio_codec;
-   Codec.Video video_codec;
-
-   void load_url() {
-      String urlfile = FileCache.url_filename(id);
-
-      byte data[] = Utils.load_file(urlfile);
-
-      if (data != null) {
-         url = new String(data).trim();
-      }
-   }
-
-   void load_ls_url() {
-      String lsurlfile = FileCache.lsurl_filename(id);
-
-      byte data[] = Utils.load_file(lsurlfile);
-
-      if (data != null) {
-         ls_url = new String(data).trim();
-      }
-   }
-
-   void load_key() {
-      String keyfile = FileCache.key_filename(id);
-
-      byte data[] = Utils.load_file(keyfile);
-
-      if (data != null) {
-         Shell.println("- loading cached content key");
-
-         String hexkey = new String(data).trim();
-
-         content_key = Utils.parse_hex_string(hexkey);
-      }
-   }
 
    public String download_url() {
       if (download_url == null) {
@@ -124,40 +80,8 @@ public class Asset {
       return download_url;
    }
 
-   public Asset(String id, MP4Builder.StreamsDesc sd, MP4Builder.TimeDesc td) {
-      this.id = id;
-      this.sd = sd;
-      this.td = td;
-
-      String dir = FileCache.asset_dir(id);
-
-      if (!Utils.file_exists(dir)) {
-         FileCache.make_dirs(id);
-      }
-   }
-
-   public Asset(String id) {
-      this(id, null, null);
-   }
-
    public String id() {
       return id;
-   }
-
-   public String url() {
-      if (url == null) {
-         load_url();
-      }
-
-      return url;
-   }
-
-   public String ls_url() {
-      if (ls_url == null) {
-         load_ls_url();
-      }
-
-      return ls_url;
    }
 
    public String manifest_url() {
@@ -172,33 +96,6 @@ public class Asset {
       }
 
       return manifest_url;
-   }
-
-   public MP4Builder.StreamsDesc sd() {
-      return sd;
-   }
-
-   public MP4Builder.TimeDesc td() {
-      return td;
-   }
-
-   public ISMManifest manifest() throws Throwable {
-      if (ism == null) {
-         String manpath = FileCache.manifest_filename(id);
-
-         if (!Utils.file_exists(manpath)) {
-            Device curdev = Device.cur_device();
-
-            Shell.println("- downloading manifest");
-            CDN.download_content(curdev.get_serial(), url(), manpath);
-         } else {
-            Shell.println("- loading cached manifest");
-         }
-
-         ism = ISMManifest.from_file(manpath);
-      }
-
-      return ism;
    }
 
    public void cache_key(byte content_key[]) throws Throwable {
