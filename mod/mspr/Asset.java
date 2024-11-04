@@ -65,8 +65,8 @@ public class Asset {
    ////base download url for fragments
    //String download_url;
 
-   //MP4Builder.StreamsDesc sd;
-   //MP4Builder.TimeDesc td;
+   MP4Builder.StreamsDesc sd;
+   MP4Builder.TimeDesc td;
 
    ISMManifest ism;
    License license;
@@ -124,21 +124,21 @@ public class Asset {
    //   return download_url;
    //}
 
-   //public Asset(String id, MP4Builder.StreamsDesc sd, MP4Builder.TimeDesc td) {
-   //   this.id = id;
-   //   this.sd = sd;
-   //   this.td = td;
+   public Asset(String id, MP4Builder.StreamsDesc sd, MP4Builder.TimeDesc td) {
+      this.id = id;
+      this.sd = sd;
+      this.td = td;
 
-   //   String dir = FileCache.asset_dir(id);
+      String dir = FileCache.asset_dir(id);
 
-   //   if (!Utils.file_exists(dir)) {
-   //      FileCache.make_dirs(id);
-   //   }
-   //}
+      if (!Utils.file_exists(dir)) {
+         FileCache.make_dirs(id);
+      }
+   }
 
-   //public Asset(String id) {
-   //   this(id, null, null);
-   //}
+   public Asset(String id) {
+      this(id, null, null);
+   }
 
    //public String id() {
    //   return id;

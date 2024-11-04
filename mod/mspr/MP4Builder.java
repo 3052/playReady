@@ -13,146 +13,146 @@ import java.lang.*;
 import java.util.*;
 
 public class MP4Builder {
-   //public static class StreamsDesc {
-   //   public static final String AUDIO_STREAM_START = "audio=";
-   //   public static final String VIDEO_STREAM_START = "video=";
+   public static class StreamsDesc {
+      public static final String AUDIO_STREAM_START = "audio=";
+      public static final String VIDEO_STREAM_START = "video=";
 
-   //   String audio_name;
-   //   String audio_quality;
-   //   String video_quality;
+      String audio_name;
+      String audio_quality;
+      String video_quality;
 
-   //   public StreamsDesc(String audio_name, String audio_quality, String video_quality) {
-   //      this.audio_name = audio_name;
-   //      this.audio_quality = audio_quality;
-   //      this.video_quality = video_quality;
-   //   }
+      public StreamsDesc(String audio_name, String audio_quality, String video_quality) {
+         this.audio_name = audio_name;
+         this.audio_quality = audio_quality;
+         this.video_quality = video_quality;
+      }
 
-   //   public String audio_name() {
-   //      return audio_name;
-   //   }
+      public String audio_name() {
+         return audio_name;
+      }
 
-   //   public String audio_quality() {
-   //      return audio_quality;
-   //   }
+      public String audio_quality() {
+         return audio_quality;
+      }
 
-   //   public String video_quality() {
-   //      return video_quality;
-   //   }
+      public String video_quality() {
+         return video_quality;
+      }
 
-   //   public static StreamsDesc from_args(String audio_desc, String video_desc) {
-   //      if (!audio_desc.startsWith(AUDIO_STREAM_START)) return null;
-   //      audio_desc = audio_desc.substring(AUDIO_STREAM_START.length());
+      public static StreamsDesc from_args(String audio_desc, String video_desc) {
+         if (!audio_desc.startsWith(AUDIO_STREAM_START)) return null;
+         audio_desc = audio_desc.substring(AUDIO_STREAM_START.length());
 
-   //      if (!video_desc.startsWith(VIDEO_STREAM_START)) return null;
-   //      video_desc = video_desc.substring(VIDEO_STREAM_START.length());
+         if (!video_desc.startsWith(VIDEO_STREAM_START)) return null;
+         video_desc = video_desc.substring(VIDEO_STREAM_START.length());
 
-   //      String audio_params[] = Utils.tokenize(audio_desc, ".");
+         String audio_params[] = Utils.tokenize(audio_desc, ".");
 
-   //      if (audio_params.length != 2) return null;
+         if (audio_params.length != 2) return null;
 
-   //      return new StreamsDesc(audio_params[0], audio_params[1], video_desc);
-   //   }
-   //}
+         return new StreamsDesc(audio_params[0], audio_params[1], video_desc);
+      }
+   }
 
-   //public static class TimeDesc {
-   //   public static final long SECS_IN_HOURS = 3600 L;
-   //   public static final long SECS_IN_MINUTES = 60 L;
+   public static class TimeDesc {
+      public static final long SECS_IN_HOURS = 3600L;
+      public static final long SECS_IN_MINUTES = 60L;
 
-   //   //format is start_time+duration_time
-   //   // where
-   //   //          start_time is    [hh:[mm:]]ss
-   //   //          duration_time is [hh:[mm:]]ss or empty
+      //format is start_time+duration_time
+      // where
+      //          start_time is    [hh:[mm:]]ss
+      //          duration_time is [hh:[mm:]]ss or empty
 
-   //   //all time is represented in seconds
-   //   long start_time;
-   //   long duration;
+      //all time is represented in seconds
+      long start_time;
+      long duration;
 
-   //   private static long parse_time_val(String timeval) {
-   //      long val = Utils.long_value(timeval);
+      private static long parse_time_val(String timeval) {
+         long val = Utils.long_value(timeval);
 
-   //      if ((val >= 0) && (val < 60)) return val;
+         if ((val >= 0) && (val < 60)) return val;
 
-   //      return -1;
-   //   }
+         return -1;
+      }
 
-   //   private static long parse_time(String time) {
-   //      if (time.equals("")) return 0;
+      private static long parse_time(String time) {
+         if (time.equals("")) return 0;
 
-   //      String time_params[] = Utils.tokenize(time, ":");
+         String time_params[] = Utils.tokenize(time, ":");
 
-   //      long val = -1;
+         long val = -1;
 
-   //      long hours = 0;
-   //      long minutes = 0;
-   //      long seconds = 0;
+         long hours = 0;
+         long minutes = 0;
+         long seconds = 0;
 
-   //      try {
-   //         switch (time_params.length) {
-   //            //seconds
-   //         case 1:
-   //            seconds = parse_time_val(time_params[0]);
-   //            break;
-   //            //minutes, seconds
-   //         case 2:
-   //            minutes = parse_time_val(time_params[0]);
-   //            seconds = parse_time_val(time_params[1]);
-   //            break;
-   //            //hours, minutes, seconds
-   //         case 3:
-   //            hours = parse_time_val(time_params[0]);
-   //            minutes = parse_time_val(time_params[1]);
-   //            seconds = parse_time_val(time_params[2]);
-   //            break;
-   //         default:
-   //            hours = -1;
-   //            break;
-   //         }
-   //      } catch (Throwable t) {}
+         try {
+            switch (time_params.length) {
+               //seconds
+            case 1:
+               seconds = parse_time_val(time_params[0]);
+               break;
+               //minutes, seconds
+            case 2:
+               minutes = parse_time_val(time_params[0]);
+               seconds = parse_time_val(time_params[1]);
+               break;
+               //hours, minutes, seconds
+            case 3:
+               hours = parse_time_val(time_params[0]);
+               minutes = parse_time_val(time_params[1]);
+               seconds = parse_time_val(time_params[2]);
+               break;
+            default:
+               hours = -1;
+               break;
+            }
+         } catch (Throwable t) {}
 
-   //      if ((hours < 0) | (minutes < 0) || (seconds < 0)) return -1;
+         if ((hours < 0) | (minutes < 0) || (seconds < 0)) return -1;
 
-   //      val = hours * SECS_IN_HOURS + minutes * SECS_IN_MINUTES + seconds;
+         val = hours * SECS_IN_HOURS + minutes * SECS_IN_MINUTES + seconds;
 
-   //      return val;
-   //   }
+         return val;
+      }
 
-   //   public TimeDesc(long start_time, long duration) {
-   //      this.start_time = start_time;
-   //      this.duration = duration;
-   //   }
+      public TimeDesc(long start_time, long duration) {
+         this.start_time = start_time;
+         this.duration = duration;
+      }
 
-   //   public static TimeDesc from_arg(String time_desc) {
-   //      String time_params[] = Utils.tokenize(time_desc, "+");
+      public static TimeDesc from_arg(String time_desc) {
+         String time_params[] = Utils.tokenize(time_desc, "+");
 
-   //      if ((time_params.length != 1) && (time_params.length != 2)) return null;
+         if ((time_params.length != 1) && (time_params.length != 2)) return null;
 
-   //      String s_time = "0";
-   //      String s_duration = "0";
+         String s_time = "0";
+         String s_duration = "0";
 
-   //      switch (time_params.length) {
-   //      case 2:
-   //         s_duration = time_params[1];
-   //      case 1:
-   //         s_time = time_params[0];
-   //         break;
-   //      }
+         switch (time_params.length) {
+         case 2:
+            s_duration = time_params[1];
+         case 1:
+            s_time = time_params[0];
+            break;
+         }
 
-   //      long start_time = parse_time(s_time);
-   //      long duration = parse_time(s_duration);
+         long start_time = parse_time(s_time);
+         long duration = parse_time(s_duration);
 
-   //      if ((start_time < 0) || (duration < 0)) return null;
+         if ((start_time < 0) || (duration < 0)) return null;
 
-   //      return new TimeDesc(start_time, duration);
-   //   }
+         return new TimeDesc(start_time, duration);
+      }
 
-   //   public long start_time() {
-   //      return start_time;
-   //   }
+      public long start_time() {
+         return start_time;
+      }
 
-   //   public long duration() {
-   //      return duration;
-   //   }
-   //}
+      public long duration() {
+         return duration;
+      }
+   }
 
    //public static MP4File.Box ftyp_box(String mbrand, String cbrands[]) {
    //   int major_brand = MP4File.str2int(mbrand);

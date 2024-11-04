@@ -21,20 +21,20 @@ public class XmlUtils {
       return Utils.tokenize(path, ".");
    }
 
-   public static Document open_xml(String path) {
-      Document doc = null;
+   //public static Document open_xml(String path) {
+   //   Document doc = null;
 
-      try {
-         DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
-         DocumentBuilder db = dbf.newDocumentBuilder();
-         doc = db.parse(new File(path));
-         doc.getDocumentElement().normalize();
-      } catch (Throwable t) {
-         t.printStackTrace();
-      }
+   //   try {
+   //      DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+   //      DocumentBuilder db = dbf.newDocumentBuilder();
+   //      doc = db.parse(new File(path));
+   //      doc.getDocumentElement().normalize();
+   //   } catch (Throwable t) {
+   //      t.printStackTrace();
+   //   }
 
-      return doc;
-   }
+   //   return doc;
+   //}
 
    public static Document parse_xml(InputStream is) {
       Document doc = null;
@@ -120,54 +120,54 @@ public class XmlUtils {
       return null;
    }
 
-   public static Node[] select_by_attr_value(Node[] list, String filter) {
-      String keyval[] = Utils.tokenize(filter, "=");
+   //public static Node[] select_by_attr_value(Node[] list, String filter) {
+   //   String keyval[] = Utils.tokenize(filter, "=");
 
-      if (keyval.length != 2) return null;
+   //   if (keyval.length != 2) return null;
 
-      String attr = keyval[0];
-      String val = keyval[1];
+   //   String attr = keyval[0];
+   //   String val = keyval[1];
 
-      Vector < Node > matched = new Vector < Node > ();
+   //   Vector < Node > matched = new Vector < Node > ();
 
-      for (int i = 0; i < list.length; i++) {
-         Node node = list[i];
+   //   for (int i = 0; i < list.length; i++) {
+   //      Node node = list[i];
 
-         if (node instanceof Element) {
-            String attval = ((Element) node).getAttribute(attr);
+   //      if (node instanceof Element) {
+   //         String attval = ((Element) node).getAttribute(attr);
 
-            if (attval.equals(val)) {
-               matched.addElement(node);
-            }
-         }
-      }
+   //         if (attval.equals(val)) {
+   //            matched.addElement(node);
+   //         }
+   //      }
+   //   }
 
-      return matched.toArray(new Node[0]);
-   }
+   //   return matched.toArray(new Node[0]);
+   //}
 
-   public static String get_filtered_attr(Node from, String path, String filter, String attr) {
-      Node[] list = select(from, path);
+   //public static String get_filtered_attr(Node from, String path, String filter, String attr) {
+   //   Node[] list = select(from, path);
 
-      if (list.length > 0) {
-         Node filtered_nodes[] = select_by_attr_value(list, filter);
+   //   if (list.length > 0) {
+   //      Node filtered_nodes[] = select_by_attr_value(list, filter);
 
-         if (filtered_nodes.length > 0) {
-            return get_attr_value(filtered_nodes[0], attr);
-         }
-      }
+   //      if (filtered_nodes.length > 0) {
+   //         return get_attr_value(filtered_nodes[0], attr);
+   //      }
+   //   }
 
-      return null;
-   }
+   //   return null;
+   //}
 
-   public static String get_attr(Node from, String path, String attr) {
-      Node[] list = select(from, path);
+   //public static String get_attr(Node from, String path, String attr) {
+   //   Node[] list = select(from, path);
 
-      if (list.length > 0) {
-         return get_attr_value(list[0], attr);
-      }
+   //   if (list.length > 0) {
+   //      return get_attr_value(list[0], attr);
+   //   }
 
-      return null;
-   }
+   //   return null;
+   //}
 
    public static String get_value(Node node) {
       return node.getTextContent();
@@ -208,12 +208,12 @@ public class XmlUtils {
       }
    }
 
-   public static Object instance_from_node(Class clazz, Node node) {
+   public static Object instance_from_node(Class<?> clazz, Node node) {
       Object instance = null;
 
       try {
-         instance = clazz.newInstance();
-
+         instance = clazz.getConstructor().newInstance();
+         
          while (clazz != null) {
             fill_instance(instance, clazz, node);
 
