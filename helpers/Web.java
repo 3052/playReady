@@ -20,7 +20,6 @@ import java.security.cert.*;
 import javax.net.ssl.*;
 import javax.crypto.*;
 import javax.crypto.spec.*;
-import sun.net.www.*;
 
 public class Web {
    public static class CleanMessageHeader extends MessageHeader {

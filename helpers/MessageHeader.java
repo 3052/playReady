@@ -27,7 +27,8 @@
  *      news stream opener
  */
 
-package sun.net.www;
+// package sun.net.www;
+package agsecres.helper;
 
 import java.io.*;
 import java.util.Collections;
@@ -40,8 +41,7 @@ import java.util.*;
     the header that don't have a valid key, but do have
     a value (this isn't legal according to the standard,
     but lines like this are everywhere). */
-public
-class MessageHeader {
+public class MessageHeader {
     private String keys[];
     private String values[];
     private int nkeys;
