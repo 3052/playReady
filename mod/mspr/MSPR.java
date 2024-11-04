@@ -523,31 +523,23 @@ public class MSPR {
    }
 
    public static String get_cipherdata(Device dev, XmlKey xmlkey) throws Throwable {
+      System.out.println("get_cipherdata");
       BCert.CertificateChain dchain = dev.get_cert_chain();
       byte chain_data[] = dchain.body();
-
       String b64_certchain = Crypto.base64_encode(chain_data);
-
       String s = "";
-
       s += CERT_CHAIN_START();
       s += " ";
       s += b64_certchain;
       s += " ";
       s += CERT_CHAIN_END();
-
       byte cert_data[] = pad16(s);
-
       byte enc_cert_data[] = Crypto.aes_cbc_encrypt(cert_data, xmlkey.aes_iv(), xmlkey.aes_key());
-
       int iv_len = xmlkey.aes_iv().length;
       int enc_data_len = enc_cert_data.length;
-
       byte ciphertext[] = new byte[iv_len + enc_data_len];
-
       System.arraycopy(xmlkey.aes_iv(), 0, ciphertext, 0, iv_len);
       System.arraycopy(enc_cert_data, 0, ciphertext, iv_len, enc_data_len);
-
       return Crypto.base64_encode(ciphertext);
    }
 
@@ -594,21 +586,22 @@ public class MSPR {
       pp.pad(2, "");
       pp.println(keydata);
       pp.leave();
-
+      
       if (fixed_identity()) {
          //random k for ECC signing (BCert generation)
          BigInteger r = ECC.make_bi(Utils.reverse_hex_string("062dd035241da79eedbc2abc9d99ab5b159788bb78d56aedcc3b603018ec02f7"));
          ECC.set_random(r);
       }
-
+      
+      // THIS IS FAILING
       String cipherdata = get_cipherdata(dev, xkey);
+      
       pp.println("CIPHERDATA");
       pp.pad(2, "");
       pp.println(cipherdata);
       pp.leave();
-
+      
       String xml_req = build_license_request(dev, wrmheader, nonce, keydata, cipherdata);
-
       return xml_req;
    }
 

@@ -63,19 +63,16 @@ public class Vars {
 
    public static final int UNKNOWN_VAL = -1;
 
-   static Vector < Var > vars;
+   static Vector<Var> vars;
 
    static {
-      vars = new Vector < Var > ();
+      vars = new Vector<Var>();
    }
 
    public static Var get_var(String name) {
       for (int i = 0; i < vars.size(); i++) {
-         Var
-         var = vars.elementAt(i);
-         Proto proto =
-            var.proto();
-
+         Var var = vars.elementAt(i);
+         Proto proto = var.proto();
          if (proto.name().equals(name)) return var;
       }
 
@@ -158,22 +155,17 @@ public class Vars {
       return ival.intValue();
    }
 
-   public static String get_str(Var
-      var) {
+   public static String get_str(Var var) {
       return (String) var.val();
    }
 
    public static int get_int(String name) {
-      Var
-      var = get_var(name);
-
+      Var var = get_var(name);
       return get_int(var);
    }
 
    public static String get_str(String name) {
-      Var
-      var = get_var(name);
-
+      Var var = get_var(name);
       return get_str(var);
    }
 
