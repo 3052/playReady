@@ -13,7 +13,14 @@ import java.util.*;
 import java.io.*;
 import java.nio.charset.*;
 
+import mod.mspr.MSPR;
+
 public class Shell {
+   
+   public static void main(String args[]) {
+      System.out.println(MSPR.SL2000);
+   }
+   
    // Windows console CP to support Polish characters
    public static final String CODE_PAGE = "Cp852";
 

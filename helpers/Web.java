@@ -22,32 +22,32 @@ import javax.crypto.*;
 import javax.crypto.spec.*;
 
 public class Web {
-   //public static class CleanMessageHeader extends MessageHeader {
-   //   //ignore setting unneeded properties
-   //   public void setIfNotSet(String k, String v) {}
-   //}
+   public static class CleanMessageHeader extends MessageHeader {
+      //ignore setting unneeded properties
+      public void setIfNotSet(String k, String v) {}
+   }
 
-   //public static CleanMessageHeader raw_headers(HttpURLConnection conn) throws Throwable {
-   //   if (conn instanceof HttpsURLConnection) {
-   //      //get delegate to HttpURLConnection
-   //      Class c = Class.forName("sun.net.www.protocol.https.HttpsURLConnectionImpl");
+   public static CleanMessageHeader raw_headers(HttpURLConnection conn) throws Throwable {
+      if (conn instanceof HttpsURLConnection) {
+         //get delegate to HttpURLConnection
+         Class c = Class.forName("sun.net.www.protocol.https.HttpsURLConnectionImpl");
 
-   //      Field f = c.getDeclaredField("delegate");
-   //      f.setAccessible(true);
+         Field f = c.getDeclaredField("delegate");
+         f.setAccessible(true);
 
-   //      conn = (HttpURLConnection) f.get(conn);
-   //   }
+         conn = (HttpURLConnection) f.get(conn);
+      }
 
-   //   Class c = Class.forName("sun.net.www.protocol.http.HttpURLConnection");
+      Class c = Class.forName("sun.net.www.protocol.http.HttpURLConnection");
 
-   //   Field f = c.getDeclaredField("requests");
-   //   f.setAccessible(true);
+      Field f = c.getDeclaredField("requests");
+      f.setAccessible(true);
 
-   //   CleanMessageHeader hdrs = new CleanMessageHeader();
-   //   f.set(conn, hdrs);
+      CleanMessageHeader hdrs = new CleanMessageHeader();
+      f.set(conn, hdrs);
 
-   //   return hdrs;
-   //}
+      return hdrs;
+   }
 
    public static final String USER_AGENT = "Mozilla/5.0 (ADB)";
 
@@ -56,7 +56,7 @@ public class Web {
    //public static String KSFILE = Vars.get_str("KSFILE");
    //public static String KSPASSFILE = Vars.get_str("KSPASSFILE");
 
-   //public static final int BUFSIZE = 0x100000;
+   public static final int BUFSIZE = 0x100000;
 
    public static final int TIMEOUT_VAL = 2000;
 
@@ -217,21 +217,21 @@ public class Web {
       } catch (Throwable t) {}
    }
 
-   //public static CleanMessageHeader set_headers(HttpURLConnection conn, String reqprops[]) throws Throwable {
-   //   CleanMessageHeader hdrs = raw_headers(conn);
+   public static CleanMessageHeader set_headers(HttpURLConnection conn, String reqprops[]) throws Throwable {
+      CleanMessageHeader hdrs = raw_headers(conn);
 
-   //   for (int i = 0; i < reqprops.length; i += 2) {
-   //      String prop = reqprops[i];
-   //      String value = reqprops[i + 1];
+      for (int i = 0; i < reqprops.length; i += 2) {
+         String prop = reqprops[i];
+         String value = reqprops[i + 1];
 
-   //      //conn.setRequestProperty(prop,value);
-   //      hdrs.add(prop, value);
-   //   }
+         //conn.setRequestProperty(prop,value);
+         hdrs.add(prop, value);
+      }
 
-   //   hdrs.add("User-Agent", USER_AGENT);
+      hdrs.add("User-Agent", USER_AGENT);
 
-   //   return hdrs;
-   //}
+      return hdrs;
+   }
 
    //public static byte[] https_get(String urlstr, String reqprops[]) {
    //   boolean successfull = false;
@@ -386,19 +386,19 @@ public class Web {
       return result;
    }
 
-   //public static long http_get_to_file(String s_url, String reqprops[], String outfile) {
-   //   long size = -1;
+   public static long http_get_to_file(String s_url, String reqprops[], String outfile) {
+      long size = -1;
 
-   //   try {
-   //      FileOutputStream fos = new FileOutputStream(outfile);
+      try {
+         FileOutputStream fos = new FileOutputStream(outfile);
 
-   //      size = http_get(s_url, reqprops, fos);
-   //   } catch (Throwable t) {
-   //      t.printStackTrace();
-   //   }
+         size = http_get(s_url, reqprops, fos);
+      } catch (Throwable t) {
+         t.printStackTrace();
+      }
 
-   //   return size;
-   //}
+      return size;
+   }
 
    //public static byte[] http_get_to_array(String s_url, String reqprops[]) {
    //   ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -412,62 +412,62 @@ public class Web {
    //   return null;
    //}
 
-   //public static long http_get(String urlstr, String reqprops[], OutputStream os) {
-   //   boolean successfull = false;
-   //   long cnt = -1;
+   public static long http_get(String urlstr, String reqprops[], OutputStream os) {
+      boolean successfull = false;
+      long cnt = -1;
 
-   //   while (!successfull) {
-   //      try {
-   //         cnt = http_get_internal(urlstr, reqprops, os);
-   //         if (cnt > 0) successfull = true;
-   //      } catch (Throwable t) {}
-   //   }
+      while (!successfull) {
+         try {
+            cnt = http_get_internal(urlstr, reqprops, os);
+            if (cnt > 0) successfull = true;
+         } catch (Throwable t) {}
+      }
 
-   //   return cnt;
-   //}
+      return cnt;
+   }
 
-   //public static long http_get_internal(String s_url, String reqprops[], OutputStream os) {
-   //   long cnt = 0;
+   public static long http_get_internal(String s_url, String reqprops[], OutputStream os) {
+      long cnt = 0;
 
-   //   try {
-   //      //   System.out.println("GET for: "+s_url);
+      try {
+         //   System.out.println("GET for: "+s_url);
 
-   //      URL url = new URL(s_url);
-   //      HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-   //      conn.setConnectTimeout(TIMEOUT_VAL);
-   //      conn.setFollowRedirects(true);
+         URL url = new URL(s_url);
+         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+         conn.setConnectTimeout(TIMEOUT_VAL);
+         conn.setFollowRedirects(true);
 
-   //      conn.setRequestMethod("GET");
-   //      set_headers(conn, reqprops);
-   //      conn.connect();
+         conn.setRequestMethod("GET");
+         set_headers(conn, reqprops);
+         conn.connect();
 
-   //      int code = conn.getResponseCode();
+         int code = conn.getResponseCode();
 
-   //      //   System.out.println("HTTP RESP: "+code);
+         //   System.out.println("HTTP RESP: "+code);
 
-   //      BufferedInputStream bis = new BufferedInputStream(conn.getInputStream());
+         BufferedInputStream bis = new BufferedInputStream(conn.getInputStream());
 
-   //      try {
-   //         byte[] buffer = new byte[BUFSIZE];
-   //         int size;
+         try {
+            byte[] buffer = new byte[BUFSIZE];
+            int size;
 
-   //         while ((size = bis.read(buffer)) != -1) {
-   //            //     System.out.println("read: "+size);
-   //            os.write(buffer, 0, size);
-   //            cnt += size;
-   //         }
-   //      } finally {
-   //         os.close();
-   //         bis.close();
-   //      }
-   //   } catch (Throwable t) {
-   //      //   System.out.println("timeout!");
-   //      sleep(1000);
-   //      cnt = -1;
-   //   }
+            while ((size = bis.read(buffer)) != -1) {
+               //     System.out.println("read: "+size);
+               os.write(buffer, 0, size);
+               cnt += size;
+            }
+         } finally {
+            os.close();
+            bis.close();
+         }
+      } catch (Throwable t) {
+         //   System.out.println("timeout!");
+         sleep(1000);
+         cnt = -1;
+      }
 
-   //   return cnt;
-   //}
+      return cnt;
+   }
 
    //public static long http_head(String s_url, String reqprops[], String outfile) {
    //   long cnt = 0;
