@@ -129,10 +129,8 @@ public class Vars {
       if (!known_var(name)) {
          declare(new Proto(name, VAR_INT));
       }
-
       Var v = get_var(name);
-
-      v.set(new Integer(val));
+      v.set(Integer.valueOf(val));
    }
 
    public static void set(String name, String val) {
