@@ -182,15 +182,12 @@ public class Device {
    public static BCert.CertificateChain get_group_cert() {
       if (group_cert == null) {
          group_cert = (BCert.CertificateChain) BCert.from_file("g1");
-
          //check if we should generate fake group cert
          if (Vars.get_int("MSPR_FAKE_ROOT") == 1) {
             gen_fake_group_cert();
-
             group_cert.save("fakechain");
          }
       }
-
       return group_cert;
    }
 
@@ -221,51 +218,40 @@ public class Device {
    public BCert.Certificate get_cert() {
       if ((cert == null) || changed() || ((cert != null) && (cert.get_seclevel() != cur_SL()))) {
          cert = new BCert.Certificate();
-
          Shell.out.println("generating new cert, device changed or not initialized");
-
          if (MSPR.fixed_identity()) {
             byte random[] = Utils.parse_hex_string("bee27cbf64aac0c94cd60ff28a05e1b4");
             cert.set_random(random);
-
             cert.set_seclevel(cur_SL());
-
             cert.set_uniqueid(get_uniqueid());
-
             cert.set_prvkey_sign(sign_key.prv_bytes());
             cert.set_pubkey_sign(sign_key.pub_bytes());
-
             cert.set_pubkey_enc(enc_key.pub_bytes());
          } else {
             byte random[] = ECC.bi_bytes(ECC.random(128));
             cert.set_random(random);
-
             cert.set_seclevel(cur_SL());
-
             cert.set_uniqueid(get_uniqueid());
-
             cert.set_prvkey_sign(sign_key.prv_bytes());
             cert.set_pubkey_sign(sign_key.pub_bytes());
-
             cert.set_pubkey_enc(enc_key.pub_bytes());
          }
       }
-
+      System.out.println("Device.get_cert");
       return cert;
    }
 
    public BCert.CertificateChain get_cert_chain() {
+      System.out.println("Device.get_cert_chain");
       if ((cert_chain == null) || changed() || ((cert != null) && (cert.get_seclevel() != cur_SL()))) {
          if (MSPR.fixed_identity()) {
             //random k for ECC signing (BCert generation)
             BigInteger r = ECC.make_bi(Utils.reverse_hex_string("062dd035241da79eedbc2abc9d99ab5b159788bb78d56aedcc3b603018ec02f7"));
             ECC.set_random(r);
          }
-
          BCert.CertificateChain gcert = get_group_cert();
-
+         System.out.println("gcert " + gcert);
          cert_chain = gcert.insert(get_cert());
-
          cert_chain.save("genchain");
       }
 

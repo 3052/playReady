@@ -523,7 +523,7 @@ public class MSPR {
    }
 
    public static String get_cipherdata(Device dev, XmlKey xmlkey) throws Throwable {
-      System.out.println("get_cipherdata");
+      System.out.println("MSPR.get_cipherdata");
       BCert.CertificateChain dchain = dev.get_cert_chain();
       byte chain_data[] = dchain.body();
       String b64_certchain = Crypto.base64_encode(chain_data);

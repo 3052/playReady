@@ -4,6 +4,9 @@ import agsecres.tool.Vars;
 import mod.mspr.Device;
 import mod.mspr.MSPR;
 
+// `CDN_NOAUTH`   - it implicates that a random value ise used instead of the
+// auth cookie for content data requests (CDN requests) 
+
 public class Hello {
    
    static String wrm_hdr = """
@@ -18,7 +21,10 @@ public class Hello {
    public static void main(String args[]) {
       Vars.set("MAC", "AABBCCDDEEFF");
       Vars.set("MSPR_DEBUG", 1);
+      Vars.set("MSPR_FAKE_ROOT", 0);
+      Vars.set("SECLEVEL", "SL2000");
       Vars.set("SERIAL", "DGBD0123456789ABC");
+      
       Device cur_dev = Device.cur_device();
       
       try {
@@ -31,3 +37,6 @@ public class Hello {
    }
    
 }
+
+
+
