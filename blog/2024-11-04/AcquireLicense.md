@@ -1,26 +1,41 @@
 # AcquireLicense
 
-~~~java
-public static String SIGNED_INFO(String digest)
-~~~
-
-called by:
-
-~~~java
-public static String build_license_request(Device dev, String wrmheader, String
-nonce, String keydata, String cipherdata) throws Throwable
-~~~
-
-called by:
-
-~~~java
-public static String get_license_request(Device dev, String wrmheader) throws
-Throwable
-~~~
-
-called by:
+https://reference.dashif.org/dash.js/nightly/samples/drm/playready.html
 
 ~~~
-src\mod\mspr\Asset.java
-242:     String req=MSPR.get_license_request(curdev,wrmhdr);
+mitmproxy --set stream_large_bodies=9m
 ~~~
+
+even with the above, I cant seem to capture the license request with MitmProxy,
+so just use HAR instead:
+
+~~~
+mitmproxy -r reference.dashif.org.har
+~~~
+
+<https://wikipedia.org/wiki/Replay_attack>
+
+## how to get X-Axdrm-Message?
+
+its in HTML response body:
+
+~~~js
+const protData = {
+    "com.microsoft.playready": {
+        "serverURL": "https://drm-playready-licensing.axtest.net/AcquireLicense",
+        "httpRequestHeaders": {
+            "X-AxDRM-Message": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ2ZXJz..."
+        }
+    }
+};
+~~~
+
+## Microsoft Edge
+
+1. Settings and more
+2. Settings
+3. Privacy, search, and services
+4. Clear browsing data, Clear browsing data now, Choose what to clear
+5. Time range, all time
+6. Cookies and other site data, Cached images and files
+7. Clear now

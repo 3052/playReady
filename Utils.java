@@ -350,7 +350,7 @@ public class Utils {
 
          Date d = f.parse("1904/01/01 12:00 AM");
 
-         long timeval = d.getTime() + val * 1000 L;
+         long timeval = d.getTime() + val * 1000L;
 
          d = new Date(timeval);
 
@@ -361,7 +361,7 @@ public class Utils {
    }
 
    public static long date2long(String sdate) {
-      long timeval = -1 L;
+      long timeval = -1L;
 
       try {
          DateFormat f = new SimpleDateFormat("yyyy/MM/dd hh:mm:ss aaa");
@@ -371,14 +371,14 @@ public class Utils {
          long base_timeval = base.getTime();
 
          Date d = f.parse(sdate);
-         timeval = (d.getTime() - base_timeval) / 1000 L;
+         timeval = (d.getTime() - base_timeval) / 1000L;
       } catch (Throwable t) {}
 
       return timeval;
    }
 
    public static long current_date() {
-      long timeval = -1 L;
+      long timeval = -1L;
 
       try {
          DateFormat f = new SimpleDateFormat("yyyy/MM/dd hh:mm:ss aaa");
@@ -388,7 +388,7 @@ public class Utils {
          long base_timeval = base.getTime();
 
          Date d = new Date();
-         timeval = (d.getTime() - base_timeval) / 1000 L;
+         timeval = (d.getTime() - base_timeval) / 1000L;
       } catch (Throwable t) {}
 
       return timeval;

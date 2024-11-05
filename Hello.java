@@ -4,19 +4,16 @@ import agsecres.tool.Vars;
 import mod.mspr.Device;
 import mod.mspr.MSPR;
 
-// `CDN_NOAUTH`   - it implicates that a random value ise used instead of the
-// auth cookie for content data requests (CDN requests) 
+// Finally, as a proof for no importance of device identity such as SERIAL and
+// MAC, a test was conducted that successfully obtained license to the asset
+// with fake client device identity (fake `MAC` and `SERIAL` numbers):
+// msprcp> set SERIAL DGBD0123456789ABC
+// msprcp> set MAC AABBCCDDEEFF
 
 public class Hello {
    
    static String wrm_hdr = """
 <WRMHEADER xmlns="http://schemas.microsoft.com/DRM/2007/03/PlayReadyHeader" version="4.0.0.0"><DATA><PROTECTINFO><KEYLEN>16</KEYLEN><ALGID>AESCTR</ALGID></PROTECTINFO><KID>UZ4Ci2rVvUSRD9S1/ZD7og==</KID></DATA></WRMHEADER>""";
-
-   // Finally, as a proof for no importance of device identity such as SERIAL and
-   // MAC, a test was conducted that successfully obtained license to the asset
-   // with fake client device identity (fake `MAC` and `SERIAL` numbers):
-   // msprcp> set SERIAL DGBD0123456789ABC
-   // msprcp> set MAC AABBCCDDEEFF
    
    public static void main(String args[]) {
       Vars.set("MAC", "AABBCCDDEEFF");

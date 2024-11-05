@@ -199,19 +199,21 @@ public class MSPR {
    }
 
    public static String CLIENT_INFO() {
-      return "<ClientInfo><ClientVersion>1.2.0.1404</ClientVersion></ClientInfo>";
+      // return "<ClientInfo><ClientVersion>1.2.0.1404</ClientVersion></ClientInfo>";
+      return "<CLIENTINFO><CLIENTVERSION>10.0.16384.10011</CLIENTVERSION></CLIENTINFO>";
    }
 
    public static String LICENSE_NONCE(String nonce) {
       String s = "";
-
       s += "<LicenseNonce>";
       s += nonce;
       s += "</LicenseNonce>";
-
-      //not sure of this
-      s += "  ";
-
+      // not sure of this
+      // s += "  ";
+      // <ClientTime>1730770911</ClientTime>
+      s += "<ClientTime>";
+      s += System.currentTimeMillis() / 1000L;
+      s += "</ClientTime>";
       return s;
    }
 
