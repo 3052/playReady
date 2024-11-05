@@ -22,14 +22,14 @@ size = 49.92 megabyte
 version code = 383000445
 ~~~
 
-secrets\z1 (PlayReady private ECC group key):
-
-~~~
-assets\PlayReady\zgpriv.dat
-~~~
-
 secrets\g1 (PlayReady binary group certificate):
 
 ~~~
 assets\PlayReady\bgroupcert.dat
+~~~
+
+secrets\z1 (PlayReady private ECC group key):
+
+~~~
+assets\PlayReady\zgpriv.dat
 ~~~

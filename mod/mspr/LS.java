@@ -14,15 +14,18 @@ import java.lang.*;
 import java.util.*;
 
 public class LS {
- public static String[] get_reqprops(Device dev) {
-  return new String[]{
-   "Content-type",  "text/xml; charset=utf-8",
-   "Mac",           dev.get_mac(),
-   "Soapaction",    "http://schemas.microsoft.com/DRM/2007/03/protocols/AcquireLicense"
-  };
- }
+   public static String[] get_reqprops(Device dev) {
+      return new String[] {
+         "Content-type",
+         "text/xml; charset=utf-8",
+         "Mac",
+         dev.get_mac(),
+         "Soapaction",
+         "http://schemas.microsoft.com/DRM/2007/03/protocols/AcquireLicense"
+      };
+   }
 
- public static String send_license_req(String ls_url,Device dev,String msg) {
-  return Web.https_post(ls_url,msg,get_reqprops(dev));
- }
+   public static String send_license_req(String ls_url, Device dev, String msg) {
+      return Web.https_post(ls_url, msg, get_reqprops(dev));
+   }
 }
