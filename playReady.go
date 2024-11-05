@@ -9,6 +9,9 @@ import (
 
 func main() {
    err := os.Setenv("PATH", "C:/Program Files/Android/Android Studio/jbr/bin")
+   if err != nil {
+      panic(err)
+   }
    compile := flag.Bool("c", false, "compile")
    flag.Parse()
    if *compile {
