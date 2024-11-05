@@ -180,8 +180,10 @@ public class Device {
    }
 
    public static BCert.CertificateChain get_group_cert() {
+      System.out.println("Device.get_group_cert");
       if (group_cert == null) {
          group_cert = (BCert.CertificateChain) BCert.from_file("g1");
+         System.out.println("group_cert " + group_cert);
          //check if we should generate fake group cert
          if (Vars.get_int("MSPR_FAKE_ROOT") == 1) {
             gen_fake_group_cert();

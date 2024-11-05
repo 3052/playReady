@@ -46,7 +46,7 @@ public abstract class BCert {
 
    public static byte[] load_file(String name) {
       String path = BASE_DIR + File.separatorChar + name;
-
+      System.out.println("path " + path);
       return Utils.load_file(path);
    }
 
@@ -58,12 +58,9 @@ public abstract class BCert {
 
    public static BCert from_file(String name) {
       byte data[] = load_file(name);
-
       if (data != null) {
          ByteInput bi = new ByteInput(name, data);
-
          int magic = bi.peek_4();
-
          switch (magic) {
          case BCERT_CHAIN:
             return new CertificateChain(bi);
@@ -71,8 +68,7 @@ public abstract class BCert {
             return new Certificate(bi);
          }
       }
-
-      //unknown bcert file
+      // unknown bcert file
       return null;
    }
 

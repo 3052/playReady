@@ -13,91 +13,91 @@ import java.lang.*;
 import java.util.*;
 
 public class PaddedPrinter {
- public static class PrintLevel {
-  int pad;
-  String header;
-  String prefix;
+   public static class PrintLevel {
+      int pad;
+      String header;
+      String prefix;
 
-  public PrintLevel(int pad,String header,String prefix) {
-   this.pad=pad;
-   this.header=header;
-   this.prefix=prefix;
-  }
+      public PrintLevel(int pad, String header, String prefix) {
+         this.pad = pad;
+         this.header = header;
+         this.prefix = prefix;
+      }
 
-  public int pad() {
-   return pad;
-  }
+      public int pad() {
+         return pad;
+      }
 
-  public String header() {
-   return header;
-  }
+      public String header() {
+         return header;
+      }
 
-  public String prefix() {
-   return prefix;
-  }
- }  
+      public String prefix() {
+         return prefix;
+      }
+   }
 
- static Stack<PrintLevel> levels=new Stack<PrintLevel>();
+   static Stack < PrintLevel > levels = new Stack < PrintLevel > ();
 
- int lvl;
- int pad;
+   int lvl;
+   int pad;
 
- public PaddedPrinter() {
-  lvl=0;
-  pad=0;
- }
+   public PaddedPrinter() {
+      lvl = 0;
+      pad = 0;
+   }
 
- public void pad(int cnt,String header,String prefix) {
-  pad+=cnt;
-  levels.push(new PrintLevel(pad,header,prefix));
-  lvl++;
+   public void pad(int cnt, String header, String prefix) {
+      pad += cnt;
+      levels.push(new PrintLevel(pad, header, prefix));
+      lvl++;
 
-  if (header!=null) {
-   String line=Utils.pad(pad)+header;
-   Utils.outputln(line);
-  }
- }
- 
- public void pad(int cnt) {
-  pad(cnt,"");
- }
+      if (header != null) {
+         String line = Utils.pad(pad) + header;
+         Utils.outputln(line);
+      }
+   }
 
- public void pad(int cnt,String prefix) {
-  pad(cnt,null,prefix);
- }
+   public void pad(int cnt) {
+      pad(cnt, "");
+   }
 
- public PrintLevel leave() {
-  levels.pop();
-  PrintLevel pl=peek();
+   public void pad(int cnt, String prefix) {
+      pad(cnt, null, prefix);
+   }
 
-  pad=pl.pad();
-  lvl--;
+   public PrintLevel leave() {
+      levels.pop();
+      PrintLevel pl = peek();
 
-  return pl;  
- }
+      pad = pl.pad();
+      lvl--;
 
- public PrintLevel peek() {
-  PrintLevel pl=levels.peek();
+      return pl;
+   }
 
-  return pl;  
- }
+   public PrintLevel peek() {
+      PrintLevel pl = levels.peek();
 
- public static PaddedPrinter getInstance() {
-  PaddedPrinter pp=new PaddedPrinter();
-  pp.pad(0,"","");
+      return pl;
+   }
 
-  return pp;
- }
+   public static PaddedPrinter getInstance() {
+      PaddedPrinter pp = new PaddedPrinter();
+      pp.pad(0, "", "");
 
- public void println(String s) {
-  PrintLevel pl=peek();
+      return pp;
+   }
 
-  String line=Utils.pad(pl.pad())+pl.prefix()+s;
-  Utils.outputln(line);
- }
+   public void println(String s) {
+      PrintLevel pl = peek();
 
- public void printhex(String s,byte data[]) {
-  PrintLevel pl=peek();
-  Utils.print_buf(pl.pad(),s,data);
- }
+      String line = Utils.pad(pl.pad()) + pl.prefix() + s;
+      Utils.outputln(line);
+   }
+
+   public void printhex(String s, byte data[]) {
+      PrintLevel pl = peek();
+      Utils.print_buf(pl.pad(), s, data);
+   }
 }
