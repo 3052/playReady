@@ -11,24 +11,24 @@ package mod.mspr;
 import java.lang.*;
 
 public class POCInfo {
- public static final String UUID = "(c) AGSecRes2022";
- public static final String MSG  = "Proof of Concept MP4 file demonstrating weak content protection in the environment of CANAL+ (Microsoft PlayReady DRM case)";
+   public static final String UUID = "(c)";
+   public static final String MSG = "Proof of Concept MP4 file demonstrating weak content protection in the environment of CANAL+ (Microsoft PlayReady DRM case)";
 
- public static void replace_array_content(byte array[],String str) {
-  int alen=array.length;
+   public static void replace_array_content(byte array[], String str) {
+      int alen = array.length;
 
-  byte data[]=str.getBytes();
+      byte data[] = str.getBytes();
 
-  int slen=data.length;
+      int slen = data.length;
 
-  if (slen>alen) slen=alen;
+      if (slen > alen) slen = alen;
 
-  for(int i=0;i<slen;i++) {
-   array[i]=data[i];
-  }  
+      for (int i = 0; i < slen; i++) {
+         array[i] = data[i];
+      }
 
-  for(int i=slen;i<alen;i++) {
-   array[i]=0;
-  }
- }
+      for (int i = slen; i < alen; i++) {
+         array[i] = 0;
+      }
+   }
 }

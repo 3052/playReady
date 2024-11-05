@@ -200,11 +200,22 @@ public class MSPR {
 
    public static String CLIENT_INFO() {
       // return "<ClientInfo><ClientVersion>1.2.0.1404</ClientVersion></ClientInfo>";
-      return "<CLIENTINFO><CLIENTVERSION>10.0.16384.10011</CLIENTVERSION></CLIENTINFO>";
+      String s = "";
+      s += "<CLIENTINFO><CLIENTVERSION>10.0.16384.10011</CLIENTVERSION>";
+      s += "</CLIENTINFO>";
+      s += "<RevocationLists>";
+      s += "<RevListInfo><ListID>ioydTlK2p0WXkWklprR5Hw==</ListID><Version>0</Version></RevListInfo>";
+      s += "<RevListInfo><ListID>gC4IKKPHsUCCVhnlttibJw==</ListID><Version>0</Version></RevListInfo>";
+      s += "<RevListInfo><ListID>Ef/RUojT3U6Ct2jqTCChbA==</ListID><Version>0</Version></RevListInfo>";
+      s += "<RevListInfo><ListID>BOZ1zT1UnEqfCf5tJOi/kA==</ListID><Version>0</Version></RevListInfo>";
+      s += "</RevocationLists>";
+      return s;
    }
 
    public static String LICENSE_NONCE(String nonce) {
       String s = "";
+      
+      
       s += "<LicenseNonce>";
       s += nonce;
       s += "</LicenseNonce>";
