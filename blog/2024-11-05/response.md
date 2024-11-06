@@ -152,3 +152,176 @@ function Run(licensesCol, target) {
    }
 }
 ~~~
+
+https://testweb.playready.microsoft.com/js/parser/XMRParser.js
+
+~~~js
+function parseXMRLicense(xmr, offset) {
+   XMRStatic.offset = offset;
+   var list = new Array();
+   var headerObject = new playready.XMRHeader();
+   headerObject.parse(xmr);
+   list.push(headerObject);
+   while (XMRStatic.offset < xmr.length) {
+       XMRStatic.setPostOffset(0);
+       var peekOffset = XMRStatic.offset;
+       var flags = readWORD(xmr);
+       var type = readWORD(xmr);
+       XMRStatic.offset = peekOffset;
+       var xmrObject = new playready.XMRObject();
+       var unknownType = false;
+       switch (type) {
+           case playready.XMRObjectType.OuterContainer:
+               xmrObject = new playready.OuterContainer();
+               break;
+           case playready.XMRObjectType.GlobalPolicy:
+               xmrObject = new playready.GlobalPolicyContainer();
+               break;
+           case playready.XMRObjectType.PlaybackPolicy:
+               xmrObject = new playready.PlaybackPolicyContainer();
+               break;
+           case playready.XMRObjectType.PlayEnabler:
+               xmrObject = new playready.PlayEnablerContainer();
+               break;
+           case playready.XMRObjectType.PlayEnablerType:
+               xmrObject = new playready.PlayEnablerType();
+               break;
+           case playready.XMRObjectType.DomainRestriction:
+               xmrObject = new playready.DomainRestrictionObject();
+               break;
+           case playready.XMRObjectType.IssueDate:
+               xmrObject = new playready.IssueDateObject();
+               break;
+           case playready.XMRObjectType.RevInfoVersion:
+               xmrObject = new playready.RevInfoVersionObject();
+               break;
+           case playready.XMRObjectType.SecurityLevel:
+               xmrObject = new playready.SecurityLevelObject();
+               break;
+           case playready.XMRObjectType.EmbeddedLicenseSettings:
+               xmrObject = new playready.EmbeddedLicenseSettingsObject();
+               break;
+           case playready.XMRObjectType.KeyMaterialContainer:
+               xmrObject = new playready.KeyMaterialContainerObject();
+               break;
+           case playready.XMRObjectType.ContentKey:
+               xmrObject = new playready.ContentKeyObject();
+               break;
+           case playready.XMRObjectType.ECCKey:
+               xmrObject = new playready.ECCKeyObject();
+               break;
+           case playready.XMRObjectType.XMRSignature:
+               xmrObject = new playready.XMRSignatureObject();
+               break;
+           case playready.XMRObjectType.RightsSettingObject:
+               xmrObject = new playready.XMRRightsSettingsObject();
+               break;
+           case playready.XMRObjectType.OutputProtectionLevelRestriction:
+               xmrObject = new playready.XMROutputProtectionLevelRestrictionObject();
+               break;
+           case playready.XMRObjectType.ExpirationRestriction:
+               xmrObject = new playready.ExpirationRestrictionObject();
+               break;
+           case playready.XMRObjectType.RealTimeExpirationRestriction:
+               xmrObject = new playready.XMRRealTimeExpirationRestriction();
+               break;
+           case playready.XMRObjectType.UplinkKIDObject:
+               xmrObject = new playready.XMRUplinkKIDObject();
+               break;
+           case playready.XMRObjectType.ExplicitDigitalVideoOutputProtection:
+               xmrObject = new playready.ExplicitDigitalVideoOutputProtectionObject();
+               break;
+           case playready.XMRObjectType.DigitalVideoOutputRestriction:
+               xmrObject = new playready.DigitalVideoOutputRestrictionObject();
+               break;
+           case playready.XMRObjectType.ExplicitDigitalAudioOutputProtection:
+               xmrObject = new playready.ExplicitDigitalAudioOutputProtectionObject();
+               break;
+           case playready.XMRObjectType.DigitalAudioOutputRestriction:
+               xmrObject = new playready.DigitalAudioOutputRestrictionObject();
+               break;
+           case playready.XMRObjectType.SecureStopRestriction:
+               xmrObject = new playready.SecureStopRestrictionObject();
+               break;
+           case playready.XMRObjectType.ExpirationAfterFirstPlayRestriction:
+               xmrObject = new playready.ExpirationAfterFirstPlayRestrictionObject();
+               break;
+           case playready.XMRObjectType.RemovalDateObject:
+               xmrObject = new playready.RemovalDateObject();
+               break;
+           case playready.XMRObjectType.GracePeriodObject:
+               xmrObject = new playready.GracePeriodObject();
+               break;
+           case playready.XMRObjectType.SourceIdObject:
+               xmrObject = new playready.SourceIdObject();
+               break;
+           case playready.XMRObjectType.MeteringRestrictionObject:
+               xmrObject = new playready.MeteringRestrictionObject();
+               break;
+           case playready.XMRObjectType.PolicyMetadataObject:
+               xmrObject = new playready.PolicyMetadataObject();
+               break;
+           case playready.XMRObjectType.ExplicitAnalogVideoOutputProtectionContainer:
+               xmrObject = new playready.ExplicitAnalogVideoOutputProtectionContainer();
+               break;
+           case playready.XMRObjectType.AnalogVideoOutputConfigurationRestriction:
+               xmrObject = new playready.AnalogVideoOutputConfigurationRestriction();
+               break;
+           case playready.XMRObjectType.AuxiliaryKeyObject:
+               xmrObject = new playready.AuxiliaryKeyObject();
+               break;
+           case playready.XMRObjectType.UplinkKeyObject3:
+               xmrObject = new playready.UplinkKeyObject3();
+               break;
+           case playready.XMRObjectType.CopyObject:
+               xmrObject = new playready.CopyObject();
+               break;
+           case playready.XMRObjectType.CopyEnablerContainerObject:
+               xmrObject = new playready.CopyEnablerContainerObject();
+               break;
+           case playready.XMRObjectType.CopyEnablerObject:
+               xmrObject = new playready.CopyEnablerObject();
+               break;
+           case playready.XMRObjectType.CopyCountRestrictionObject:
+               xmrObject = new playready.CopyCountRestrictionObject();
+               break;
+           case playready.XMRObjectType.MoveObject:
+               xmrObject = new playready.MoveObject();
+               break;
+           case playready.XMRObjectType.ReadContainerObject:
+               xmrObject = new playready.ReadContainerObject();
+               break;
+           case playready.XMRObjectType.ExecuteContainerObject:
+               xmrObject = new playready.ExecuteContainerObject();
+               break;
+           case playready.XMRObjectType.RestrictedSourceIdObject:
+               xmrObject = new playready.RestrictedSourceIdObject();
+               break;
+           default:
+               xmrObject = new playready.UnknownObject();
+               unknownType = true;
+               break;
+       }
+       xmrObject.parse(xmr);
+       list.push(xmrObject);
+       XMRStatic.depthByteCount[XMRStatic.currentDepth] += xmrObject.Length;
+       xmrObject.Debug = XMRStatic.depthByteCount.toString();
+       for (var d = XMRStatic.currentDepth; d >= 0; d--) {
+           XMRStatic.depthByteCount[d] -= (XMRStatic.offset - peekOffset);
+       }
+       xmrObject.Depth = XMRStatic.currentDepth;
+       if (XMRStatic.depthByteCount[XMRStatic.currentDepth] > 0) {
+           XMRStatic.currentDepth += 1;
+       }
+       else if (XMRStatic.currentDepth > 0) {
+           for (var e = 0; e < XMRStatic.depthByteCount.length; e++) {
+               if (XMRStatic.depthByteCount[e] === 0) {
+                   XMRStatic.currentDepth = e;
+                   break;
+               }
+           }
+       }
+   }
+   return list;
+}
+~~~
