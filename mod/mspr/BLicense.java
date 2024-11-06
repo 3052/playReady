@@ -262,10 +262,11 @@ public class BLicense {
       public Attr lookup_attr_by_name(String name) {
          for (int i = 0; i < cnt(); i++) {
             Attr attr = get(i);
-
-            if (attr.name().equals(name)) return attr;
+            System.out.println(attr.name());
+            if (attr.name().equals(name)) {
+               return attr;
+            }
          }
-
          return null;
       }
 
@@ -354,6 +355,7 @@ public class BLicense {
       for (int i = 0; i < path_elem.length; i++) {
          if (curpos instanceof ContainerAttr) {
             res = ((ContainerAttr) curpos).lookup_attr_by_name(path_elem[i]);
+            System.out.println("---");
          }
 
          if (res == null) break;

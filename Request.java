@@ -10,7 +10,7 @@ import mod.mspr.MSPR;
 // msprcp> set SERIAL DGBD0123456789ABC
 // msprcp> set MAC AABBCCDDEEFF
 
-public class Hello {
+public class Request {
    
    static String wrm_hdr = """
 <WRMHEADER xmlns="http://schemas.microsoft.com/DRM/2007/03/PlayReadyHeader" version="4.0.0.0"><DATA><PROTECTINFO><KEYLEN>16</KEYLEN><ALGID>AESCTR</ALGID></PROTECTINFO><KID>UZ4Ci2rVvUSRD9S1/ZD7og==</KID></DATA></WRMHEADER>""";

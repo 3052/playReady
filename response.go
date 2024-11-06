@@ -27,14 +27,8 @@ func main() {
       }
    }
    os.Remove("secrets/genchain")
-   if err != nil {
-      panic(err)
-   }
-   data, err := exec.Command("java", "agsecres.tool.Hello").CombinedOutput()
-   if err != nil {
-      panic(err)
-   }
-   err = os.WriteFile("playReady.txt", data, os.ModePerm)
+   data, err := exec.Command("java", "agsecres.tool.Response").CombinedOutput()
+   os.Stdout.Write(data)
    if err != nil {
       panic(err)
    }

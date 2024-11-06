@@ -114,9 +114,8 @@ public class License {
 
          try {
             license_data = Crypto.base64_decode(license);
-            custom_data = Crypto.base64_decode(custom);
-
-            parse_customdata();
+            //custom_data = Crypto.base64_decode(custom);
+            //parse_customdata();
             parse_license();
          } catch (Throwable t) {
             t.printStackTrace();
@@ -136,11 +135,9 @@ public class License {
 
    public byte[] get_encrypted_data() {
       BLicense.ContentKey ck = (BLicense.ContentKey) blicense.get_attr("OuterContainer.KeyMaterialContainer.ContentKey");
-
       if (ck != null) {
          return ck.enc_data();
       }
-
       return null;
    }
 
