@@ -37,7 +37,7 @@ public class PaddedPrinter {
       }
    }
 
-   static Stack < PrintLevel > levels = new Stack < PrintLevel > ();
+   static Stack<PrintLevel> levels = new Stack<PrintLevel>();
 
    int lvl;
    int pad;
