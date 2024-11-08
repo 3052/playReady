@@ -19,42 +19,137 @@ public class BLicense {
 
    public static final int ATTR_HDR_SIZE = 8;
 
-   //tag values
-   public static final short TAG_OuterContainer = 0x0001;
-   public static final short TAG_PlaybackContainer = 0x0004;
-   public static final short TAG_GlobalContainer = 0x0002;
-   public static final short TAG_DWORD_Versioned = 0x0032;
-   public static final short TAG_SecurityLevel = 0x0034;
-   public static final short TAG_WORD = 0x0033;
-   public static final short TAG_KeyMaterialContainer = 0x0009;
-   public static final short TAG_ContentKey = 0x000a;
-   public static final short TAG_ECCDeviceKey = 0x002a;
-   public static final short TAG_Signature = 0x000b;
+   public static final short TAG_OuterContainer = 0x0001;  // 1
+   public static final short TAG_GlobalPolicy = 0x0002;  // 2
+   public static final short TAG_PlaybackPolicy = 0x0004;  // 4
+   public static final short TAG_PlayEnabler = 0x0036;  // 54
+   public static final short TAG_PlayEnablerType = 0x0039;  // 57
+   public static final short TAG_DomainRestriction = 0x0029;  // 41
+   public static final short TAG_IssueDate = 0x0013;  // 19
+   public static final short TAG_RevInfoVersion = 0x0032;  // 50
+   public static final short TAG_SecurityLevel = 0x0034;  // 52
+   public static final short TAG_EmbeddedLicenseSettings = 0x0033;  // 51
+   public static final short TAG_KeyMaterialContainer = 0x0009;  // 9
+   public static final short TAG_ContentKey = 0x000A;  // 10
+   public static final short TAG_ECCKey = 0x002A;  // 42
+   public static final short TAG_XMRSignature = 0x000B;  // 11
+   public static final short TAG_RightsSettingObject = 0x000D;  // 13
+   public static final short TAG_OutputProtectionLevelRestriction = 0x0005;  // 5
+   public static final short TAG_ExpirationRestriction = 0x0012;  // 18
+   public static final short TAG_RealTimeExpirationRestriction = 0x0055;  // 85
+   public static final short TAG_UplinkKIDObject = 0x003B;  // 59
+   public static final short TAG_ExplicitDigitalVideoOutputProtection = 0x0058;  // 88
+   public static final short TAG_DigitalVideoOutputRestriction = 0x0059;  // 89
+   public static final short TAG_ExplicitDigitalAudioOutputProtection = 0x002E;  // 46
+   public static final short TAG_DigitalAudioOutputRestriction = 0x0031;  // 49
+   public static final short TAG_SecureStopRestriction = 0x005A;  // 90
+   public static final short TAG_ExpirationAfterFirstPlayRestriction = 0x0030;  // 48
+   public static final short TAG_RemovalDateObject = 0x0050;  // 80
+   public static final short TAG_GracePeriodObject = 0x001A;  // 26
+   public static final short TAG_SourceIdObject = 0x0022;  // 34
+   public static final short TAG_MeteringRestrictionObject = 0x0016;  // 22
+   public static final short TAG_PolicyMetadataObject = 0x002C;  // 44
+   public static final short TAG_ExplicitAnalogVideoOutputProtectionContainer = 0x0007;  // 7
+   public static final short TAG_AnalogVideoOutputConfigurationRestriction = 0x0008;  // 8
+   public static final short TAG_AuxiliaryKeyObject = 0x0051;  // 81
+   public static final short TAG_UplinkKeyObject3 = 0x0052;  // 82
+   public static final short TAG_CopyObject = 0x003C;  // 60
+   public static final short TAG_CopyEnablerContainerObject = 0x0038;  // 56
+   public static final short TAG_CopyEnablerObject = 0x003A;  // 58
+   public static final short TAG_CopyCountRestrictionObject = 0x003D;  // 61
+   public static final short TAG_MoveObject = 0x0037;  // 55
+   public static final short TAG_ReadContainerObject = 0x0041;  // 65
+   public static final short TAG_ExecuteContainerObject = 0x003F;  // 63
+   public static final short TAG_RestrictedSourceIdObject = 0x0028;  // 40
 
    public static final short TAG_ROOT_CONTAINER = 0x7fff;
 
    static String tag_name(short tag) {
       switch (tag) {
-      case TAG_OuterContainer:
-         return "OuterContainer";
-      case TAG_PlaybackContainer:
-         return "PlaybackContainer";
-      case TAG_GlobalContainer:
-         return "GlobalContainer";
-      case TAG_DWORD_Versioned:
-         return "DWORD_Versioned";
-      case TAG_SecurityLevel:
-         return "SecurityLevel";
-      case TAG_WORD:
-         return "WORD";
-      case TAG_KeyMaterialContainer:
-         return "KeyMaterialContainer";
-      case TAG_ContentKey:
-         return "ContentKey";
-      case TAG_ECCDeviceKey:
-         return "ECCDeviceKey";
-      case TAG_Signature:
-         return "Signature";
+        case TAG_OuterContainer:
+             return "OuterContainer";
+        case TAG_GlobalPolicy:
+             return "GlobalPolicy";
+        case TAG_PlaybackPolicy:
+             return "PlaybackPolicy";
+        case TAG_PlayEnabler:
+             return "PlayEnabler";
+        case TAG_PlayEnablerType:
+             return "PlayEnablerType";
+        case TAG_DomainRestriction:
+             return "DomainRestriction";
+        case TAG_IssueDate:
+             return "IssueDate";
+        case TAG_RevInfoVersion:
+             return "RevInfoVersion";
+        case TAG_SecurityLevel:
+             return "SecurityLevel";
+        case TAG_EmbeddedLicenseSettings:
+             return "EmbeddedLicenseSettings";
+        case TAG_KeyMaterialContainer:
+             return "KeyMaterialContainer";
+        case TAG_ContentKey:
+             return "ContentKey";
+        case TAG_ECCKey:
+             return "ECCKey";
+        case TAG_XMRSignature:
+             return "XMRSignature";
+        case TAG_RightsSettingObject:
+             return "RightsSettingObject";
+        case TAG_OutputProtectionLevelRestriction:
+             return "OutputProtectionLevelRestriction";
+        case TAG_ExpirationRestriction:
+             return "ExpirationRestriction";
+        case TAG_RealTimeExpirationRestriction:
+             return "RealTimeExpirationRestriction";
+        case TAG_UplinkKIDObject:
+             return "UplinkKIDObject";
+        case TAG_ExplicitDigitalVideoOutputProtection:
+             return "ExplicitDigitalVideoOutputProtection";
+        case TAG_DigitalVideoOutputRestriction:
+             return "DigitalVideoOutputRestriction";
+        case TAG_ExplicitDigitalAudioOutputProtection:
+             return "ExplicitDigitalAudioOutputProtection";
+        case TAG_DigitalAudioOutputRestriction:
+             return "DigitalAudioOutputRestriction";
+        case TAG_SecureStopRestriction:
+             return "SecureStopRestriction";
+        case TAG_ExpirationAfterFirstPlayRestriction:
+             return "ExpirationAfterFirstPlayRestriction";
+        case TAG_RemovalDateObject:
+             return "RemovalDateObject";
+        case TAG_GracePeriodObject:
+             return "GracePeriodObject";
+        case TAG_SourceIdObject:
+             return "SourceIdObject";
+        case TAG_MeteringRestrictionObject:
+             return "MeteringRestrictionObject";
+        case TAG_PolicyMetadataObject:
+             return "PolicyMetadataObject";
+        case TAG_ExplicitAnalogVideoOutputProtectionContainer:
+             return "ExplicitAnalogVideoOutputProtectionContainer";
+        case TAG_AnalogVideoOutputConfigurationRestriction:
+             return "AnalogVideoOutputConfigurationRestriction";
+        case TAG_AuxiliaryKeyObject:
+             return "AuxiliaryKeyObject";
+        case TAG_UplinkKeyObject3:
+             return "UplinkKeyObject3";
+        case TAG_CopyObject:
+             return "CopyObject";
+        case TAG_CopyEnablerContainerObject:
+             return "CopyEnablerContainerObject";
+        case TAG_CopyEnablerObject:
+             return "CopyEnablerObject";
+        case TAG_CopyCountRestrictionObject:
+             return "CopyCountRestrictionObject";
+        case TAG_MoveObject:
+             return "MoveObject";
+        case TAG_ReadContainerObject:
+             return "ReadContainerObject";
+        case TAG_ExecuteContainerObject:
+             return "ExecuteContainerObject";
+        case TAG_RestrictedSourceIdObject:
+             return "RestrictedSourceIdObject";
       }
 
       return "Unknown";
@@ -130,18 +225,50 @@ public class BLicense {
       public static Attr parse(Attr attr) {
          switch (attr.tag()) {
          case TAG_OuterContainer:
-         case TAG_PlaybackContainer:
-         case TAG_GlobalContainer:
          case TAG_KeyMaterialContainer:
+         case TAG_ExplicitAnalogVideoOutputProtectionContainer:
             return ContainerAttr.get(attr.tag(), attr.data());
          case TAG_SecurityLevel:
             return SecurityLevel.get(attr.data());
          case TAG_ContentKey:
             return ContentKey.get(attr.data());
-         case TAG_DWORD_Versioned:
-         case TAG_WORD:
-         case TAG_ECCDeviceKey:
-         case TAG_Signature:
+         case TAG_ECCKey:
+         case TAG_XMRSignature:
+         case TAG_RightsSettingObject:
+         case TAG_OutputProtectionLevelRestriction:
+         case TAG_ExpirationRestriction:
+         case TAG_RealTimeExpirationRestriction:
+         case TAG_UplinkKIDObject:
+         case TAG_ExplicitDigitalVideoOutputProtection:
+         case TAG_DigitalVideoOutputRestriction:
+         case TAG_ExplicitDigitalAudioOutputProtection:
+         case TAG_DigitalAudioOutputRestriction:
+         case TAG_SecureStopRestriction:
+         case TAG_ExpirationAfterFirstPlayRestriction:
+         case TAG_RemovalDateObject:
+         case TAG_GracePeriodObject:
+         case TAG_SourceIdObject:
+         case TAG_MeteringRestrictionObject:
+         case TAG_PolicyMetadataObject:
+         case TAG_AnalogVideoOutputConfigurationRestriction:
+         case TAG_AuxiliaryKeyObject:
+         case TAG_UplinkKeyObject3:
+         case TAG_CopyObject:
+         case TAG_CopyEnablerContainerObject:
+         case TAG_CopyEnablerObject:
+         case TAG_CopyCountRestrictionObject:
+         case TAG_MoveObject:
+         case TAG_ReadContainerObject:
+         case TAG_ExecuteContainerObject:
+         case TAG_RestrictedSourceIdObject:
+         case TAG_GlobalPolicy:
+         case TAG_PlaybackPolicy:
+         case TAG_PlayEnabler:
+         case TAG_PlayEnablerType:
+         case TAG_DomainRestriction:
+         case TAG_IssueDate:
+         case TAG_RevInfoVersion:
+         case TAG_EmbeddedLicenseSettings:
             break;
          }
 
@@ -198,7 +325,6 @@ public class BLicense {
          v1 = bi.read_2();
          v2 = bi.read_2();
          enc_data_len = bi.read_2();
-
          enc_data = bi.read_n(enc_data_len);
       }
 
