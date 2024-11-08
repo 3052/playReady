@@ -2,6 +2,8 @@
 
 - https://reference.dashif.org/dash.js/nightly/samples/drm/playready.html
 - https://sample.pallycon.com/demo/drm-demo/shaka
+- https://testweb.playready.microsoft.com
+- https://testweb.playready.microsoft.com/Tool/PlayerHAS
 
 ~~~
 mitmproxy --set stream_large_bodies=9m

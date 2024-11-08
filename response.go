@@ -26,7 +26,7 @@ func main() {
          panic(err)
       }
    }
-   os.Remove("secrets/genchain")
+   //os.Remove("secrets/genchain")
    data, err := exec.Command("java", "agsecres.tool.Response").CombinedOutput()
    os.Stdout.Write(data)
    if err != nil {
