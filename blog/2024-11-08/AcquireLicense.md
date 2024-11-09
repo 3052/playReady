@@ -1,5 +1,6 @@
 # AcquireLicense
 
+- http://playready.directtaps.net/pr/svc/rightsmanager.asmx?PlayRight=1&SecurityLevel=2000
 - https://reference.dashif.org/dash.js/nightly/samples/drm/playready.html
 - https://sample.pallycon.com/demo/drm-demo/shaka
 - https://testweb.playready.microsoft.com
