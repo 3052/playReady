@@ -21,7 +21,7 @@ all the public devices are revoked, this repo will no longer work
 
 <dl>
    <dt>email</dt>
-      <dd>10317@proton.me</dd>
+      <dd>367@tuta.io</dd>
    <dt>Discord username</dt>
       <dd>10308</dd>
    <dt>Discord invite</dt>
