@@ -4,8 +4,6 @@ import (
    "crypto/aes"
    "fmt"
    "os"
-   
-   "encoding/hex"
 )
 
 const (
