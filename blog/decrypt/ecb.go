@@ -2,8 +2,8 @@ package main
 
 import (
    "crypto/aes"
-   "fmt"
    "os"
+   "encoding/hex"
 )
 
 const (
@@ -13,16 +13,18 @@ const (
 
 // github.com/qdvbp/mstar-tools/blob/master/default_keys/AESboot.bin
 func main() {
-   data, err := os.ReadFile("zgpriv_protected.dat")
-   if err != nil {
-      panic(err)
-   }
-   fmt.Printf("%x\n", data)
    key, err := os.ReadFile("AESboot.bin")
    if err != nil {
       panic(err)
    }
-   fmt.Printf("%x\n", key)
+   key, err = hex.DecodeString("BC1197CA30AA0FC84F7FE62E09FD3D9F")
+   if err != nil {
+      panic(err)
+   }
+   data, err := os.ReadFile("zgpriv_protected.dat")
+   if err != nil {
+      panic(err)
+   }
    data = DecryptAes128Ecb(data, key)
    os.WriteFile("stage-1.dat", data, os.ModePerm)
 }
