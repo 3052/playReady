@@ -24,7 +24,7 @@ func main() {
    if err != nil {
       panic(err)
    }
-   key, err := os.ReadFile("MBOOT.bin")
+   key, err := os.ReadFile("MBOOT_b.img")
    if err != nil {
       panic(err)
    }
@@ -32,8 +32,9 @@ func main() {
       data = DecryptAes128Ecb(data, key[:16])
       if bytes.Contains(data, []byte(stage1)) {
          fmt.Println("pass")
-         break
+         return
       }
       key = key[1:]
    }
+   fmt.Println("fail")
 }

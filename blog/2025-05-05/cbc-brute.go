@@ -15,7 +15,7 @@ func main() {
    if err != nil {
       panic(err)
    }
-   key, err := os.ReadFile("MBOOT.bin")
+   key, err := os.ReadFile("MBOOT_b.img")
    if err != nil {
       panic(err)
    }
@@ -28,8 +28,9 @@ func main() {
       cipher.NewCBCDecrypter(block, iv[:]).CryptBlocks(data, data)
       if bytes.Contains(data, []byte(stage1)) {
          fmt.Println("pass")
-         break
+         return
       }
       key = key[1:]
    }
+   fmt.Println("fail")
 }

@@ -1,3 +1,5 @@
-*.class
 *.bin
+*.class
+*.dat
+*.img
 secrets
