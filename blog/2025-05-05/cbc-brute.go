@@ -7,7 +7,7 @@ import (
    "fmt"
    "os"
    
-   "slices"
+   //"slices"
 )
 
 const stage1 = "INNER_MSTAR_FILE"
@@ -17,11 +17,16 @@ func main() {
    if err != nil {
       panic(err)
    }
+   
+   src = src[16:]
+   
    key, err := os.ReadFile("mboot_emmc_mb180.bin")
    if err != nil {
       panic(err)
    }
-   slices.Reverse(key)
+   
+   //slices.Reverse(key)
+   
    var iv [16]byte
    dst := make([]byte, len(src))
    for len(key) >= 16 {
