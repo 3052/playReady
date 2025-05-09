@@ -6,27 +6,31 @@ import (
    "crypto/cipher"
    "fmt"
    "os"
+   
+   "slices"
 )
 
 const stage1 = "INNER_MSTAR_FILE"
 
 func main() {
-   data, err := os.ReadFile("zgpriv_protected.dat")
+   src, err := os.ReadFile("zgpriv_protected.dat.mb180")
    if err != nil {
       panic(err)
    }
-   key, err := os.ReadFile("MBOOT_b.img")
+   key, err := os.ReadFile("mboot_emmc_mb180.bin")
    if err != nil {
       panic(err)
    }
+   slices.Reverse(key)
    var iv [16]byte
+   dst := make([]byte, len(src))
    for len(key) >= 16 {
       block, err := aes.NewCipher(key[:16])
       if err != nil {
          panic(err)
       }
-      cipher.NewCBCDecrypter(block, iv[:]).CryptBlocks(data, data)
-      if bytes.Contains(data, []byte(stage1)) {
+      cipher.NewCBCDecrypter(block, iv[:]).CryptBlocks(dst, src)
+      if bytes.Contains(dst, []byte(stage1)) {
          fmt.Println("pass")
          return
       }

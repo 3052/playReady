@@ -5,6 +5,8 @@ import (
    "crypto/aes"
    "fmt"
    "os"
+   
+   "slices"
 )
 
 const stage1 = "INNER_MSTAR_FILE"
@@ -20,17 +22,18 @@ func DecryptAes128Ecb(data, key []byte) []byte {
 }
 
 func main() {
-   data, err := os.ReadFile("zgpriv_protected.dat")
+   src, err := os.ReadFile("zgpriv_protected.dat.mb180")
    if err != nil {
       panic(err)
    }
-   key, err := os.ReadFile("MBOOT_b.img")
+   key, err := os.ReadFile("mboot_emmc_mb180.bin")
    if err != nil {
       panic(err)
    }
+   slices.Reverse(key)
    for len(key) >= 16 {
-      data = DecryptAes128Ecb(data, key[:16])
-      if bytes.Contains(data, []byte(stage1)) {
+      dst := DecryptAes128Ecb(src, key[:16])
+      if bytes.Contains(dst, []byte(stage1)) {
          fmt.Println("pass")
          return
       }
