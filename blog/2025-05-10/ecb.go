@@ -10,7 +10,7 @@ import (
 )
 
 const (
-   //stage0 = "MSTAR_SECURE_STORE_FILE_MAGIC_ID"
+   stage0 = "MSTAR_SECURE_STORE_FILE_MAGIC_ID"
    stage1 = "INNER_MSTAR_FILE"
 )
 
