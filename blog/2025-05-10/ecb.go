@@ -3,54 +3,12 @@ package main
 import (
    "bytes"
    "crypto/aes"
-   "crypto/cipher"
    "encoding/hex"
    "fmt"
+   "iter"
+   "log"
    "os"
 )
-
-const (
-   stage0 = "MSTAR_SECURE_STORE_FILE_MAGIC_ID"
-   stage1 = "INNER_MSTAR_FILE"
-)
-
-func main() {
-   src, err := os.ReadFile("KeyBox.bin")
-   if err != nil {
-      panic(err)
-   }
-   src = src[20:]
-   for _, raw_key := range keys {
-      key, err := hex.DecodeString(raw_key)
-      if err != nil {
-         panic(err)
-      }
-      // ECB
-      dst := DecryptAes128Ecb(src, key)
-      if bytes.Contains(dst, []byte(stage1)) {
-         fmt.Println("pass")
-         break
-      }
-      // CBC zero
-      block, err := aes.NewCipher(key)
-      if err != nil {
-         panic(err)
-      }
-      var iv [16]byte
-      cipher.NewCBCDecrypter(block, iv[:]).CryptBlocks(dst, src)
-      if bytes.Contains(dst, []byte(stage1)) {
-         fmt.Println("pass")
-         break
-      }
-      // CBC key
-      cipher.NewCBCDecrypter(block, key).CryptBlocks(dst, src)
-      if bytes.Contains(dst, []byte(stage1)) {
-         fmt.Println("pass")
-         break
-      }
-   }
-   fmt.Println("fail")
-}
 
 func DecryptAes128Ecb(data, key []byte) []byte {
     cipher, _ := aes.NewCipher([]byte(key))
@@ -62,7 +20,46 @@ func DecryptAes128Ecb(data, key []byte) []byte {
     return decrypted
 }
 
-// github.com/qdvbp/mstar-tools/blob/master/default_keys/AESboot.bin
+const (
+   stage0 = "MSTAR_SECURE_STORE_FILE_MAGIC_ID"
+   stage1 = "INNER_MSTAR_FILE"
+)
+
+func get_source(data []byte) iter.Seq[[]byte] {
+   magic_id := bytes.Index(data, []byte(stage0))
+   return func(yield func([]byte) bool) {
+      for i := 0; i < magic_id; i++ {
+         if len(data[i:]) % 16 == 0 {
+            log.Println("source", i)
+            if !yield(data[i:]) {
+               return
+            }
+         }
+      }
+   }
+}
+
+func main() {
+   sources, err := os.ReadFile("KeyBox.bin")
+   if err != nil {
+      panic(err)
+   }
+   for source := range get_source(sources) {
+      for _, raw_key := range keys {
+         key, err := hex.DecodeString(raw_key)
+         if err != nil {
+            panic(err)
+         }
+         dest := DecryptAes128Ecb(source, key)
+         if bytes.Contains(dest, []byte(stage1)) {
+            fmt.Println("pass")
+            return
+         }
+      }
+   }
+   fmt.Println("fail")
+}
+
 var keys = []string{
    "0007FF4154534D92FC55AA0FFF0110E0", // default
    "24490B4CC95F739CE34138478E47139E", // advised by lossui (not sure when to be used)
