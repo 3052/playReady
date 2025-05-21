@@ -29,7 +29,7 @@ func main() {
    os.Remove("secrets/genchain")
    data, err := exec.Command("java", "agsecres.tool.Request").CombinedOutput()
    if err != nil {
-      panic(err)
+      fmt.Println(err)
    }
    err = os.WriteFile("request.txt", data, os.ModePerm)
    if err != nil {
