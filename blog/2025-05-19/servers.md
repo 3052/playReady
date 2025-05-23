@@ -35,12 +35,3 @@ const protData = {
 };
 ~~~
 
-## Microsoft Edge
-
-1. Settings and more
-2. Settings
-3. Privacy, search, and services
-4. Clear browsing data, Clear browsing data now, Choose what to clear
-5. Time range, all time
-6. Cookies and other site data, Cached images and files
-7. Clear now
