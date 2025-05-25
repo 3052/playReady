@@ -3,102 +3,124 @@ package apps
 var details = map[string][]app{
    "100M+ Downloads": {
       {
-         Max: Stream HBO, TV, & Movies
-         https://play.google.com/store/apps/details?id=com.wbd.stream
+         playReady: "sign up now",
+         title:     "Max: Stream HBO, TV, & Movies",
+         url:       "play.google.com/store/apps/details?id=com.wbd.stream",
       },
       {
-         PlutoTV: Live TV & Free Movies
-         https://play.google.com/store/apps/details?id=tv.pluto.android
+         playReady: "clearKey",
+         title:     "Tubi: Free Movies & Live TV",
+         url:       "play.google.com/store/apps/details?id=com.tubitv",
       },
       {
-         Tubi: Free Movies & Live TV
-         https://play.google.com/store/apps/details?id=com.tubitv
+         playReady: "there is an error with this content",
+         title:     "PlutoTV: Live TV & Free Movies",
+         url:       "play.google.com/store/apps/details?id=tv.pluto.android",
       },
    },
    "50M+ Downloads": {
       {
-         Hulu: Stream TV shows & movies
-         https://play.google.com/store/apps/details?id=com.hulu.plus
+         playReady: "sign up now",
+         title:     "Hulu: Stream TV shows & movies",
+         url:       "play.google.com/store/apps/details?id=com.hulu.plus",
       },
       {
-         Plex: Stream Movies & TV
-         https://play.google.com/store/apps/details?id=com.plexapp.android
+         playReady: "there was an error loading the video",
+         title:     "Plex: Stream Movies & TV",
+         url:       "play.google.com/store/apps/details?id=com.plexapp.android",
       },
    },
    "10M+ Downloads": {
       {
-         CANAL+, Live and catch-up TV
-         https://play.google.com/store/apps/details?id=com.canal.android.canal
+         playReady: "register",
+         title:     "CANAL+, Live and catch-up TV",
+         url:       "play.google.com/store/apps/details?id=com.canal.android.canal",
       },
       {
-         ITVX
-         https://play.google.com/store/apps/details?id=air.ITVMobilePlayer
+         playReady: "sign in",
+         title:     "Paramount+",
+         url:       "play.google.com/store/apps/details?id=com.cbs.app",
       },
       {
-         Molotov - TV en direct, replay
-         https://play.google.com/store/apps/details?id=tv.molotov.app
+         playReady: "login",
+         title:     "The NBC App - Stream TV Shows",
+         url:       "play.google.com/store/apps/details?id=com.nbcuni.nbc",
       },
       {
-         Movistar Plus+
-         https://play.google.com/store/apps/details?id=es.plus.yomvi
+         playReady: "log in",
+         title:     "Movistar Plus+",
+         url:       "play.google.com/store/apps/details?id=es.plus.yomvi",
       },
       {
-         Paramount+
-         https://play.google.com/store/apps/details?id=com.cbs.app
+         playReady: "available in a fee-paying option",
+         title:     "Molotov - TV en direct, replay",
+         url:       "play.google.com/store/apps/details?id=tv.molotov.app",
       },
       {
-         The NBC App - Stream TV Shows
-         https://play.google.com/store/apps/details?id=com.nbcuni.nbc
+         playReady: "sign in",
+         title:     "ITVX",
+         url:       "play.google.com/store/apps/details?id=air.ITVMobilePlayer",
       },
    },
    "5M+ Downloads": {
-      MUBI: Curated Cinema
-      https://play.google.com/store/apps/details?id=com.mubi
-
-      Rakuten TV -Movies & TV Series
-      https://play.google.com/store/apps/details?id=tv.wuaki
+      {
+         playReady: "log in",
+         title:     "MUBI: Curated Cinema",
+         url:       "play.google.com/store/apps/details?id=com.mubi",
+      },
+      {
+         playReady: "web client need residential proxy, license does not",
+         title:     "Rakuten TV -Movies & TV Series",
+         url:       "play.google.com/store/apps/details?id=tv.wuaki",
+      },
    },
    "1M+ Downloads": {
       {
-         AMC+
-         https://play.google.com/store/apps/details?id=com.amcplus.amcfullepisodes
+         playReady: "to see this content, log in",
+         title:     "RTBF Auvio : direct et replay",
+         url:       "play.google.com/store/apps/details?id=be.rtbf.auvio",
       },
       {
-         CTV
-         https://play.google.com/store/apps/details?id=ca.ctv.ctvgo
+         playReady: "sign up now",
+         title:     "AMC+",
+         url:       "play.google.com/store/apps/details?id=com.amcplus.amcfullepisodes",
       },
       {
-         Kanopy
-         https://play.google.com/store/apps/details?id=com.kanopy
+         playReady: "log in",
+         title:     "Kanopy",
+         url:       "play.google.com/store/apps/details?id=com.kanopy",
       },
       {
-         RTBF Auvio : direct et replay
-         https://play.google.com/store/apps/details?id=be.rtbf.auvio
+         playReady: "failed to load response data",
+         title:     "The Roku Channel",
+         url:       "play.google.com/store/apps/details?id=com.roku.web.trc",
       },
       {
-         The Roku Channel
-         https://play.google.com/store/apps/details?id=com.roku.web.trc
+         playReady: "web client needs Mullvad but license request is OK",
+         title:     "CTV",
+         url:       "play.google.com/store/apps/details?id=ca.ctv.ctvgo",
       },
    },
    "100K+ Downloads": {
       {
-         The Criterion Channel
-         https://play.google.com/store/apps/details?id=com.criterionchannel
+         title: "The Criterion Channel",
+         url:   "play.google.com/store/apps/details?id=com.criterionchannel",
       },
    },
    "10K+ Downloads": {
       {
-         CineMember
-         https://play.google.com/store/apps/details?id=nl.peoplesplayground.audienceplayer.cinemember
+         title: "CineMember",
+         url:   "play.google.com/store/apps/details?id=nl.peoplesplayground.audienceplayer.cinemember",
       },
       {
-         Draken Film
-         https://play.google.com/store/apps/details?id=com.draken.android
+         title: "Draken Film",
+         url:   "play.google.com/store/apps/details?id=com.draken.android",
       },
    },
 }
 
 type app struct {
-   address string
-   title string
+   playReady string
+   title     string
+   url       string
 }
