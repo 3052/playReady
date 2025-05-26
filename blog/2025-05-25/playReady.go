@@ -1,8 +1,7 @@
 package main
 
 import (
-   "encoding/json"
-   "os"
+   "fmt"
    "tanith.dev/goplayready/certificate"
 )
 
@@ -12,15 +11,13 @@ func main() {
    if err != nil {
       panic(err)
    }
-   file, err := os.Create(".json")
-   if err != nil {
-      panic(err)
-   }
-   defer file.Close()
-   encode := json.NewEncoder(file)
-   encode.SetIndent("", " ")
-   err = encode.Encode(chain)
-   if err != nil {
-      panic(err)
-   }
+   manufacturer := chain.Certs[0].ManufacturerInfo
+   manufacturer_name := manufacturer.ManufacturerName.Value
+   model_name := manufacturer.ModelName.Value
+   model_number := manufacturer.ModelNumber.Value
+   security_level := chain.Certs[0].CertificateInfo.SecurityLevel
+   fmt.Printf("%+v\n", security_level)
+   fmt.Printf("%q\n", manufacturer_name)
+   fmt.Printf("%q\n", model_name)
+   fmt.Printf("%q\n", model_number)
 }

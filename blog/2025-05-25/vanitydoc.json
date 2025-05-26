@@ -1,0 +1,13 @@
+{
+   "html": {
+      "output": "tanith.dev"
+   },
+   "modules": {
+      "tanith.dev/goplayready": {
+         "archive_ref_prefix": "tags/",
+         "ref": "v1.0.1",
+         "type": "github",
+         "url": "https://github.com/8c/goplayready"
+      }
+   }
+}
