@@ -1,0 +1,204 @@
+package license
+
+import (
+   "crypto/aes"
+   "encoding/base64"
+   "encoding/binary"
+   "github.com/chmike/cmac-go"
+)
+
+type XmrType uint16
+
+const (
+   OUTER_CONTAINER_ENTRY_TYPE                   XmrType = 1
+   GLOBAL_POLICY_CONTAINER_ENTRY_TYPE                   = 2
+   PLAYBACK_POLICY_CONTAINER_ENTRY_TYPE                 = 4
+   MINIMUM_OUTPUT_PROTECTION_LEVELS_ENTRY_TYPE          = 5
+   EXPLICIT_ANALOG_VIDEO_PROTECTION_ENTRY_TYPE          = 7
+   ANALOG_VIDEO_OPL_ENTRY_TYPE                          = 8
+   KEY_MATERIAL_CONTAINER_ENTRY_TYPE                    = 9
+   CONTENT_KEY_ENTRY_TYPE                               = 10
+   SIGNATURE_ENTRY_TYPE                                 = 11
+   SERIAL_NUMBER_ENTRY_TYPE                             = 12
+   RIGHTS_ENTRY_TYPE                                    = 13
+   EXPIRATION_ENTRY_TYPE                                = 18
+   ISSUEDATE_ENTRY_TYPE                                 = 19
+   METERING_ENTRY_TYPE                                  = 22
+   GRACEPERIOD_ENTRY_TYPE                               = 26
+   SOURCEID_ENTRY_TYPE                                  = 34
+   RESTRICTED_SOURCEID_ENTRY_TYPE                       = 40
+   DOMAIN_ID_ENTRY_TYPE                                 = 41
+   DEVICE_KEY_ENTRY_TYPE                                = 42
+   POLICY_METADATA_ENTRY_TYPE                           = 44
+   OPTIMIZED_CONTENT_KEY_ENTRY_TYPE                     = 45
+   EXPLICIT_DIGITAL_AUDIO_PROTECTION_ENTRY_TYPE         = 46
+   EXPIRE_AFTER_FIRST_USE_ENTRY_TYPE                    = 48
+   DIGITAL_AUDIO_OPL_ENTRY_TYPE                         = 49
+   REVOCATION_INFO_VERSION_ENTRY_TYPE                   = 50
+   EMBEDDING_BEHAVIOR_ENTRY_TYPE                        = 51
+   SECURITY_LEVEL_ENTRY_TYPE                            = 52
+   MOVE_ENABLER_ENTRY_TYPE                              = 55
+   UPLINK_KID_ENTRY_TYPE                                = 59
+   COPY_POLICIES_CONTAINER_ENTRY_TYPE                   = 60
+   COPY_COUNT_ENTRY_TYPE                                = 61
+   REMOVAL_DATE_ENTRY_TYPE                              = 80
+   AUX_KEY_ENTRY_TYPE                                   = 81
+   UPLINKX_ENTRY_TYPE                                   = 82
+   REAL_TIME_EXPIRATION_ENTRY_TYPE                      = 85
+   EXPLICIT_DIGITAL_VIDEO_PROTECTION_ENTRY_TYPE         = 88
+   DIGITAL_VIDEO_OPL_ENTRY_TYPE                         = 89
+   SECURESTOP_ENTRY_TYPE                                = 90
+   COPY_UNKNOWN_OBJECT_ENTRY_TYPE                       = 65533
+   GLOBAL_POLICY_UNKNOWN_OBJECT_ENTRY_TYPE              = 65533
+   PLAYBACK_UNKNOWN_OBJECT_ENTRY_TYPE                   = 65533
+   COPY_UNKNOWN_CONTAINER_ENTRY_TYPE                    = 65534
+   UNKNOWN_CONTAINERS_ENTRY_TYPE                        = 65534
+   PLAYBACK_UNKNOWN_CONTAINER_ENTRY_TYPE                = 65534
+)
+
+type LicenseResponse struct {
+   RawData          []byte
+   Magic            [4]byte
+   Offset           uint16
+   Version          uint16
+   RightsId         [16]byte
+   OuterContainer   FTLV
+   ContentKeyObject *ContentKey
+   ECCKeyObject     *ECCKey
+   SignatureObject  *Signature
+   AuxKeyObject     *AuxKeys
+}
+
+func (l *LicenseResponse) Decode(data []byte) error {
+   l.RawData = make([]byte, len(data))
+   copy(l.RawData, data)
+
+   n := copy(l.Magic[:], data)
+   l.Offset = binary.BigEndian.Uint16(data[n:])
+   n += 2
+   l.Version = binary.BigEndian.Uint16(data[n:])
+   n += 2
+   n += copy(l.RightsId[:], data[n:])
+
+   j, err := l.OuterContainer.Decode(data[n:])
+
+   if err != nil {
+      return err
+   }
+   n += int(j)
+
+   var size uint32 = 0
+
+   for size < l.OuterContainer.Length-16 {
+      var ftlv FTLV
+
+      i, err := ftlv.Decode(l.OuterContainer.Value[int(size):])
+
+      if err != nil {
+         return err
+      }
+      var ObjectType = XmrType(ftlv.Type)
+
+      switch ObjectType {
+      case SIGNATURE_ENTRY_TYPE:
+         l.SignatureObject = new(Signature)
+
+         err := l.SignatureObject.Decode(ftlv.Value)
+
+         l.SignatureObject.Length = uint16(ftlv.Length)
+
+         if err != nil {
+            return err
+         }
+
+      case KEY_MATERIAL_CONTAINER_ENTRY_TYPE:
+         var j uint32 = 0
+         for j < ftlv.Length-16 {
+            var ftlv_2 FTLV
+
+            k, err := ftlv_2.Decode(ftlv.Value[j:])
+
+            if err != nil {
+               return err
+            }
+            var ObjectType2 = XmrType(ftlv_2.Type)
+
+            switch ObjectType2 {
+            case CONTENT_KEY_ENTRY_TYPE:
+               l.ContentKeyObject = new(ContentKey)
+
+               err = l.ContentKeyObject.Decode(ftlv_2.Value)
+
+               if err != nil {
+                  return err
+               }
+            case DEVICE_KEY_ENTRY_TYPE:
+               l.ECCKeyObject = new(ECCKey)
+               err = l.ECCKeyObject.Decode(ftlv_2.Value)
+
+               if err != nil {
+                  return err
+               }
+            case AUX_KEY_ENTRY_TYPE:
+               l.AuxKeyObject = new(AuxKeys)
+
+               err = l.AuxKeyObject.Decode(ftlv_2.Value)
+
+               if err != nil {
+                  return err
+               }
+
+            default:
+               break
+            }
+
+            j += k
+
+         }
+
+      default:
+         break
+      }
+
+      size += i
+   }
+
+   return nil
+}
+
+func (l *LicenseResponse) Encode() []byte {
+   data := l.Magic[:]
+   data = binary.BigEndian.AppendUint16(data, l.Offset)
+   data = binary.BigEndian.AppendUint16(data, l.Version)
+   data = append(data, l.RightsId[:]...)
+
+   data = append(data, l.OuterContainer.Encode()...)
+   return data
+}
+
+func (l *LicenseResponse) Verify(ContentIntegrity []byte) bool {
+   cm, err := cmac.New(aes.NewCipher, ContentIntegrity)
+   if err != nil {
+      return false
+   }
+   data := l.Encode()
+   data = data[:len(l.RawData)-int(l.SignatureObject.Length)]
+
+   cm.Write(data)
+   mac1 := cm.Sum(nil)
+
+   if !cmac.Equal(mac1, l.SignatureObject.Data) {
+      return false
+   }
+
+   return true
+}
+
+func (l *LicenseResponse) Parse(data string) error {
+   decoded, err := base64.StdEncoding.DecodeString(data)
+
+   if err != nil {
+      return err
+   }
+   return l.Decode(decoded)
+}

@@ -1,0 +1,117 @@
+package license
+
+import (
+   "41.neocities.org/playReady/crypto"
+   "encoding/binary"
+   "encoding/hex"
+   "errors"
+)
+
+type ContentKey struct {
+   KeyId      Guid
+   KeyType    uint16
+   CipherType uint16
+   Length     uint16
+   Value      []byte
+   Integrity  Guid
+   Key        Guid
+}
+
+func (c *ContentKey) Decode(data []byte) error {
+   c.KeyId.Decode(data[:])
+   data = data[16:]
+   c.KeyType = binary.BigEndian.Uint16(data)
+   data = data[2:]
+
+   c.CipherType = binary.BigEndian.Uint16(data)
+   data = data[2:]
+
+   c.Length = binary.BigEndian.Uint16(data)
+   data = data[2:]
+
+   c.Value = make([]byte, c.Length)
+
+   copy(c.Value[:], data)
+
+   return nil
+}
+
+func XorKey(root, second []byte) []byte {
+   data := make([]byte, len(second))
+   copy(data, root)
+   for i := range 16 {
+      data[i] ^= second[i]
+   }
+   return data
+}
+
+func (c *ContentKey) Scalable(key crypto.EcKey, auxKeys *AuxKeys) error {
+   rootKeyInfo := c.Value[:144]
+   rootKey := rootKeyInfo[128:]
+   leafKeys := c.Value[144:]
+
+   var elgamal crypto.ElGamal
+   decrypted := elgamal.Decrypt(rootKeyInfo[:128], key.Key.D)
+
+   var CI [16]byte
+   var CK [16]byte
+
+   for i := range 16 {
+      CI[i] = decrypted[i*2]
+      CK[i] = decrypted[i*2+1]
+   }
+
+   magicConstantZero, err := hex.DecodeString("7ee9ed4af773224f00b8ea7efb027cbb")
+   if err != nil {
+      return err
+   }
+
+   rgbUplinkXKey := XorKey(CK[:], magicConstantZero)
+
+   var aes crypto.Aes
+
+   contentKeyPrime := aes.EncryptECB(CK[:], rgbUplinkXKey)
+
+   auxKeyCalc := aes.EncryptECB(contentKeyPrime, auxKeys.Keys[0].Key[:])
+
+   UpLinkXKey := XorKey(auxKeyCalc, new([16]byte)[:])
+
+   oSecondaryKey := aes.EncryptECB(CK[:], rootKey)
+
+   rgbKey := aes.EncryptECB(UpLinkXKey, leafKeys)
+   rgbKey = aes.EncryptECB(oSecondaryKey, rgbKey)
+
+   c.Integrity.Decode(rgbKey[:])
+
+   rgbKey = rgbKey[16:]
+
+   c.Key.Decode(rgbKey[:])
+
+   return nil
+}
+
+func (c *ContentKey) ECC256(key crypto.EcKey) []byte {
+   var elgamal crypto.ElGamal
+   decrypted := elgamal.Decrypt(c.Value, key.Key.D)
+
+   return decrypted
+}
+
+func (c *ContentKey) Decrypt(key crypto.EcKey, auxKeys *AuxKeys) error {
+   switch c.CipherType {
+   case 6:
+      return c.Scalable(key, auxKeys)
+
+   case 3:
+      decrypted := c.ECC256(key)
+      c.Integrity.Decode(decrypted)
+
+      decrypted = decrypted[16:]
+
+      c.Key.Decode(decrypted)
+   default:
+      return errors.New("cant decrypt key")
+   }
+
+   return nil
+}
