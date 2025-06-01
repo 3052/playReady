@@ -1,0 +1,13 @@
+{
+   "html": {
+      "output": "../41.neocities.org"
+   },
+   "modules": {
+      "41.neocities.org/playReady": {
+         "archive_ref_prefix": "tags/",
+         "ref": "v1.0.1",
+         "type": "github",
+         "url": "https://github.com/3052/playReady"
+      }
+   }
+}
