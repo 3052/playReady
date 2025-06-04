@@ -2,13 +2,14 @@ package device
 
 import (
    "41.neocities.org/playReady/header"
+   "encoding/hex"
+   "io"
    "net/http"
-   "os"
    "strings"
    "testing"
 )
 
-var DeviceTest = struct {
+var device_test = struct {
    content string
    key     string
    key_id  string
@@ -17,7 +18,7 @@ var DeviceTest = struct {
    content: "rakuten.tv/cz?content_type=movies&content_id=transvulcania-the-people-s-run",
    key:     "ab82952e8b567a2359393201e4dde4b4",
    key_id:  "318f7ece69afcfe3e96de31be6b77272",
-   url:     "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=473f5e6a-5b64-41f7-a8c7-8c3f2ab5f80b",
+   url:     "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=af8ce3fb-ad12-4b34-920b-60f1afecacb9",
 }
 
 const wrm = `
@@ -35,7 +36,7 @@ const wrm = `
 
 func Test(t *testing.T) {
    var device LocalDevice
-   err := device.Load("../ignore")
+   err := device.Load("../hisense")
    if err != nil {
       t.Fatal(err)
    }
@@ -49,16 +50,28 @@ func Test(t *testing.T) {
       t.Fatal(err)
    }
    resp, err := http.Post(
-      //device_test.url,
-      "https://test.playready.microsoft.com/service/rightsmanager.asmx?cfg=(persist:false,ckt:aesctr)",
-      "text/xml; charset=UTF-8",
-      strings.NewReader(challenge),
+      device_test.url, "text/xml; charset=UTF-8", strings.NewReader(challenge),
    )
    if err != nil {
       t.Fatal(err)
    }
-   err = resp.Write(os.Stdout)
+   defer resp.Body.Close()
+   data, err := io.ReadAll(resp.Body)
    if err != nil {
       t.Fatal(err)
+   }
+   if resp.StatusCode != http.StatusOK {
+      t.Fatal(string(data))
+   }
+   keys, err := device.ParseLicense(string(data))
+   if err != nil {
+      t.Fatal(err)
+   }
+   key := keys[0]
+   if hex.EncodeToString(key.KeyId.Encode()) != device_test.key_id {
+      t.Fatal(".KeyId")
+   }
+   if hex.EncodeToString(key.Key.Bytes()) != device_test.key {
+      t.Fatal(".Key")
    }
 }

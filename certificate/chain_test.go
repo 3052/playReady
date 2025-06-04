@@ -7,14 +7,16 @@ import (
    "testing"
 )
 
+const dir = "../hisense"
+
 func Test(t *testing.T) {
    var chain1 Chain
-   err := chain1.LoadFile("../ignore/bgroupcert.dat")
+   err := chain1.LoadFile(dir + "/bgroupcert.dat")
    if err != nil {
       t.Fatal(err)
    }
    var z1 crypto.EcKey
-   err = z1.LoadFile("../ignore/zgpriv.dat")
+   err = z1.LoadFile(dir + "/zgpriv.dat")
    if err != nil {
       t.Fatal(err)
    }
@@ -33,15 +35,15 @@ func Test(t *testing.T) {
    if err != nil {
       t.Fatal(err)
    }
-   err = write_file("../ignore/Chain", chain1.Encode())
+   err = write_file(dir + "/Chain", chain1.Encode())
    if err != nil {
       t.Fatal(err)
    }
-   err = write_file("../ignore/SigningKey", signing_key.Private())
+   err = write_file(dir + "/SigningKey", signing_key.Private())
    if err != nil {
       t.Fatal(err)
    }
-   err = write_file("../ignore/EncryptKey", encrypt_key.Private())
+   err = write_file(dir + "/EncryptKey", encrypt_key.Private())
    if err != nil {
       t.Fatal(err)
    }
