@@ -10,6 +10,12 @@ import (
    "os"
 )
 
+func (e EcKey) Private() []byte {
+   var data [32]byte
+   e.Key.D.FillBytes(data[:])
+   return data[:]
+}
+
 type EcKey struct {
    Key *ecdsa.PrivateKey
 }
