@@ -11,12 +11,12 @@ const dir = "../hisense"
 
 func Test(t *testing.T) {
    var chain1 Chain
-   err := chain1.LoadFile(dir + "/bgroupcert.dat")
+   err := chain1.LoadFile(dir + "/g1")
    if err != nil {
       t.Fatal(err)
    }
    var z1 crypto.EcKey
-   err = z1.LoadFile(dir + "/zgpriv.dat")
+   err = z1.LoadFile(dir + "/z1")
    if err != nil {
       t.Fatal(err)
    }

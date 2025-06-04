@@ -9,31 +9,6 @@ import (
    "testing"
 )
 
-var device_test = struct {
-   content string
-   key     string
-   key_id  string
-   url     string
-}{
-   content: "rakuten.tv/cz?content_type=movies&content_id=transvulcania-the-people-s-run",
-   key:     "ab82952e8b567a2359393201e4dde4b4",
-   key_id:  "318f7ece69afcfe3e96de31be6b77272",
-   url:     "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=af8ce3fb-ad12-4b34-920b-60f1afecacb9",
-}
-
-const wrm = `
-<WRMHEADER xmlns="http://schemas.microsoft.com/DRM/2007/03/PlayReadyHeader" version="4.0.0.0">
-   <DATA>
-      <PROTECTINFO>
-         <KEYLEN>16</KEYLEN>
-         <ALGID>AESCTR</ALGID>
-      </PROTECTINFO>
-      <KID>zn6PMa9p48/pbeMb5rdycg==</KID>
-      <CHECKSUM>YbomCXHUUNo=</CHECKSUM>
-   </DATA>
-</WRMHEADER>
-`
-
 func Test(t *testing.T) {
    var device LocalDevice
    err := device.Load("../hisense")
@@ -75,3 +50,28 @@ func Test(t *testing.T) {
       t.Fatal(".Key")
    }
 }
+
+var device_test = struct {
+   content string
+   key     string
+   key_id  string
+   url     string
+}{
+   content: "rakuten.tv/cz?content_type=movies&content_id=transvulcania-the-people-s-run",
+   key:     "ab82952e8b567a2359393201e4dde4b4",
+   key_id:  "318f7ece69afcfe3e96de31be6b77272",
+   url:     "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=af8ce3fb-ad12-4b34-920b-60f1afecacb9",
+}
+
+const wrm = `
+<WRMHEADER xmlns="http://schemas.microsoft.com/DRM/2007/03/PlayReadyHeader" version="4.0.0.0">
+   <DATA>
+      <PROTECTINFO>
+         <KEYLEN>16</KEYLEN>
+         <ALGID>AESCTR</ALGID>
+      </PROTECTINFO>
+      <KID>zn6PMa9p48/pbeMb5rdycg==</KID>
+      <CHECKSUM>YbomCXHUUNo=</CHECKSUM>
+   </DATA>
+</WRMHEADER>
+`

@@ -104,10 +104,7 @@ func (ld *LocalDevice) Load(path string) error {
 
 func (ld LocalDevice) GetChallenge(header header.Header) (string, error) {
    var Challenge challenge.Challenge
-
-   data, err := Challenge.Create(ld.CertificateChain, ld.SigningKey, header)
-
-   return data, err
+   return Challenge.Create(ld.CertificateChain, ld.SigningKey, header)
 }
 
 type KeyData struct {
