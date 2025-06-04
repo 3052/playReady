@@ -7,7 +7,7 @@ import (
    "testing"
 )
 
-const dir = "../hisense"
+const dir = "../ignore"
 
 func Test(t *testing.T) {
    var chain1 Chain

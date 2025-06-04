@@ -9,9 +9,22 @@ import (
    "testing"
 )
 
+var device_test = struct {
+   content string
+   key     string
+   key_id  string
+   url     string
+}{
+   content: "rakuten.tv/cz?content_type=movies&content_id=transvulcania-the-people-s-run",
+   key:     "ab82952e8b567a2359393201e4dde4b4",
+   key_id:  "318f7ece69afcfe3e96de31be6b77272",
+   // THIS URL GETS LOCKED TO DEVICE ON FIRST REQUEST
+   url:     "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=858b0e59-a052-4b6f-b500-bd960f55621d",
+}
+
 func Test(t *testing.T) {
    var device LocalDevice
-   err := device.Load("../hisense")
+   err := device.Load("../ignore")
    if err != nil {
       t.Fatal(err)
    }
@@ -25,7 +38,7 @@ func Test(t *testing.T) {
       t.Fatal(err)
    }
    resp, err := http.Post(
-      device_test.url, "text/xml; charset=UTF-8", strings.NewReader(challenge),
+      device_test.url, "", strings.NewReader(challenge),
    )
    if err != nil {
       t.Fatal(err)
@@ -49,18 +62,6 @@ func Test(t *testing.T) {
    if hex.EncodeToString(key.Key.Bytes()) != device_test.key {
       t.Fatal(".Key")
    }
-}
-
-var device_test = struct {
-   content string
-   key     string
-   key_id  string
-   url     string
-}{
-   content: "rakuten.tv/cz?content_type=movies&content_id=transvulcania-the-people-s-run",
-   key:     "ab82952e8b567a2359393201e4dde4b4",
-   key_id:  "318f7ece69afcfe3e96de31be6b77272",
-   url:     "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=af8ce3fb-ad12-4b34-920b-60f1afecacb9",
 }
 
 const wrm = `
