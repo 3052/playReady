@@ -1,4 +1,4 @@
-package certificate
+package playReady
 
 import "encoding/binary"
 

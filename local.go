@@ -1,10 +1,7 @@
-package device
+package playReady
 
 import (
-   "41.neocities.org/playReady/certificate"
-   "41.neocities.org/playReady/challenge"
    "41.neocities.org/playReady/crypto"
-   "41.neocities.org/playReady/header"
    "41.neocities.org/playReady/license"
    "bytes"
    "encoding/json"
@@ -23,7 +20,7 @@ type Config struct {
 }
 
 type LocalDevice struct {
-   CertificateChain       certificate.Chain
+   CertificateChain       Chain
    SigningKey, EncryptKey crypto.EcKey
    Version                string
 }
@@ -102,8 +99,8 @@ func (ld *LocalDevice) Load(path string) error {
    return nil
 }
 
-func (ld LocalDevice) GetChallenge(header header.Header) (string, error) {
-   var Challenge challenge.Challenge
+func (ld LocalDevice) GetChallenge(header Header) (string, error) {
+   var Challenge Challenge
    return Challenge.Create(ld.CertificateChain, ld.SigningKey, header)
 }
 

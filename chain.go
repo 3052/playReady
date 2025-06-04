@@ -1,4 +1,4 @@
-package certificate
+package playReady
 
 import (
    "41.neocities.org/playReady/crypto"

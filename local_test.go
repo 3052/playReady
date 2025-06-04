@@ -1,7 +1,6 @@
-package device
+package playReady
 
 import (
-   "41.neocities.org/playReady/header"
    "encoding/hex"
    "io"
    "net/http"
@@ -28,7 +27,7 @@ func Test(t *testing.T) {
    if err != nil {
       t.Fatal(err)
    }
-   var head header.Header
+   var head Header
    err = head.ParseWrm(wrm)
    if err != nil {
       t.Fatal(err)

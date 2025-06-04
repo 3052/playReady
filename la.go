@@ -1,9 +1,7 @@
-package challenge
+package playReady
 
 import (
-   "41.neocities.org/playReady/certificate"
    "41.neocities.org/playReady/crypto"
-   "41.neocities.org/playReady/header"
    "crypto/ecdsa"
    "crypto/rand"
    "crypto/sha256"
@@ -17,7 +15,7 @@ import (
 
 type Challenge struct{}
 
-func (c *Challenge) Create(certificateChain certificate.Chain, signingKey crypto.EcKey, header header.Header) (string, error) {
+func (c *Challenge) Create(certificateChain Chain, signingKey crypto.EcKey, header Header) (string, error) {
    var key crypto.XmlKey
    err := key.New()
    if err != nil {
@@ -95,7 +93,8 @@ func (Challenge) Root(LA *etree.Document, SignedInfo *etree.Document, Signature 
    doc.Indent(0)
    return doc
 }
-func (Challenge) CipherData(certChain certificate.Chain, key crypto.XmlKey) ([]byte, error) {
+
+func (Challenge) CipherData(certChain Chain, key crypto.XmlKey) ([]byte, error) {
    doc := etree.NewDocument()
    doc.WriteSettings.CanonicalEndTags = true
 
@@ -154,7 +153,7 @@ func (Challenge) SignedInfo(digest []byte) *etree.Document {
    return doc
 }
 
-func (Challenge) LicenseAcquisition(key crypto.XmlKey, cipherData []byte, header header.Header) (*etree.Document, error) {
+func (Challenge) LicenseAcquisition(key crypto.XmlKey, cipherData []byte, header Header) (*etree.Document, error) {
    doc := etree.NewDocument()
    doc.WriteSettings.CanonicalEndTags = true
    LicenseNonce := make([]byte, 16)
