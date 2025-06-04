@@ -3,11 +3,6 @@ package apps
 var details = map[string][]app{
    "100M+ Downloads": {
       {
-         playReady: "sign up now",
-         title:     "Max: Stream HBO, TV, & Movies",
-         url:       "play.google.com/store/apps/details?id=com.wbd.stream",
-      },
-      {
          playReady: "clearKey",
          title:     "Tubi: Free Movies & Live TV",
          url:       "play.google.com/store/apps/details?id=com.tubitv",
@@ -16,6 +11,11 @@ var details = map[string][]app{
          playReady: "there is an error with this content",
          title:     "PlutoTV: Live TV & Free Movies",
          url:       "play.google.com/store/apps/details?id=tv.pluto.android",
+      },
+      {
+         playReady: "sign up now",
+         title:     "Max: Stream HBO, TV, & Movies",
+         url:       "play.google.com/store/apps/details?id=com.wbd.stream",
       },
    },
    "50M+ Downloads": {
@@ -104,16 +104,19 @@ var details = map[string][]app{
    },
    "100K+ Downloads": {
       {
+         playReady: "subscribe",
          title: "The Criterion Channel",
          url:   "play.google.com/store/apps/details?id=com.criterionchannel",
       },
    },
    "10K+ Downloads": {
       {
+         playReady: "log in",
          title: "CineMember",
          url:   "play.google.com/store/apps/details?id=nl.peoplesplayground.audienceplayer.cinemember",
       },
       {
+         playReady: "join",
          title: "Draken Film",
          url:   "play.google.com/store/apps/details?id=com.draken.android",
       },
