@@ -13,45 +13,46 @@ import (
    "time"
 )
 
-type Challenge struct{}
-
-func (c *Challenge) Create(certificateChain Chain, signingKey crypto.EcKey, header Header) (string, error) {
+func (c Challenge) Create(
+   certificateChain Chain, signingKey crypto.EcKey, header Header,
+) (string, error) {
    var key crypto.XmlKey
    err := key.New()
    if err != nil {
-      panic(err)
+      return "", err
    }
    cipherData, err := c.CipherData(certificateChain, key)
    LA, err := c.LicenseAcquisition(key, cipherData, header)
    LAStr, err := LA.WriteToString()
    if err != nil {
-      panic(err)
+      return "", err
    }
    LAStr = strings.Replace(LAStr, "\n", "", -1)
    LADigest := sha256.Sum256([]byte(LAStr))
    SignedInfo := c.SignedInfo(LADigest[:])
    SignedStr, err := SignedInfo.WriteToString()
    if err != nil {
-      panic(err)
+      return "", err
    }
    SignedStr = strings.Replace(SignedStr, "\n", "", -1)
    SignedDigest := sha256.Sum256([]byte(SignedStr))
    r, s, err := ecdsa.Sign(rand.Reader, signingKey.Key, SignedDigest[:])
    if err != nil {
-      fmt.Println("failed to sign")
+      return "", fmt.Errorf("failed to sign: %v", err)
    }
    sig := r.Bytes()
    sig = append(sig, s.Bytes()...)
    challenge := c.Root(LA, SignedInfo, sig, signingKey.PublicBytes())
    base, err := challenge.WriteToString()
    if err != nil {
-      panic(err)
+      return "", err
    }
    xmlHeader := `<?xml version="1.0" encoding="utf-8"?>`
    challengeStr := xmlHeader + base
    challengeStr = strings.Replace(challengeStr, "\n", "", -1)
    return challengeStr, nil
 }
+
 func (Challenge) Root(LA *etree.Document, SignedInfo *etree.Document, Signature []byte, SigningPublicKey []byte) *etree.Document {
    doc := etree.NewDocument()
    doc.WriteSettings.CanonicalEndTags = true
@@ -115,7 +116,7 @@ func (Challenge) CipherData(certChain Chain, key crypto.XmlKey) ([]byte, error) 
 
    base, err := doc.WriteToString()
    if err != nil {
-      panic(err)
+      return nil, err
    }
 
    base = strings.Replace(base, "\n", "", -1)
@@ -126,6 +127,7 @@ func (Challenge) CipherData(certChain Chain, key crypto.XmlKey) ([]byte, error) 
 
    return append(key.AesIv[:], ciphertext...), nil
 }
+
 func (Challenge) SignedInfo(digest []byte) *etree.Document {
    doc := etree.NewDocument()
    doc.WriteSettings.CanonicalEndTags = true
@@ -153,18 +155,20 @@ func (Challenge) SignedInfo(digest []byte) *etree.Document {
    return doc
 }
 
-func (Challenge) LicenseAcquisition(key crypto.XmlKey, cipherData []byte, header Header) (*etree.Document, error) {
+func (Challenge) LicenseAcquisition(
+   key crypto.XmlKey, cipherData []byte, header Header,
+) (*etree.Document, error) {
    doc := etree.NewDocument()
    doc.WriteSettings.CanonicalEndTags = true
    LicenseNonce := make([]byte, 16)
    _, err := rand.Read(LicenseNonce)
    if err != nil {
-      panic(err)
+      return nil, err
    }
    var WMRMEccPubKey crypto.WMRM
    x, y, err := WMRMEccPubKey.Points()
    if err != nil {
-      panic(err)
+      return nil, err
    }
    var LicenseVersion string
    switch header.WrmHeader.Version {
@@ -236,3 +240,5 @@ func (Challenge) LicenseAcquisition(key crypto.XmlKey, cipherData []byte, header
    doc.Indent(0)
    return doc, nil
 }
+
+type Challenge struct{}

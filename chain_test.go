@@ -7,9 +7,48 @@ import (
    "testing"
 )
 
-const dir = "../ignore"
+const dir = "ignore"
 
-func Test(t *testing.T) {
+func write_file(name string, data []byte) error {
+   log.Println("WriteFile", name)
+   return os.WriteFile(name, data, os.ModePerm)
+}
+
+func TestChainZero(t *testing.T) {
+   var chain1 Chain
+   err := chain1.LoadFile(dir + "/g1")
+   if err != nil {
+      t.Fatal(err)
+   }
+   var z1 crypto.EcKey
+   err = z1.LoadFile(dir + "/z1")
+   if err != nil {
+      t.Fatal(err)
+   }
+   var data [32]byte
+   var signing_key crypto.EcKey
+   signing_key.LoadBytes(data[:])
+   var encrypt_key crypto.EcKey
+   encrypt_key.LoadBytes(data[:])
+   err = chain1.CreateLeaf(z1, signing_key, encrypt_key)
+   if err != nil {
+      t.Fatal(err)
+   }
+   err = write_file(dir + "/Chain", chain1.Encode())
+   if err != nil {
+      t.Fatal(err)
+   }
+   err = write_file(dir + "/SigningKey", signing_key.Private())
+   if err != nil {
+      t.Fatal(err)
+   }
+   err = write_file(dir + "/EncryptKey", encrypt_key.Private())
+   if err != nil {
+      t.Fatal(err)
+   }
+}
+
+func TestChainNew(t *testing.T) {
    var chain1 Chain
    err := chain1.LoadFile(dir + "/g1")
    if err != nil {
@@ -49,7 +88,3 @@ func Test(t *testing.T) {
    }
 }
 
-func write_file(name string, data []byte) error {
-   log.Println("WriteFile", name)
-   return os.WriteFile(name, data, os.ModePerm)
-}

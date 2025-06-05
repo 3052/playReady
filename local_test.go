@@ -18,12 +18,12 @@ var device_test = struct {
    key:     "ab82952e8b567a2359393201e4dde4b4",
    key_id:  "318f7ece69afcfe3e96de31be6b77272",
    // THIS URL GETS LOCKED TO DEVICE ON FIRST REQUEST
-   url:     "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=858b0e59-a052-4b6f-b500-bd960f55621d",
+   url:     "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=153a9508-304b-4c8f-a20a-46fe8c42924d",
 }
 
-func Test(t *testing.T) {
+func TestLocal(t *testing.T) {
    var device LocalDevice
-   err := device.Load("../ignore")
+   err := device.Load("ignore")
    if err != nil {
       t.Fatal(err)
    }

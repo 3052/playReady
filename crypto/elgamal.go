@@ -15,138 +15,31 @@ import (
    "os"
 )
 
-type Aes struct{}
-
-func (a Aes) EncryptCBC(key XmlKey, data string) ([]byte, error) {
-   block, err := aes.NewCipher(key.AesKey[:])
-
-   if err != nil {
-      return nil, err
-   }
-
-   padded := a.Pad([]byte(data))
-
-   ciphertext := make([]byte, len(padded))
-   mode := cipher.NewCBCEncrypter(block, key.AesIv[:])
-
-   mode.CryptBlocks(ciphertext, padded)
-
-   return ciphertext, nil
-}
-
-func (a Aes) EncryptECB(key []byte, data []byte) []byte {
-   block, _ := aes.NewCipher(key)
-
-   ciphertext := make([]byte, len(data))
-   ecbMode := mode.NewECBEncrypter(block)
-
-   ecbMode.CryptBlocks(ciphertext, data)
-
-   return ciphertext
-}
-
-func (Aes) Pad(data []byte) []byte {
-   length := aes.BlockSize - len(data)%aes.BlockSize
-   for high := byte(length); length >= 1; length-- {
-      data = append(data, high)
-   }
-   return data
-}
-type XmlKey struct {
-   PublicKey     ecdsa.PublicKey
-   AesKey, AesIv [16]byte
-}
-
-func (x *XmlKey) New() error {
-   key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-
-   if err != nil {
-      return err
-   }
-
-   x.PublicKey = key.PublicKey
-
-   Aes := x.PublicKey.X.Bytes()
-
-   n := copy(x.AesIv[:], Aes)
-
-   Aes = Aes[n:]
-
-   copy(x.AesKey[:], Aes)
-
-   return nil
-}
-type WMRM struct{}
-
-var WMRMPublicKey = "C8B6AF16EE941AADAA5389B4AF2C10E356BE42AF175EF3FACE93254E7B0B3D9B982B27B5CB2341326E56AA857DBFD5C634CE2CF9EA74FCA8F2AF5957EFEEA562"
-
-func (WMRM) Points() (*big.Int, *big.Int, error) {
-   bytes, err := hex.DecodeString(WMRMPublicKey)
-
-   if err != nil {
-      fmt.Println("Error decoding hex string:", err)
-   }
-
-   x := new(big.Int).SetBytes(bytes[:32])
-   y := new(big.Int).SetBytes(bytes[32:])
-
-   return x, y, nil
-}
-func (e EcKey) Private() []byte {
-   var data [32]byte
-   e.Key.D.FillBytes(data[:])
-   return data[:]
-}
-
-type EcKey struct {
-   Key *ecdsa.PrivateKey
-}
-
-func (e *EcKey) New() error {
-   key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-
-   if err != nil {
-      return err
-   }
-
-   e.Key = key
-   return nil
-}
-
-func (e *EcKey) LoadFile(path string) error {
-   keyFile, err := os.ReadFile(path)
-
-   if err != nil {
-      return err
-   }
-
-   block, _ := pem.Decode(keyFile)
-
-   if block == nil {
-      e.LoadBytes(keyFile)
-      return nil
-   }
-
-   key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
-
-   if err != nil {
-      return err
-   }
-
-   e.Key = key.(*ecdsa.PrivateKey)
-   return nil
-}
-
-func (e *EcKey) LoadBytes(data []byte) error {
+func (e *EcKey) LoadBytes(data []byte) {
    var public ecdsa.PublicKey
    public.Curve = elliptic.P256()
    public.X, public.Y = public.Curve.ScalarBaseMult(data)
    var private ecdsa.PrivateKey
    private.D = new(big.Int).SetBytes(data)
    private.PublicKey = public
-
    e.Key = &private
+}
 
+func (e *EcKey) LoadFile(path string) error {
+   keyFile, err := os.ReadFile(path)
+   if err != nil {
+      return err
+   }
+   block, _ := pem.Decode(keyFile)
+   if block == nil {
+      e.LoadBytes(keyFile)
+      return nil
+   }
+   key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+   if err != nil {
+      return err
+   }
+   e.Key = key.(*ecdsa.PrivateKey)
    return nil
 }
 
@@ -208,3 +101,104 @@ func (el ElGamal) Decrypt(ciphertext []byte, PrivateKey *big.Int) []byte {
 
    return append(Decrypted, PY.Bytes()...)
 }
+type Aes struct{}
+
+func (a Aes) EncryptCBC(key XmlKey, data string) ([]byte, error) {
+   block, err := aes.NewCipher(key.AesKey[:])
+
+   if err != nil {
+      return nil, err
+   }
+
+   padded := a.Pad([]byte(data))
+
+   ciphertext := make([]byte, len(padded))
+   mode := cipher.NewCBCEncrypter(block, key.AesIv[:])
+
+   mode.CryptBlocks(ciphertext, padded)
+
+   return ciphertext, nil
+}
+
+func (a Aes) EncryptECB(key []byte, data []byte) []byte {
+   block, _ := aes.NewCipher(key)
+
+   ciphertext := make([]byte, len(data))
+   ecbMode := mode.NewECBEncrypter(block)
+
+   ecbMode.CryptBlocks(ciphertext, data)
+
+   return ciphertext
+}
+
+func (Aes) Pad(data []byte) []byte {
+   length := aes.BlockSize - len(data)%aes.BlockSize
+   for high := byte(length); length >= 1; length-- {
+      data = append(data, high)
+   }
+   return data
+}
+
+type XmlKey struct {
+   PublicKey     ecdsa.PublicKey
+   AesKey, AesIv [16]byte
+}
+
+func (x *XmlKey) New() error {
+   key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+
+   if err != nil {
+      return err
+   }
+
+   x.PublicKey = key.PublicKey
+
+   Aes := x.PublicKey.X.Bytes()
+
+   n := copy(x.AesIv[:], Aes)
+
+   Aes = Aes[n:]
+
+   copy(x.AesKey[:], Aes)
+
+   return nil
+}
+
+type WMRM struct{}
+
+var WMRMPublicKey = "C8B6AF16EE941AADAA5389B4AF2C10E356BE42AF175EF3FACE93254E7B0B3D9B982B27B5CB2341326E56AA857DBFD5C634CE2CF9EA74FCA8F2AF5957EFEEA562"
+
+func (WMRM) Points() (*big.Int, *big.Int, error) {
+   bytes, err := hex.DecodeString(WMRMPublicKey)
+
+   if err != nil {
+      fmt.Println("Error decoding hex string:", err)
+   }
+
+   x := new(big.Int).SetBytes(bytes[:32])
+   y := new(big.Int).SetBytes(bytes[32:])
+
+   return x, y, nil
+}
+
+func (e EcKey) Private() []byte {
+   var data [32]byte
+   e.Key.D.FillBytes(data[:])
+   return data[:]
+}
+
+type EcKey struct {
+   Key *ecdsa.PrivateKey
+}
+
+func (e *EcKey) New() error {
+   key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+
+   if err != nil {
+      return err
+   }
+
+   e.Key = key
+   return nil
+}
+
