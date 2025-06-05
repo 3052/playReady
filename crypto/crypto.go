@@ -16,6 +16,17 @@ import (
    "os"
 )
 
+func random_int(curveData elliptic.Curve) (*big.Int, error) {
+   one := big.NewInt(1)
+   maxInt := new(big.Int).Sub(curveData.Params().N, one)
+   r, err := rand.Int(rand.Reader, maxInt)
+   if err != nil {
+      return nil, err
+   }
+   r.Add(r, one)
+   return r, nil
+}
+
 func (WMRM) Points() (*big.Int, *big.Int, error) {
    bytes, err := hex.DecodeString(WMRMPublicKey)
    if err != nil {
@@ -168,17 +179,6 @@ func (x *XmlKey) New() error {
    Aes = Aes[n:]
    copy(x.AesKey[:], Aes)
    return nil
-}
-
-func random_int(curveData elliptic.Curve) (*big.Int, error) {
-   one := big.NewInt(1)
-   maxInt := new(big.Int).Sub(curveData.Params().N, one)
-   r, err := rand.Int(rand.Reader, maxInt)
-   if err != nil {
-      return nil, err
-   }
-   r.Add(r, one)
-   return r, nil
 }
 
 func (ElGamal) Encrypt(
