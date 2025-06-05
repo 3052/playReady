@@ -22,7 +22,13 @@ func (c Challenge) Create(
       return "", err
    }
    cipherData, err := c.CipherData(certificateChain, key)
+   if err != nil {
+      return "", err
+   }
    LA, err := c.LicenseAcquisition(key, cipherData, header)
+   if err != nil {
+      return "", err
+   }
    LAStr, err := LA.WriteToString()
    if err != nil {
       return "", err
@@ -49,8 +55,7 @@ func (c Challenge) Create(
    }
    xmlHeader := `<?xml version="1.0" encoding="utf-8"?>`
    challengeStr := xmlHeader + base
-   challengeStr = strings.Replace(challengeStr, "\n", "", -1)
-   return challengeStr, nil
+   return strings.Replace(challengeStr, "\n", "", -1), nil
 }
 
 func (Challenge) Root(LA *etree.Document, SignedInfo *etree.Document, Signature []byte, SigningPublicKey []byte) *etree.Document {

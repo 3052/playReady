@@ -14,41 +14,7 @@ func write_file(name string, data []byte) error {
    return os.WriteFile(name, data, os.ModePerm)
 }
 
-func TestChainZero(t *testing.T) {
-   var chain1 Chain
-   err := chain1.LoadFile(dir + "/g1")
-   if err != nil {
-      t.Fatal(err)
-   }
-   var z1 crypto.EcKey
-   err = z1.LoadFile(dir + "/z1")
-   if err != nil {
-      t.Fatal(err)
-   }
-   var data [32]byte
-   var signing_key crypto.EcKey
-   signing_key.LoadBytes(data[:])
-   var encrypt_key crypto.EcKey
-   encrypt_key.LoadBytes(data[:])
-   err = chain1.CreateLeaf(z1, signing_key, encrypt_key)
-   if err != nil {
-      t.Fatal(err)
-   }
-   err = write_file(dir + "/Chain", chain1.Encode())
-   if err != nil {
-      t.Fatal(err)
-   }
-   err = write_file(dir + "/SigningKey", signing_key.Private())
-   if err != nil {
-      t.Fatal(err)
-   }
-   err = write_file(dir + "/EncryptKey", encrypt_key.Private())
-   if err != nil {
-      t.Fatal(err)
-   }
-}
-
-func TestChainNew(t *testing.T) {
+func TestChain(t *testing.T) {
    var chain1 Chain
    err := chain1.LoadFile(dir + "/g1")
    if err != nil {
@@ -74,15 +40,15 @@ func TestChainNew(t *testing.T) {
    if err != nil {
       t.Fatal(err)
    }
-   err = write_file(dir + "/Chain", chain1.Encode())
+   err = write_file(dir + "/chain.txt", chain1.Encode())
    if err != nil {
       t.Fatal(err)
    }
-   err = write_file(dir + "/SigningKey", signing_key.Private())
+   err = write_file(dir + "/signing_key.txt", signing_key.Private())
    if err != nil {
       t.Fatal(err)
    }
-   err = write_file(dir + "/EncryptKey", encrypt_key.Private())
+   err = write_file(dir + "/encrypt_key.txt", encrypt_key.Private())
    if err != nil {
       t.Fatal(err)
    }

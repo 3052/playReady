@@ -15,6 +15,22 @@ import (
    "os"
 )
 
+type fake_rand struct{}
+
+// github.com/golang/go/issues/58454
+func (fake_rand) Read(data []byte) (int, error) {
+   return copy(data, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"), nil
+}
+
+func (e *EcKey) New() error {
+   var err error
+   e.Key, err = ecdsa.GenerateKey(elliptic.P256(), fake_rand{})
+   if err != nil {
+      return err
+   }
+   return nil
+}
+
 func (e *EcKey) LoadBytes(data []byte) {
    var public ecdsa.PublicKey
    public.Curve = elliptic.P256()
@@ -45,23 +61,19 @@ func (e *EcKey) LoadFile(path string) error {
 
 func (e *EcKey) PublicBytes() []byte {
    SigningX, SigningY := e.Key.PublicKey.X.Bytes(), e.Key.PublicKey.Y.Bytes()
-
    SigningPublicKey := SigningX
    SigningPublicKey = append(SigningPublicKey, SigningY...)
-
    return SigningPublicKey
 }
+
 func random(curveData elliptic.Curve) *big.Int {
    one := big.NewInt(1)
    maxInt := new(big.Int).Sub(curveData.Params().N, one)
-
    r, err := rand.Int(rand.Reader, maxInt)
    if err != nil {
       panic(err)
    }
-
    r.Add(r, one)
-
    return r
 }
 
@@ -101,6 +113,7 @@ func (el ElGamal) Decrypt(ciphertext []byte, PrivateKey *big.Int) []byte {
 
    return append(Decrypted, PY.Bytes()...)
 }
+
 type Aes struct{}
 
 func (a Aes) EncryptCBC(key XmlKey, data string) ([]byte, error) {
@@ -190,15 +203,3 @@ func (e EcKey) Private() []byte {
 type EcKey struct {
    Key *ecdsa.PrivateKey
 }
-
-func (e *EcKey) New() error {
-   key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-
-   if err != nil {
-      return err
-   }
-
-   e.Key = key
-   return nil
-}
-
