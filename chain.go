@@ -21,14 +21,14 @@ func (c *Chain) CreateLeaf(ModelKey, SigningKey, EncryptKey crypto.EcKey) error 
    }
    var (
       BuiltKeyInfo KeyInfo
-      CertificateFtlv FTLV
       CertificateInfo CertInfo
+      SignatureData Signature
+      SignatureFtlv FTLV
       DeviceFtlv FTLV
       FeatureFtlv FTLV
       KeyInfoFtlv FTLV
       ManufacturerFtlv FTLV
-      SignatureData Signature
-      SignatureFtlv FTLV
+      CertificateFtlv FTLV
    )
    SigningKeyDigest := sha256.Sum256(SigningKey.PublicBytes())
    err := CertificateInfo.New(c.Certs[0].CertificateInfo.SecurityLevel, SigningKeyDigest[:])

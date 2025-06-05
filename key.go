@@ -76,6 +76,7 @@ func (c *CertInfo) Decode(data []byte) error {
 
    return nil
 }
+
 type Manufacturer struct {
    Flags            uint32
    ManufacturerName ManufacturerInfo
@@ -117,6 +118,7 @@ func (m *Manufacturer) Decode(data []byte) error {
 
    return nil
 }
+
 type Key struct {
    Type      uint16
    Length    uint16

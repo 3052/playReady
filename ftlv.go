@@ -48,6 +48,7 @@ func (d *Device) Encode() []byte {
 
    return data
 }
+
 type ObjType uint16
 
 const (

@@ -50,6 +50,7 @@ func (s *Signature) Decode(data []byte) error {
 
    return nil
 }
+
 type Feature struct {
    Entries  uint32
    Features []uint32
@@ -57,7 +58,6 @@ type Feature struct {
 
 func (f *Feature) New(Type int) {
    f.Entries = 1
-
    f.Features = append(f.Features, uint32(Type))
 }
 
@@ -92,9 +92,7 @@ type KeyInfo struct {
 
 func (k *KeyInfo) New(SigningKey, EncryptKey []byte) {
    k.Entries = uint32(2)
-
    k.Keys = make([]Key, 2)
-
    k.Keys[0].New(SigningKey, 1)
    k.Keys[1].New(EncryptKey, 2)
 }
