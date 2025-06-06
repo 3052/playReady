@@ -12,7 +12,7 @@ import (
 )
 
 func (c *Chain) CreateLeaf(ModelKey, SigningKey, EncryptKey crypto.EcKey) error {
-   if bytes.Compare(c.Certs[0].KeyData.Keys[0].PublicKey[:], ModelKey.PublicBytes()) != 0 {
+   if !bytes.Equal(c.Certs[0].KeyData.Keys[0].PublicKey[:], ModelKey.PublicBytes()) {
       return errors.New("zgpriv not for cert")
    }
    if !c.Verify() {

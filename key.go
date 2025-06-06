@@ -5,24 +5,20 @@ import "encoding/binary"
 func (m *Manufacturer) Decode(data []byte) error {
    m.Flags = binary.BigEndian.Uint32(data)
    data = data[4:]
-
-   j, err := m.ManufacturerName.Decode(data)
+   n, err := m.ManufacturerName.Decode(data)
    if err != nil {
       return err
    }
-   data = data[j:]
-
-   j, err = m.ModelName.Decode(data)
+   data = data[n:]
+   n, err = m.ModelName.Decode(data)
    if err != nil {
       return err
    }
-   data = data[j:]
-
-   j, err = m.ModelNumber.Decode(data)
+   data = data[n:]
+   _, err = m.ModelNumber.Decode(data)
    if err != nil {
       return err
    }
-
    return nil
 }
 

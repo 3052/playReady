@@ -10,28 +10,6 @@ import (
    "math/big"
 )
 
-type Cert struct {
-   Magic             [4]byte
-   Version           uint32
-   Length            uint32
-   LengthToSignature uint32
-   RawData           []byte
-   CertificateInfo   *CertInfo
-   Features          *Feature
-   KeyData           *KeyInfo
-   ManufacturerInfo  *Manufacturer
-   SignatureData     *Signature
-}
-
-func (c *Cert) NewNoSig(Value []byte) {
-   copy(c.Magic[:], "CERT")
-   c.Version = 1
-   c.Length = uint32(len(Value)) + 16 + 144
-   c.LengthToSignature = uint32(len(Value)) + 16
-   c.RawData = make([]byte, len(Value))
-   copy(c.RawData, Value)
-}
-
 func (c *Cert) Verify(PubKey []byte) bool {
    if bytes.Compare(c.SignatureData.IssuerKey, PubKey) != 0 {
       return false
@@ -150,3 +128,25 @@ func (c *Cert) Encode() []byte {
 
    return append(data, c.RawData[:]...)
 }
+type Cert struct {
+   Magic             [4]byte
+   Version           uint32
+   Length            uint32
+   LengthToSignature uint32
+   RawData           []byte
+   CertificateInfo   *CertInfo
+   Features          *Feature
+   KeyData           *KeyInfo
+   ManufacturerInfo  *Manufacturer
+   SignatureData     *Signature
+}
+
+func (c *Cert) NewNoSig(Value []byte) {
+   copy(c.Magic[:], "CERT")
+   c.Version = 1
+   c.Length = uint32(len(Value)) + 16 + 144
+   c.LengthToSignature = uint32(len(Value)) + 16
+   c.RawData = make([]byte, len(Value))
+   copy(c.RawData, Value)
+}
+
