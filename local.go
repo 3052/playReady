@@ -29,12 +29,15 @@ func (ld LocalDevice) ParseLicense(response string) ([]KeyData, error) {
       }
       err = ParsedLicense.ContentKeyObject.Decrypt(ld.EncryptKey, ParsedLicense.AuxKeyObject)
       if err != nil {
-         return Keys, err
+         return nil, err
       }
-      if !ParsedLicense.Verify(ParsedLicense.ContentKeyObject.Integrity.Bytes()) {
-         return nil, errors.New("failed to decrypt the keys")
+      err = ParsedLicense.Verify(ParsedLicense.ContentKeyObject.Integrity.Bytes())
+      if err != nil {
+         return nil, err
       }
-      Keys = append(Keys, KeyData{ParsedLicense.ContentKeyObject.KeyId, ParsedLicense.ContentKeyObject.Key})
+      Keys = append(
+         Keys, KeyData{ParsedLicense.ContentKeyObject.KeyId, ParsedLicense.ContentKeyObject.Key},
+      )
    }
    return Keys, nil
 }

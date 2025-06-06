@@ -11,32 +11,22 @@ import (
 )
 
 func (c *Cert) Verify(PubKey []byte) bool {
-   if bytes.Compare(c.SignatureData.IssuerKey, PubKey) != 0 {
+   if !bytes.Equal(c.SignatureData.IssuerKey, PubKey) {
       return false
    }
-
    data := c.Encode()
    data = data[:c.LengthToSignature]
-
    x := new(big.Int).SetBytes(PubKey[:32])
    y := new(big.Int).SetBytes(PubKey[32:])
-
    PublicKey := &ecdsa.PublicKey{
       Curve: elliptic.P256(),
       X:     x,
       Y:     y,
    }
    Sig := c.SignatureData.SignatureData
-
    SignatureDigest := sha256.Sum256(data)
-
    r, s := new(big.Int).SetBytes(Sig[:32]), new(big.Int).SetBytes(Sig[32:])
-
-   if !ecdsa.Verify(PublicKey, SignatureDigest[:], r, s) {
-      return false
-   }
-
-   return true
+   return ecdsa.Verify(PublicKey, SignatureDigest[:], r, s)
 }
 
 func (c *Cert) Decode(data []byte) (int, error) {

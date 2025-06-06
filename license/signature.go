@@ -70,6 +70,7 @@ func (a *AuxKey) Decode(data []byte) (int, error) {
 
    return n + 4, nil
 }
+
 type ECCKey struct {
    Curve  uint16
    Length uint16

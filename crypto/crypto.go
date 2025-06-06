@@ -14,62 +14,10 @@ import (
    "os"
 )
 
-var Fill Filler = '!'
-
-type Filler byte
-
-// github.com/golang/go/issues/58454
-func (f Filler) Read(data []byte) (int, error) {
-   for index := range data {
-      data[index] = byte(f)
-   }
-   return len(data), nil
-}
-
-func (e *EcKey) New() error {
-   var err error
-   e.Key, err = ecdsa.GenerateKey(elliptic.P256(), Fill)
-   if err != nil {
-      return err
-   }
-   return nil
-}
-
-func (x *XmlKey) New() error {
-   key, err := ecdsa.GenerateKey(elliptic.P256(), Fill)
-   if err != nil {
-      return err
-   }
-   x.PublicKey = key.PublicKey
-   Aes := x.PublicKey.X.Bytes()
-   n := copy(x.AesIv[:], Aes)
-   Aes = Aes[n:]
-   copy(x.AesKey[:], Aes)
-   return nil
-}
-
-func (ElGamal) Encrypt(
-   PubX *big.Int, PubY *big.Int, plaintext XmlKey,
-) ([]byte, error) {
-   curveData := elliptic.P256()
-   curve_int := big.NewInt(1)
-   C1X, C1Y := curveData.ScalarMult(
-      curveData.Params().Gx, curveData.Params().Gy, curve_int.Bytes(),
-   )
-   C2XMulti, C2YMulti := curveData.ScalarMult(PubX, PubY, curve_int.Bytes())
-   C2X, C2Y := curveData.Add(
-      plaintext.PublicKey.X, plaintext.PublicKey.Y, C2XMulti, C2YMulti,
-   )
-   Encrypted := C1X.Bytes()
-   Encrypted = append(Encrypted, C1Y.Bytes()...)
-   Encrypted = append(Encrypted, C2X.Bytes()...)
-   return append(Encrypted, C2Y.Bytes()...), nil
-}
-
 func (WMRM) Points() (*big.Int, *big.Int, error) {
    bytes, err := hex.DecodeString(WMRMPublicKey)
    if err != nil {
-      return nil, nil, fmt.Errorf("Error decoding hex string: %v", err)
+      return nil, nil, fmt.Errorf("decoding hex string: %v", err)
    }
    x := new(big.Int).SetBytes(bytes[:32])
    y := new(big.Int).SetBytes(bytes[32:])
@@ -188,3 +136,55 @@ func (e EcKey) Private() []byte {
 type EcKey struct {
    Key *ecdsa.PrivateKey
 }
+var Fill Filler = '!'
+
+type Filler byte
+
+// github.com/golang/go/issues/58454
+func (f Filler) Read(data []byte) (int, error) {
+   for index := range data {
+      data[index] = byte(f)
+   }
+   return len(data), nil
+}
+
+func (e *EcKey) New() error {
+   var err error
+   e.Key, err = ecdsa.GenerateKey(elliptic.P256(), Fill)
+   if err != nil {
+      return err
+   }
+   return nil
+}
+
+func (x *XmlKey) New() error {
+   key, err := ecdsa.GenerateKey(elliptic.P256(), Fill)
+   if err != nil {
+      return err
+   }
+   x.PublicKey = key.PublicKey
+   Aes := x.PublicKey.X.Bytes()
+   n := copy(x.AesIv[:], Aes)
+   Aes = Aes[n:]
+   copy(x.AesKey[:], Aes)
+   return nil
+}
+
+func (ElGamal) Encrypt(
+   PubX *big.Int, PubY *big.Int, plaintext XmlKey,
+) ([]byte, error) {
+   curveData := elliptic.P256()
+   curve_int := big.NewInt(1)
+   C1X, C1Y := curveData.ScalarMult(
+      curveData.Params().Gx, curveData.Params().Gy, curve_int.Bytes(),
+   )
+   C2XMulti, C2YMulti := curveData.ScalarMult(PubX, PubY, curve_int.Bytes())
+   C2X, C2Y := curveData.Add(
+      plaintext.PublicKey.X, plaintext.PublicKey.Y, C2XMulti, C2YMulti,
+   )
+   Encrypted := C1X.Bytes()
+   Encrypted = append(Encrypted, C1Y.Bytes()...)
+   Encrypted = append(Encrypted, C2X.Bytes()...)
+   return append(Encrypted, C2Y.Bytes()...), nil
+}
+
