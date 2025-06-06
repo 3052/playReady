@@ -14,6 +14,36 @@ import (
    "os"
 )
 
+func (a Aes) xEncryptECB(key []byte, data []byte) ([]byte, error) {
+   block, err := aes.NewCipher(key)
+   if err != nil {
+      return nil, err
+   }
+   ciphertext := make([]byte, len(data))
+   ecbMode := mode.NewECBEncrypter(block)
+   ecbMode.CryptBlocks(ciphertext, data)
+   return ciphertext, nil
+}
+
+func (a Aes) EncryptECB(key []byte, data []byte) []byte {
+   block, _ := aes.NewCipher(key)
+   ciphertext := make([]byte, len(data))
+   ecbMode := mode.NewECBEncrypter(block)
+   ecbMode.CryptBlocks(ciphertext, data)
+   return ciphertext
+}
+
+func (a Aes) EncryptCBC(key XmlKey, data string) ([]byte, error) {
+   block, err := aes.NewCipher(key.AesKey[:])
+   if err != nil {
+      return nil, err
+   }
+   padded := a.Pad([]byte(data))
+   ciphertext := make([]byte, len(padded))
+   cipher.NewCBCEncrypter(block, key.AesIv[:]).CryptBlocks(ciphertext, padded)
+   return ciphertext, nil
+}
+
 func (WMRM) Points() (*big.Int, *big.Int, error) {
    bytes, err := hex.DecodeString(WMRMPublicKey)
    if err != nil {
@@ -81,34 +111,6 @@ func (ElGamal) Decrypt(ciphertext []byte, PrivateKey *big.Int) []byte {
 }
 
 type Aes struct{}
-
-func (a Aes) EncryptCBC(key XmlKey, data string) ([]byte, error) {
-   block, err := aes.NewCipher(key.AesKey[:])
-
-   if err != nil {
-      return nil, err
-   }
-
-   padded := a.Pad([]byte(data))
-
-   ciphertext := make([]byte, len(padded))
-   mode := cipher.NewCBCEncrypter(block, key.AesIv[:])
-
-   mode.CryptBlocks(ciphertext, padded)
-
-   return ciphertext, nil
-}
-
-func (a Aes) EncryptECB(key []byte, data []byte) []byte {
-   block, _ := aes.NewCipher(key)
-
-   ciphertext := make([]byte, len(data))
-   ecbMode := mode.NewECBEncrypter(block)
-
-   ecbMode.CryptBlocks(ciphertext, data)
-
-   return ciphertext
-}
 
 func (Aes) Pad(data []byte) []byte {
    length := aes.BlockSize - len(data)%aes.BlockSize

@@ -7,44 +7,6 @@ import (
    "errors"
 )
 
-type ContentKey struct {
-   KeyId      Guid
-   KeyType    uint16
-   CipherType uint16
-   Length     uint16
-   Value      []byte
-   Integrity  Guid
-   Key        Guid
-}
-
-func (c *ContentKey) Decode(data []byte) error {
-   c.KeyId.Decode(data[:])
-   data = data[16:]
-   c.KeyType = binary.BigEndian.Uint16(data)
-   data = data[2:]
-
-   c.CipherType = binary.BigEndian.Uint16(data)
-   data = data[2:]
-
-   c.Length = binary.BigEndian.Uint16(data)
-   data = data[2:]
-
-   c.Value = make([]byte, c.Length)
-
-   copy(c.Value[:], data)
-
-   return nil
-}
-
-func XorKey(root, second []byte) []byte {
-   data := make([]byte, len(second))
-   copy(data, root)
-   for i := range 16 {
-      data[i] ^= second[i]
-   }
-   return data
-}
-
 func (c *ContentKey) Scalable(key crypto.EcKey, auxKeys *AuxKeys) error {
    rootKeyInfo := c.Value[:144]
    rootKey := rootKeyInfo[128:]
@@ -115,3 +77,41 @@ func (c *ContentKey) Decrypt(key crypto.EcKey, auxKeys *AuxKeys) error {
 
    return nil
 }
+type ContentKey struct {
+   KeyId      Guid
+   KeyType    uint16
+   CipherType uint16
+   Length     uint16
+   Value      []byte
+   Integrity  Guid
+   Key        Guid
+}
+
+func (c *ContentKey) Decode(data []byte) error {
+   c.KeyId.Decode(data[:])
+   data = data[16:]
+   c.KeyType = binary.BigEndian.Uint16(data)
+   data = data[2:]
+
+   c.CipherType = binary.BigEndian.Uint16(data)
+   data = data[2:]
+
+   c.Length = binary.BigEndian.Uint16(data)
+   data = data[2:]
+
+   c.Value = make([]byte, c.Length)
+
+   copy(c.Value[:], data)
+
+   return nil
+}
+
+func XorKey(root, second []byte) []byte {
+   data := make([]byte, len(second))
+   copy(data, root)
+   for i := range 16 {
+      data[i] ^= second[i]
+   }
+   return data
+}
+

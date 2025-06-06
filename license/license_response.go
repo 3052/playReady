@@ -1,12 +1,27 @@
 package license
 
 import (
+   "bytes"
    "crypto/aes"
    "encoding/base64"
    "encoding/binary"
    "errors"
-   "github.com/chmike/cmac-go"
+   "github.com/deatil/go-cryptobin/mac"
 )
+
+func (l *LicenseResponse) Verify(content_integrity []byte) error {
+   data := l.Encode()
+   data = data[:len(l.RawData)-int(l.SignatureObject.Length)]
+   block, err := aes.NewCipher(content_integrity)
+   if err != nil {
+      return err
+   }
+   sum := mac.NewCMAC(block, aes.BlockSize).MAC(data)
+   if !bytes.Equal(sum, l.SignatureObject.Data) {
+      return errors.New("failed to decrypt the keys")
+   }
+   return nil
+}
 
 func (l *LicenseResponse) Decode(data []byte) error {
    l.RawData = make([]byte, len(data))
@@ -95,20 +110,6 @@ func (l *LicenseResponse) Encode() []byte {
 
    data = append(data, l.OuterContainer.Encode()...)
    return data
-}
-func (l *LicenseResponse) Verify(content_integrity []byte) error {
-   cm, err := cmac.New(aes.NewCipher, content_integrity)
-   if err != nil {
-      return err
-   }
-   data := l.Encode()
-   data = data[:len(l.RawData)-int(l.SignatureObject.Length)]
-   cm.Write(data)
-   mac1 := cm.Sum(nil)
-   if !cmac.Equal(mac1, l.SignatureObject.Data) {
-      return errors.New("failed to decrypt the keys")
-   }
-   return nil
 }
 
 func (l *LicenseResponse) Parse(data string) error {

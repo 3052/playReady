@@ -5,8 +5,6 @@ import (
    "encoding/binary"
    "errors"
    "github.com/beevik/etree"
-   "golang.org/x/text/encoding/unicode"
-   "golang.org/x/text/transform"
 )
 
 func (h *Header) ParseWrm(Wrm string) error {
@@ -52,29 +50,6 @@ type ProtectionSystemHeaderBox struct {
    KeyIds     []license.Guid
    Length     uint32
    Data       []byte
-}
-
-func (p *PlayReadyObject) Decode(data []byte) bool {
-   p.Type = binary.LittleEndian.Uint16(data)
-   data = data[2:]
-   p.Length = binary.LittleEndian.Uint16(data)
-   data = data[2:]
-
-   if int(p.Length) > len(data) {
-      return false
-   }
-
-   decoder := unicode.UTF16(unicode.LittleEndian, unicode.UseBOM).NewDecoder()
-
-   decodedStr, _, err := transform.String(decoder, string(data))
-
-   if err != nil {
-      return false
-   }
-
-   p.Data = decodedStr
-
-   return true
 }
 
 func (p *PlayReadyRecord) Decode(data []byte) bool {
