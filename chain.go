@@ -4,7 +4,6 @@ import (
    "41.neocities.org/playReady/crypto"
    "bytes"
    "crypto/ecdsa"
-   "crypto/rand"
    "crypto/sha256"
    "encoding/binary"
    "errors"
@@ -31,10 +30,9 @@ func (c *Chain) CreateLeaf(ModelKey, SigningKey, EncryptKey crypto.EcKey) error 
       CertificateFtlv FTLV
    )
    SigningKeyDigest := sha256.Sum256(SigningKey.PublicBytes())
-   err := CertificateInfo.New(c.Certs[0].CertificateInfo.SecurityLevel, SigningKeyDigest[:])
-   if err != nil {
-      return err
-   }
+   CertificateInfo.New(
+      c.Certs[0].CertificateInfo.SecurityLevel, SigningKeyDigest[:],
+   )
    BuiltKeyInfo.New(SigningKey.PublicBytes(), EncryptKey.PublicBytes())
    CertificateFtlv.New(1, 1, CertificateInfo.Encode())
    var NewDevice Device
@@ -51,7 +49,7 @@ func (c *Chain) CreateLeaf(ModelKey, SigningKey, EncryptKey crypto.EcKey) error 
    var UnsignedCert Cert
    UnsignedCert.NewNoSig(NewLeafData)
    SignatureDigest := sha256.Sum256(UnsignedCert.Encode())
-   r, s, err := ecdsa.Sign(rand.Reader, ModelKey.Key, SignatureDigest[:])
+   r, s, err := ecdsa.Sign(crypto.Fill, ModelKey.Key, SignatureDigest[:])
    if err != nil {
       return err
    }

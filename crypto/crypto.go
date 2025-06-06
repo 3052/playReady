@@ -5,26 +5,65 @@ import (
    "crypto/cipher"
    "crypto/ecdsa"
    "crypto/elliptic"
-   "crypto/rand"
    "crypto/x509"
    "encoding/hex"
    "encoding/pem"
    "fmt"
    "github.com/deatil/go-cryptobin/mode"
-   "log"
    "math/big"
    "os"
 )
 
-func random_int(curveData elliptic.Curve) (*big.Int, error) {
-   one := big.NewInt(1)
-   maxInt := new(big.Int).Sub(curveData.Params().N, one)
-   r, err := rand.Int(rand.Reader, maxInt)
-   if err != nil {
-      return nil, err
+var Fill Filler = '!'
+
+type Filler byte
+
+// github.com/golang/go/issues/58454
+func (f Filler) Read(data []byte) (int, error) {
+   for index := range data {
+      data[index] = byte(f)
    }
-   r.Add(r, one)
-   return r, nil
+   return len(data), nil
+}
+
+func (e *EcKey) New() error {
+   var err error
+   e.Key, err = ecdsa.GenerateKey(elliptic.P256(), Fill)
+   if err != nil {
+      return err
+   }
+   return nil
+}
+
+func (x *XmlKey) New() error {
+   key, err := ecdsa.GenerateKey(elliptic.P256(), Fill)
+   if err != nil {
+      return err
+   }
+   x.PublicKey = key.PublicKey
+   Aes := x.PublicKey.X.Bytes()
+   n := copy(x.AesIv[:], Aes)
+   Aes = Aes[n:]
+   copy(x.AesKey[:], Aes)
+   return nil
+}
+
+func (ElGamal) Encrypt(
+   PubX *big.Int, PubY *big.Int, plaintext XmlKey,
+) ([]byte, error) {
+   curveData := elliptic.P256()
+   curve_int := big.NewInt(1)
+   C1X, C1Y := curveData.ScalarMult(
+      curveData.Params().Gx, curveData.Params().Gy, curve_int.Bytes(),
+   )
+   C2XMulti, C2YMulti := curveData.ScalarMult(PubX, PubY, curve_int.Bytes())
+   C2X, C2Y := curveData.Add(
+      plaintext.PublicKey.X, plaintext.PublicKey.Y, C2XMulti, C2YMulti,
+   )
+   Encrypted := C1X.Bytes()
+   Encrypted = append(Encrypted, C1Y.Bytes()...)
+   Encrypted = append(Encrypted, C2X.Bytes()...)
+   return append(Encrypted, C2Y.Bytes()...), nil
 }
 
 func (WMRM) Points() (*big.Int, *big.Int, error) {
@@ -148,52 +187,4 @@ func (e EcKey) Private() []byte {
 
 type EcKey struct {
    Key *ecdsa.PrivateKey
-}
-
-
-func (e *EcKey) New() error {
-   var err error
-   e.Key, err = ecdsa.GenerateKey(elliptic.P256(), fake_rand{})
-   if err != nil {
-      return err
-   }
-   return nil
-}
-
-type fake_rand struct{}
-
-// github.com/golang/go/issues/58454
-func (fake_rand) Read(data []byte) (int, error) {
-   log.Println("fake_rand", len(data))
-   return copy(data, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"), nil
-}
-
-func (x *XmlKey) New() error {
-   key, err := ecdsa.GenerateKey(elliptic.P256(), fake_rand{})
-   if err != nil {
-      return err
-   }
-   x.PublicKey = key.PublicKey
-   Aes := x.PublicKey.X.Bytes()
-   n := copy(x.AesIv[:], Aes)
-   Aes = Aes[n:]
-   copy(x.AesKey[:], Aes)
-   return nil
-}
-
-func (ElGamal) Encrypt(
-   PubX *big.Int, PubY *big.Int, plaintext XmlKey,
-) ([]byte, error) {
-   curveData := elliptic.P256()
-   random, err := random_int(curveData)
-   if err != nil {
-      return nil, err
-   }
-   C1X, C1Y := curveData.ScalarMult(curveData.Params().Gx, curveData.Params().Gy, random.Bytes())
-   C2XMulti, C2YMulti := curveData.ScalarMult(PubX, PubY, random.Bytes())
-   C2X, C2Y := curveData.Add(plaintext.PublicKey.X, plaintext.PublicKey.Y, C2XMulti, C2YMulti)
-   Encrypted := C1X.Bytes()
-   Encrypted = append(Encrypted, C1Y.Bytes()...)
-   Encrypted = append(Encrypted, C2X.Bytes()...)
-   return append(Encrypted, C2Y.Bytes()...), nil
 }

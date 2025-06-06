@@ -12,6 +12,56 @@ import (
    "strings"
 )
 
+func (ld LocalDevice) ParseLicense(response string) ([]KeyData, error) {
+   License := etree.NewDocument()
+   if err := License.ReadFromString(response); err != nil {
+      return nil, err
+   }
+   var Keys []KeyData
+   for _, e := range License.FindElements("./soap:Envelope/soap:Body/AcquireLicenseResponse/AcquireLicenseResult/Response/LicenseResponse/Licenses/*") {
+      var ParsedLicense license.LicenseResponse
+      err := ParsedLicense.Parse(strings.TrimSpace(e.Text()))
+      if err != nil {
+         return nil, err
+      }
+      if bytes.Equal(ParsedLicense.ECCKeyObject.Value, ld.EncryptKey.PublicBytes()) == false {
+         return nil, errors.New("license response is not for this device")
+      }
+      err = ParsedLicense.ContentKeyObject.Decrypt(ld.EncryptKey, ParsedLicense.AuxKeyObject)
+      if err != nil {
+         return Keys, err
+      }
+      if !ParsedLicense.Verify(ParsedLicense.ContentKeyObject.Integrity.Bytes()) {
+         return nil, errors.New("failed to decrypt the keys")
+      }
+      Keys = append(Keys, KeyData{ParsedLicense.ContentKeyObject.KeyId, ParsedLicense.ContentKeyObject.Key})
+   }
+   return Keys, nil
+}
+
+type Config struct {
+   Version    string `json:"client_version"`
+   CertChain  string `json:"cert_chain"`
+   SigningKey string `json:"signing"`
+   EncryptKey string `json:"encrypt"`
+}
+
+type LocalDevice struct {
+   CertificateChain       Chain
+   SigningKey, EncryptKey crypto.EcKey
+   Version                string
+}
+
+func (ld *LocalDevice) New(CertChain, EncryptionKey, SigningKey []byte, ClientVersion string) error {
+   err := ld.CertificateChain.Decode(CertChain)
+   if err != nil {
+      return err
+   }
+   ld.EncryptKey.LoadBytes(EncryptionKey)
+   ld.SigningKey.LoadBytes(SigningKey)
+   ld.Version = ClientVersion
+   return nil
+}
 func (ld LocalDevice) GetChallenge(header Header) (string, error) {
    var Challenge Challenge
    return Challenge.Create(ld.CertificateChain, ld.SigningKey, header)
@@ -54,64 +104,4 @@ func (ld *LocalDevice) Load(path string) error {
 type KeyData struct {
    KeyId license.Guid
    Key   license.Guid
-}
-
-func (ld LocalDevice) ParseLicense(response string) ([]KeyData, error) {
-   License := etree.NewDocument()
-   if err := License.ReadFromString(response); err != nil {
-      return nil, err
-   }
-
-   var Keys []KeyData
-
-   for _, e := range License.FindElements("./soap:Envelope/soap:Body/AcquireLicenseResponse/AcquireLicenseResult/Response/LicenseResponse/Licenses/*") {
-      var ParsedLicense license.LicenseResponse
-      err := ParsedLicense.Parse(strings.TrimSpace(e.Text()))
-
-      if err != nil {
-         return nil, err
-      }
-
-      if bytes.Equal(ParsedLicense.ECCKeyObject.Value, ld.EncryptKey.PublicBytes()) == false {
-         return nil, errors.New("license response is not for this device")
-      }
-
-      err = ParsedLicense.ContentKeyObject.Decrypt(ld.EncryptKey, ParsedLicense.AuxKeyObject)
-
-      if err != nil {
-         return Keys, err
-      }
-
-      if !ParsedLicense.Verify(ParsedLicense.ContentKeyObject.Integrity.Bytes()) {
-         return nil, errors.New("failed to decrypt the keys")
-      }
-
-      Keys = append(Keys, KeyData{ParsedLicense.ContentKeyObject.KeyId, ParsedLicense.ContentKeyObject.Key})
-   }
-
-   return Keys, nil
-}
-
-type Config struct {
-   Version    string `json:"client_version"`
-   CertChain  string `json:"cert_chain"`
-   SigningKey string `json:"signing"`
-   EncryptKey string `json:"encrypt"`
-}
-
-type LocalDevice struct {
-   CertificateChain       Chain
-   SigningKey, EncryptKey crypto.EcKey
-   Version                string
-}
-
-func (ld *LocalDevice) New(CertChain, EncryptionKey, SigningKey []byte, ClientVersion string) error {
-   err := ld.CertificateChain.Decode(CertChain)
-   if err != nil {
-      return err
-   }
-   ld.EncryptKey.LoadBytes(EncryptionKey)
-   ld.SigningKey.LoadBytes(SigningKey)
-   ld.Version = ClientVersion
-   return nil
 }

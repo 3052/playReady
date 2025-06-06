@@ -1,9 +1,14 @@
 package playReady
 
-import (
-   "crypto/rand"
-   "encoding/binary"
-)
+import "encoding/binary"
+
+func (c *CertInfo) New(SecurityLevel uint32, Digest []byte) {
+   c.SecurityLevel = SecurityLevel
+   c.Flags = 0
+   c.Type = 2
+   copy(c.Digest[:], Digest)
+   c.Expiry = 4294967295
+}
 
 type CertInfo struct {
    CertificateId [16]byte
@@ -13,27 +18,6 @@ type CertInfo struct {
    Digest        [32]byte
    Expiry        uint32
    ClientId      [16]byte
-}
-
-func (c *CertInfo) New(SecurityLevel uint32, Digest []byte) error {
-   _, err := rand.Read(c.CertificateId[:])
-   if err != nil {
-      return err
-   }
-
-   c.SecurityLevel = SecurityLevel
-   c.Flags = 0
-   c.Type = 2
-   copy(c.Digest[:], Digest)
-
-   c.Expiry = 4294967295
-
-   _, err = rand.Read(c.ClientId[:])
-   if err != nil {
-      return err
-   }
-
-   return nil
 }
 
 func (c *CertInfo) Encode() []byte {
