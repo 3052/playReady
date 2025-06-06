@@ -13,13 +13,59 @@ import (
    "time"
 )
 
+func (Challenge) Root(
+   LA *etree.Document, SignedInfo *etree.Document,
+   Signature, SigningPublicKey []byte,
+) *etree.Document {
+   doc := etree.NewDocument()
+   doc.WriteSettings.CanonicalEndTags = true
+   doc.CreateChild("soap:Envelope", func(e *etree.Element) {
+      e.CreateAttr("xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance")
+      e.CreateAttr("xmlns:xsd", "http://www.w3.org/2001/XMLSchema")
+      e.CreateAttr("xmlns:soap", "http://schemas.xmlsoap.org/soap/envelope/")
+      e.CreateChild("soap:Body", func(e *etree.Element) {
+         e.CreateChild("AcquireLicense", func(e *etree.Element) {
+            e.CreateAttr("xmlns", "http://schemas.microsoft.com/DRM/2007/03/protocols")
+            e.CreateChild("challenge", func(e *etree.Element) {
+               e.CreateChild("Challenge", func(e *etree.Element) {
+                  e.CreateAttr("xmlns", "http://schemas.microsoft.com/DRM/2007/03/protocols/messages")
+                  e.AddChild(LA.Root())
+                  e.CreateChild("Signature", func(e *etree.Element) {
+                     e.CreateAttr("xmlns", "http://www.w3.org/2000/09/xmldsig#")
+                     e.AddChild(SignedInfo.Root())
+                     e.CreateChild("SignatureValue", func(e *etree.Element) {
+                        e.CreateText(base64.StdEncoding.EncodeToString(Signature))
+                     })
+                     e.CreateChild("KeyInfo", func(e *etree.Element) {
+                        e.CreateAttr("xmlns", "http://www.w3.org/2000/09/xmldsig#")
+                        e.CreateChild("KeyValue", func(e *etree.Element) {
+                           e.CreateChild("ECCKeyValue", func(e *etree.Element) {
+                              e.CreateChild("PublicKey", func(e *etree.Element) {
+                                 e.CreateText(base64.StdEncoding.EncodeToString(SigningPublicKey))
+                              })
+                           })
+                        })
+                     })
+                  })
+               })
+            })
+         })
+      })
+   })
+   doc.Indent(0)
+   return doc
+}
+
 func (Challenge) CipherData(certChain Chain, key crypto.XmlKey) ([]byte, error) {
    doc := etree.NewDocument()
    doc.WriteSettings.CanonicalEndTags = true
    doc.CreateChild("Data", func(e *etree.Element) {
       e.CreateChild("CertificateChains", func(e *etree.Element) {
          e.CreateChild("CertificateChain", func(e *etree.Element) {
-            e.CreateText(" " + base64.StdEncoding.EncodeToString(certChain.Encode()) + " ")
+            e.CreateText(
+               // THIS MIGHT NEED SURROUNDING SPACE
+               base64.StdEncoding.EncodeToString(certChain.Encode()),
+            )
          })
       })
       e.CreateChild("Features", func(e *etree.Element) {
@@ -203,46 +249,4 @@ func (c Challenge) Create(
    xmlHeader := `<?xml version="1.0" encoding="utf-8"?>`
    challengeStr := xmlHeader + base
    return strings.Replace(challengeStr, "\n", "", -1), nil
-}
-
-func (Challenge) Root(LA *etree.Document, SignedInfo *etree.Document, Signature []byte, SigningPublicKey []byte) *etree.Document {
-   doc := etree.NewDocument()
-   doc.WriteSettings.CanonicalEndTags = true
-
-   doc.CreateChild("soap:Envelope", func(e *etree.Element) {
-      e.CreateAttr("xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance")
-      e.CreateAttr("xmlns:xsd", "http://www.w3.org/2001/XMLSchema")
-      e.CreateAttr("xmlns:soap", "http://schemas.xmlsoap.org/soap/envelope/")
-      e.CreateChild("soap:Body", func(e *etree.Element) {
-         e.CreateChild("AcquireLicense", func(e *etree.Element) {
-            e.CreateAttr("xmlns", "http://schemas.microsoft.com/DRM/2007/03/protocols")
-            e.CreateChild("challenge", func(e *etree.Element) {
-               e.CreateChild("Challenge", func(e *etree.Element) {
-                  e.CreateAttr("xmlns", "http://schemas.microsoft.com/DRM/2007/03/protocols/messages")
-                  e.AddChild(LA.Root())
-
-                  e.CreateChild("Signature", func(e *etree.Element) {
-                     e.CreateAttr("xmlns", "http://www.w3.org/2000/09/xmldsig#")
-                     e.AddChild(SignedInfo.Root())
-                     e.CreateChild("SignatureValue", func(e *etree.Element) {
-                        e.CreateText(base64.StdEncoding.EncodeToString(Signature))
-                     })
-                     e.CreateChild("KeyInfo", func(e *etree.Element) {
-                        e.CreateAttr("xmlns", "http://www.w3.org/2000/09/xmldsig#")
-                        e.CreateChild("KeyValue", func(e *etree.Element) {
-                           e.CreateChild("ECCKeyValue", func(e *etree.Element) {
-                              e.CreateChild("PublicKey", func(e *etree.Element) {
-                                 e.CreateText(base64.StdEncoding.EncodeToString(SigningPublicKey))
-                              })
-                           })
-                        })
-                     })
-                  })
-               })
-            })
-         })
-      })
-   })
-   doc.Indent(0)
-   return doc
 }

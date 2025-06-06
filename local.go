@@ -65,6 +65,7 @@ func (ld *LocalDevice) New(CertChain, EncryptionKey, SigningKey []byte, ClientVe
    ld.Version = ClientVersion
    return nil
 }
+
 func (ld LocalDevice) GetChallenge(header Header) (string, error) {
    var Challenge Challenge
    return Challenge.Create(ld.CertificateChain, ld.SigningKey, header)
