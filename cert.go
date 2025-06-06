@@ -45,7 +45,7 @@ func (c *Cert) Decode(data []byte) (int, error) {
    c.RawData = data[n:][:c.Length-16]
    n += len(c.RawData)
 
-   var sum uint32 = 0
+   var sum uint32
    for sum < c.Length-16 {
       var ftlv FTLV
 
@@ -118,6 +118,7 @@ func (c *Cert) Encode() []byte {
 
    return append(data, c.RawData[:]...)
 }
+
 type Cert struct {
    Magic             [4]byte
    Version           uint32
@@ -139,4 +140,3 @@ func (c *Cert) NewNoSig(Value []byte) {
    c.RawData = make([]byte, len(Value))
    copy(c.RawData, Value)
 }
-
