@@ -1,6 +1,8 @@
 package playReady
 
 import (
+   "41.neocities.org/playReady/cert"
+   "41.neocities.org/playReady/challenge"
    "encoding/hex"
    "encoding/xml"
    "io"
@@ -22,29 +24,36 @@ var device_test = struct {
    key_id:  "318f7ece69afcfe3e96de31be6b77272",
 }
 
-func TestLocal(t *testing.T) {
+const kid = "zn6PMa9p48/pbeMb5rdycg=="
+
+const WrmTest = `
+<WRMHEADER xmlns="http://schemas.microsoft.com/DRM/2007/03/PlayReadyHeader" version="4.0.0.0">
+   <DATA>
+      <PROTECTINFO>
+         <KEYLEN>16</KEYLEN>
+         <ALGID>AESCTR</ALGID>
+      </PROTECTINFO>
+      <KID>zn6PMa9p48/pbeMb5rdycg==</KID>
+   </DATA>
+</WRMHEADER>
+`
+
+func TestFail(t *testing.T) {
    var device LocalDevice
    err := device.Load("ignore")
    if err != nil {
       t.Fatal(err)
    }
-   var head WrmHeader
-   err = head.Decode(wrm)
+   data, err := challenge.New(&device.CertificateChain, device.SigningKey, kid)
    if err != nil {
       t.Fatal(err)
    }
-   challenge, err := device.GetChallenge(&Header{WrmHeader: &head})
-   if err != nil {
-      t.Fatal(err)
-   }
-   resp, err := http.Post(
-      device_test.url, "", strings.NewReader(challenge),
-   )
+   resp, err := http.Post(device_test.url, "", strings.NewReader(data))
    if err != nil {
       t.Fatal(err)
    }
    defer resp.Body.Close()
-   data, err := io.ReadAll(resp.Body)
+   data1, err := io.ReadAll(resp.Body)
    if err != nil {
       t.Fatal(err)
    }
@@ -56,13 +65,13 @@ func TestLocal(t *testing.T) {
             }
          }
       } 
-      err = xml.Unmarshal(data, &envelope)
+      err = xml.Unmarshal(data1, &envelope)
       if err != nil {
          t.Fatal(err)
       }
       t.Fatal(envelope)
    }
-   keys, err := device.ParseLicense(string(data))
+   keys, err := device.ParseLicense(string(data1))
    if err != nil {
       t.Fatal(err)
    }
@@ -75,14 +84,53 @@ func TestLocal(t *testing.T) {
    }
 }
 
-const wrm = `
-<WRMHEADER xmlns="http://schemas.microsoft.com/DRM/2007/03/PlayReadyHeader" version="4.0.0.0">
-   <DATA>
-      <PROTECTINFO>
-         <KEYLEN>16</KEYLEN>
-         <ALGID>AESCTR</ALGID>
-      </PROTECTINFO>
-      <KID>zn6PMa9p48/pbeMb5rdycg==</KID>
-   </DATA>
-</WRMHEADER>
-`
+func TestPass(t *testing.T) {
+   var device LocalDevice
+   err := device.Load("ignore")
+   if err != nil {
+      t.Fatal(err)
+   }
+   var head cert.WrmHeader
+   err = head.Decode(WrmTest)
+   if err != nil {
+      t.Fatal(err)
+   }
+   data, err := device.GetChallenge(&cert.Header{WrmHeader: &head})
+   if err != nil {
+      t.Fatal(err)
+   }
+   resp, err := http.Post(device_test.url, "", strings.NewReader(data))
+   if err != nil {
+      t.Fatal(err)
+   }
+   defer resp.Body.Close()
+   data1, err := io.ReadAll(resp.Body)
+   if err != nil {
+      t.Fatal(err)
+   }
+   if resp.StatusCode != http.StatusOK {
+      var envelope struct {
+         Body    struct {
+            Fault struct {
+               Fault string `xml:"faultstring"`
+            }
+         }
+      } 
+      err = xml.Unmarshal(data1, &envelope)
+      if err != nil {
+         t.Fatal(err)
+      }
+      t.Fatal(envelope)
+   }
+   keys, err := device.ParseLicense(string(data1))
+   if err != nil {
+      t.Fatal(err)
+   }
+   key := keys[0]
+   if hex.EncodeToString(key.KeyId.Encode()) != device_test.key_id {
+      t.Fatal(".KeyId")
+   }
+   if hex.EncodeToString(key.Key.Bytes()) != device_test.key {
+      t.Fatal(".Key")
+   }
+}

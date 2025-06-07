@@ -1,4 +1,4 @@
-package playReady
+package cert
 
 import (
    "bytes"

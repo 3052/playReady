@@ -1,7 +1,7 @@
 package challenge
 
 import (
-   "41.neocities.org/playReady"
+   "41.neocities.org/playReady/chain"
    "41.neocities.org/playReady/crypto"
    "crypto/ecdsa"
    "crypto/sha256"
@@ -9,8 +9,8 @@ import (
    "encoding/xml"
 )
 
-func NewChallenge(
-   certificate_chain *playReady.Chain, signing_key crypto.EcKey, kid string,
+func New(
+   certificate_chain *chain.Chain, signing_key crypto.EcKey, kid string,
 ) (string, error) {
    var key crypto.XmlKey
    err := key.New()
@@ -114,7 +114,7 @@ func (v *La) New(key *crypto.XmlKey, cipher_data []byte, kid string) error {
 }
 
 func get_cipher_data(
-   cert_chain *playReady.Chain, key *crypto.XmlKey,
+   cert_chain *chain.Chain, key *crypto.XmlKey,
 ) ([]byte, error) {
    base, err := xml.Marshal(Data{
       CertificateChains: CertificateChains{
@@ -151,20 +151,6 @@ type AcquireLicense struct {
 
 type Challenge struct {
    Challenge InnerChallenge
-}
-
-type InnerChallenge struct { // Renamed from Challenge
-   XmlNs     string `xml:"xmlns,attr"`
-   La        *La    `xml:"LA"`
-   Signature Signature
-}
-
-type La struct {
-   XmlNs         string `xml:"xmlns,attr"`
-   Id            string `xml:"Id,attr"`
-   Version       string
-   ContentHeader ContentHeader
-   EncryptedData EncryptedData
 }
 
 type ContentHeader struct {
@@ -227,26 +213,11 @@ type EncryptedKey struct {
    CipherData       CipherData
 }
 
-type Signature struct {
-   XmlNs          string `xml:"xmlns,attr"`
-   SignedInfo     *SignedInfo
-   SignatureValue string
-   KeyInfo        SignatureKeyInfo
-}
-
 type SignedInfo struct {
    XmlNs                  string `xml:"xmlns,attr"`
    CanonicalizationMethod Algorithm
    SignatureMethod        Algorithm
    Reference              Reference
-}
-
-type Envelope struct {
-   XMLName xml.Name `xml:"soap:Envelope"`
-   Xsi     string   `xml:"xsi,attr"`
-   Xsd     string   `xml:"xsd,attr"`
-   Soap    string   `xml:"soap,attr"`
-   Body    Body
 }
 
 type EncryptedData struct {
@@ -273,6 +244,7 @@ type Data struct {
 type CertificateChains struct {
    CertificateChain string
 }
+
 func (e *Envelope) New(
    la_value *La, signed_info *SignedInfo, signature, signing_public_key []byte,
 ) error {
@@ -327,3 +299,32 @@ func (s *SignedInfo) New(digest []byte) {
    }
 }
 
+type Envelope struct {
+   XMLName xml.Name `xml:"soap:Envelope"`
+   Xsi     string   `xml:"xmlns:xsi,attr"`
+   Xsd     string   `xml:"xmlns:xsd,attr"`
+   Soap    string   `xml:"xmlns:soap,attr"`
+   Body    Body     `xml:"soap:Body"`
+}
+
+type La struct {
+   XMLName       xml.Name `xml:"LA"`
+   XmlNs         string   `xml:"xmlns,attr"`
+   Id            string   `xml:"Id,attr"`
+   Version       string
+   ContentHeader ContentHeader
+   EncryptedData EncryptedData
+}
+
+type InnerChallenge struct { // Renamed from Challenge
+   XmlNs     string `xml:"xmlns,attr"`
+   La        *La
+   Signature Signature
+}
+
+type Signature struct {
+   XmlNs          string `xml:"xmlns,attr"`
+   SignedInfo     *SignedInfo
+   SignatureValue string
+   KeyInfo        SignatureKeyInfo
+}

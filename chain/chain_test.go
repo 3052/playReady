@@ -1,4 +1,4 @@
-package playReady
+package chain
 
 import (
    "41.neocities.org/playReady/crypto"
@@ -7,7 +7,7 @@ import (
    "testing"
 )
 
-const dir = "ignore"
+const dir = "../ignore"
 
 func write_file(name string, data []byte) error {
    log.Println("WriteFile", name)

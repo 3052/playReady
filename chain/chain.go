@@ -1,6 +1,7 @@
-package playReady
+package chain
 
 import (
+   "41.neocities.org/playReady/cert"
    "41.neocities.org/playReady/crypto"
    "bytes"
    "crypto/ecdsa"
@@ -17,7 +18,7 @@ type Chain struct {
    Length    uint32
    Flags     uint32
    CertCount uint32
-   Certs     []Cert
+   Certs     []cert.Cert
 }
 
 func (c *Chain) CreateLeaf(ModelKey, SigningKey, EncryptKey crypto.EcKey) error {
@@ -28,15 +29,15 @@ func (c *Chain) CreateLeaf(ModelKey, SigningKey, EncryptKey crypto.EcKey) error 
       return errors.New("cert is not valid")
    }
    var (
-      BuiltKeyInfo KeyInfo
-      CertificateInfo CertInfo
-      SignatureData Signature
-      SignatureFtlv FTLV
-      DeviceFtlv FTLV
-      FeatureFtlv FTLV
-      KeyInfoFtlv FTLV
-      ManufacturerFtlv FTLV
-      CertificateFtlv FTLV
+      BuiltKeyInfo cert.KeyInfo
+      CertificateInfo cert.CertInfo
+      SignatureData cert.Signature
+      SignatureFtlv cert.FTLV
+      DeviceFtlv cert.FTLV
+      FeatureFtlv cert.FTLV
+      KeyInfoFtlv cert.FTLV
+      ManufacturerFtlv cert.FTLV
+      CertificateFtlv cert.FTLV
    )
    SigningKeyDigest := sha256.Sum256(SigningKey.PublicBytes())
    CertificateInfo.New(
@@ -44,7 +45,7 @@ func (c *Chain) CreateLeaf(ModelKey, SigningKey, EncryptKey crypto.EcKey) error 
    )
    BuiltKeyInfo.New(SigningKey.PublicBytes(), EncryptKey.PublicBytes())
    CertificateFtlv.New(1, 1, CertificateInfo.Encode())
-   var NewDevice Device
+   var NewDevice cert.Device
    NewDevice.New()
    KeyInfoFtlv.New(1, 6, BuiltKeyInfo.Encode())
    ManufacturerFtlv.New(0, 7, c.Certs[0].ManufacturerInfo.Encode())
@@ -55,7 +56,7 @@ func (c *Chain) CreateLeaf(ModelKey, SigningKey, EncryptKey crypto.EcKey) error 
    NewLeafData = append(NewLeafData, FeatureFtlv.Encode()...)
    NewLeafData = append(NewLeafData, KeyInfoFtlv.Encode()...)
    NewLeafData = append(NewLeafData, ManufacturerFtlv.Encode()...)
-   var UnsignedCert Cert
+   var UnsignedCert cert.Cert
    UnsignedCert.NewNoSig(NewLeafData)
    SignatureDigest := sha256.Sum256(UnsignedCert.Encode())
    r, s, err := ecdsa.Sign(crypto.Fill, ModelKey.Key, SignatureDigest[:])
@@ -92,11 +93,9 @@ func (c *Chain) Verify() bool {
 
 func (c *Chain) Decode(data []byte) error {
    n := copy(c.Magic[:], data)
-
    if string(c.Magic[:]) != "CHAI" {
       return errors.New("failed to find chain magic")
    }
-
    data = data[n:]
    c.Version = binary.BigEndian.Uint32(data)
    data = data[4:]
@@ -108,16 +107,13 @@ func (c *Chain) Decode(data []byte) error {
    data = data[4:]
 
    for range c.CertCount {
-      var cert Cert
-      i, err := cert.Decode(data)
-
+      var cert1 cert.Cert
+      i, err := cert1.Decode(data)
       if err != nil {
          return err
       }
-
       data = data[i:]
-
-      c.Certs = append(c.Certs, cert)
+      c.Certs = append(c.Certs, cert1)
    }
    return nil
 }
@@ -128,8 +124,8 @@ func (c *Chain) Encode() []byte {
    data = binary.BigEndian.AppendUint32(data, c.Length)
    data = binary.BigEndian.AppendUint32(data, c.Flags)
    data = binary.BigEndian.AppendUint32(data, c.CertCount)
-   for _, cert := range c.Certs {
-      data = append(data, cert.Encode()...)
+   for _, cert1 := range c.Certs {
+      data = append(data, cert1.Encode()...)
    }
    return data
 }

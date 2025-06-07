@@ -1,4 +1,4 @@
-package playReady
+package cert
 
 import (
    "41.neocities.org/playReady/license"

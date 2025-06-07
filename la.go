@@ -1,6 +1,8 @@
 package playReady
 
 import (
+   "41.neocities.org/playReady/cert"
+   "41.neocities.org/playReady/chain"
    "41.neocities.org/playReady/crypto"
    "bytes"
    "crypto/ecdsa"
@@ -11,7 +13,7 @@ import (
 )
 
 func (c Challenge) Create(
-   certificate_chain *Chain, signing_key crypto.EcKey, head *Header,
+   certificate_chain *chain.Chain, signing_key crypto.EcKey, head *cert.Header,
 ) (string, error) {
    var key crypto.XmlKey
    err := key.New()
@@ -54,7 +56,7 @@ func (c Challenge) Create(
 }
 
 func (Challenge) CipherData(
-   cert_chain *Chain, key *crypto.XmlKey,
+   cert_chain *chain.Chain, key *crypto.XmlKey,
 ) ([]byte, error) {
    doc := etree.NewDocument()
    doc.WriteSettings.CanonicalEndTags = true
@@ -115,7 +117,7 @@ func (Challenge) SignedInfo(digest []byte) *etree.Document {
 type Challenge struct{}
 
 func (Challenge) LicenseAcquisition(
-   key *crypto.XmlKey, cipher_data []byte, head *Header,
+   key *crypto.XmlKey, cipher_data []byte, head *cert.Header,
 ) (*etree.Document, error) {
    doc := etree.NewDocument()
    var license_version string
