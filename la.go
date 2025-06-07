@@ -9,34 +9,9 @@ import (
    "strings"
 )
 
-func (Challenge) SignedInfo(digest []byte) *etree.Document {
-   doc := etree.NewDocument()
-   doc.WriteSettings.CanonicalEndTags = true
-   doc.CreateChild("SignedInfo", func(e *etree.Element) {
-      e.CreateAttr("xmlns", "http://www.w3.org/2000/09/xmldsig#")
-      e.CreateChild("CanonicalizationMethod", func(e *etree.Element) {
-         e.CreateAttr("Algorithm", "http://www.w3.org/TR/2001/REC-xml-c14n-20010315")
-      })
-      e.CreateChild("SignatureMethod", func(e *etree.Element) {
-         e.CreateAttr("Algorithm", "http://schemas.microsoft.com/DRM/2007/03/protocols#ecdsa-sha256")
-      })
-      e.CreateChild("Reference", func(e *etree.Element) {
-         e.CreateAttr("URI", "#SignedData")
-         e.CreateChild("DigestMethod", func(e *etree.Element) {
-            e.CreateAttr("Algorithm", "http://schemas.microsoft.com/DRM/2007/03/protocols#sha256")
-         })
-         e.CreateChild("DigestValue", func(e *etree.Element) {
-            e.CreateText(base64.StdEncoding.EncodeToString(digest))
-         })
-      })
-   })
-   doc.Indent(0)
-   return doc
-}
-
 func (Challenge) Root(
    la *etree.Document, signed_info *etree.Document,
-   Signature, SigningPublicKey []byte,
+   signature, signing_public_key []byte,
 ) *etree.Document {
    doc := etree.NewDocument()
    doc.WriteSettings.CanonicalEndTags = true
@@ -55,14 +30,14 @@ func (Challenge) Root(
                      e.CreateAttr("xmlns", "http://www.w3.org/2000/09/xmldsig#")
                      e.AddChild(signed_info.Root())
                      e.CreateChild("SignatureValue", func(e *etree.Element) {
-                        e.CreateText(base64.StdEncoding.EncodeToString(Signature))
+                        e.CreateText(base64.StdEncoding.EncodeToString(signature))
                      })
                      e.CreateChild("KeyInfo", func(e *etree.Element) {
                         e.CreateAttr("xmlns", "http://www.w3.org/2000/09/xmldsig#")
                         e.CreateChild("KeyValue", func(e *etree.Element) {
                            e.CreateChild("ECCKeyValue", func(e *etree.Element) {
                               e.CreateChild("PublicKey", func(e *etree.Element) {
-                                 e.CreateText(base64.StdEncoding.EncodeToString(SigningPublicKey))
+                                 e.CreateText(base64.StdEncoding.EncodeToString(signing_public_key))
                               })
                            })
                         })
@@ -226,5 +201,30 @@ func (c Challenge) Create(
    }
    challengeStr := `<?xml version="1.0" encoding="utf-8"?>` + base
    return strings.Replace(challengeStr, "\n", "", -1), nil
+}
+
+func (Challenge) SignedInfo(digest []byte) *etree.Document {
+   doc := etree.NewDocument()
+   doc.WriteSettings.CanonicalEndTags = true
+   doc.CreateChild("SignedInfo", func(e *etree.Element) {
+      e.CreateAttr("xmlns", "http://www.w3.org/2000/09/xmldsig#")
+      e.CreateChild("CanonicalizationMethod", func(e *etree.Element) {
+         e.CreateAttr("Algorithm", "http://www.w3.org/TR/2001/REC-xml-c14n-20010315")
+      })
+      e.CreateChild("SignatureMethod", func(e *etree.Element) {
+         e.CreateAttr("Algorithm", "http://schemas.microsoft.com/DRM/2007/03/protocols#ecdsa-sha256")
+      })
+      e.CreateChild("Reference", func(e *etree.Element) {
+         e.CreateAttr("URI", "#SignedData")
+         e.CreateChild("DigestMethod", func(e *etree.Element) {
+            e.CreateAttr("Algorithm", "http://schemas.microsoft.com/DRM/2007/03/protocols#sha256")
+         })
+         e.CreateChild("DigestValue", func(e *etree.Element) {
+            e.CreateText(base64.StdEncoding.EncodeToString(digest))
+         })
+      })
+   })
+   doc.Indent(0)
+   return doc
 }
 
