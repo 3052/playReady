@@ -10,6 +10,49 @@ import (
    "strings"
 )
 
+func (c Challenge) Create(
+   certificate_chain *Chain, signing_key crypto.EcKey, head *Header,
+) (string, error) {
+   var key crypto.XmlKey
+   err := key.New()
+   if err != nil {
+      return "", err
+   }
+   cipher_data, err := c.CipherData(certificate_chain, &key)
+   if err != nil {
+      return "", err
+   }
+   la, err := c.LicenseAcquisition(&key, cipher_data, head)
+   if err != nil {
+      return "", err
+   }
+   la_str, err := la.WriteToString()
+   if err != nil {
+      return "", err
+   }
+   la_str = strings.Replace(la_str, "\n", "", -1)
+   la_digest := sha256.Sum256([]byte(la_str))
+   signed_info := c.SignedInfo(la_digest[:])
+   signed_str, err := signed_info.WriteToString()
+   if err != nil {
+      return "", err
+   }
+   signed_str = strings.Replace(signed_str, "\n", "", -1)
+   signed_digest := sha256.Sum256([]byte(signed_str))
+   r, s, err := ecdsa.Sign(crypto.Fill, signing_key.Key, signed_digest[:])
+   if err != nil {
+      return "", err
+   }
+   sig := append(r.Bytes(), s.Bytes()...)
+   challenge := c.Root(la, signed_info, sig, signing_key.PublicBytes())
+   base, err := challenge.WriteToString()
+   if err != nil {
+      return "", err
+   }
+   challengeStr := `<?xml version="1.0" encoding="utf-8"?>` + base
+   return strings.Replace(challengeStr, "\n", "", -1), nil
+}
+
 func (Challenge) CipherData(
    cert_chain *Chain, key *crypto.XmlKey,
 ) ([]byte, error) {
@@ -187,49 +230,4 @@ func (Challenge) Root(
    })
    doc.Indent(0)
    return doc
-}
-
-///
-
-func (c Challenge) Create(
-   certificate_chain *Chain, signing_key crypto.EcKey, head *Header,
-) (string, error) {
-   var key crypto.XmlKey
-   err := key.New()
-   if err != nil {
-      return "", err
-   }
-   cipher_data, err := c.CipherData(certificate_chain, &key)
-   if err != nil {
-      return "", err
-   }
-   la, err := c.LicenseAcquisition(&key, cipher_data, head)
-   if err != nil {
-      return "", err
-   }
-   la_str, err := la.WriteToString()
-   if err != nil {
-      return "", err
-   }
-   la_str = strings.Replace(la_str, "\n", "", -1)
-   la_digest := sha256.Sum256([]byte(la_str))
-   signed_info := c.SignedInfo(la_digest[:])
-   signed_str, err := signed_info.WriteToString()
-   if err != nil {
-      return "", err
-   }
-   signed_str = strings.Replace(signed_str, "\n", "", -1)
-   signed_digest := sha256.Sum256([]byte(signed_str))
-   r, s, err := ecdsa.Sign(crypto.Fill, signing_key.Key, signed_digest[:])
-   if err != nil {
-      return "", err
-   }
-   sig := append(r.Bytes(), s.Bytes()...)
-   challenge := c.Root(la, signed_info, sig, signing_key.PublicBytes())
-   base, err := challenge.WriteToString()
-   if err != nil {
-      return "", err
-   }
-   challengeStr := `<?xml version="1.0" encoding="utf-8"?>` + base
-   return strings.Replace(challengeStr, "\n", "", -1), nil
 }
