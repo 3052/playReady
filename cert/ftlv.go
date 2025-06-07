@@ -3,13 +3,11 @@ package cert
 import (
    "41.neocities.org/playReady/license"
    "encoding/binary"
-   "github.com/beevik/etree"
 )
 
 type WrmHeader struct {
    Version string
    KeyIds  []license.Guid
-   Data    *etree.Element
 }
 
 type Header struct {
