@@ -6,6 +6,15 @@ import (
    "encoding/xml"
 )
 
+type CertificateChains struct {
+   CertificateChain string
+}
+
+type Data struct {
+   CertificateChains CertificateChains
+   Features          Features
+}
+
 func (e *Envelope) New(
    la_data *La, signed_info *SignedInfo, signature, signing_public_key []byte,
 ) error {
@@ -60,9 +69,6 @@ func (s *SignedInfo) New(digest []byte) {
    }
 }
 
-type Algorithm struct {
-   Algorithm string `xml:"Algorithm,attr"`
-}
 func (v *La) New(key crypto.XmlKey, cipher_data []byte, kid string) error {
    var ecc_pub_key crypto.WMRM
    x, y, err := ecc_pub_key.Points()
@@ -121,34 +127,20 @@ func (v *La) New(key crypto.XmlKey, cipher_data []byte, kid string) error {
    return nil
 }
 
-type Data struct {
-   XMLName           xml.Name          `xml:"Data"`
-   CertificateChains CertificateChains `xml:"CertificateChains"`
-   Features          Features          `xml:"Features"`
-}
-
-type CertificateChains struct {
-   CertificateChain string `xml:"CertificateChain"`
+type Algorithm struct {
+   Algorithm string `xml:"Algorithm,attr"`
 }
 
 type Features struct {
-   Feature Feature `xml:"Feature"`
+   Feature Feature
 }
 
 type Feature struct {
    Name string `xml:"Name,attr"`
 }
 
-type Envelope struct {
-   XMLName xml.Name `xml:"Envelope"`
-   Xsi     string   `xml:"xsi,attr"`
-   Xsd     string   `xml:"xsd,attr"`
-   Soap    string   `xml:"soap,attr"`
-   Body    Body     `xml:"Body"`
-}
-
 type Body struct {
-   AcquireLicense AcquireLicense `xml:"AcquireLicense"`
+   AcquireLicense AcquireLicense
 }
 
 type AcquireLicense struct {
@@ -157,21 +149,21 @@ type AcquireLicense struct {
 }
 
 type Challenge struct {
-   Challenge InnerChallenge `xml:"Challenge"`
+   Challenge InnerChallenge
 }
 
 type InnerChallenge struct { // Renamed from Challenge
-   XmlNs     string    `xml:"xmlns,attr"`
-   La        *La       `xml:"LA"`
-   Signature Signature `xml:"Signature"`
+   XmlNs     string `xml:"xmlns,attr"`
+   La        *La    `xml:"LA"`
+   Signature Signature
 }
 
 type La struct {
-   XmlNs         string        `xml:"xmlns,attr"`
-   Id            string        `xml:"Id,attr"`
-   Version       string        `xml:"Version"`
-   ContentHeader ContentHeader `xml:"ContentHeader"`
-   EncryptedData EncryptedData `xml:"EncryptedData"`
+   XmlNs         string `xml:"xmlns,attr"`
+   Id            string `xml:"Id,attr"`
+   Version       string
+   ContentHeader ContentHeader
+   EncryptedData EncryptedData
 }
 
 type ContentHeader struct {
@@ -188,61 +180,37 @@ type ProtectInfo struct {
    AlgId  string `xml:"ALGID"`
 }
 
-type EncryptedData struct {
-   XmlNs            string     `xml:"xmlns,attr"`
-   Type             string     `xml:"Type,attr"`
-   EncryptionMethod Algorithm  `xml:"EncryptionMethod"`
-   KeyInfo          KeyInfo    `xml:"KeyInfo"` // This one remains "KeyInfo"
-   CipherData       CipherData `xml:"CipherData"`
-}
-
 type KeyInfo struct { // This is the chosen "KeyInfo" type
-   XmlNs        string       `xml:"xmlns,attr"`
-   EncryptedKey EncryptedKey `xml:"EncryptedKey"`
-}
-
-type EncryptedKey struct {
-   XmlNs            string           `xml:"xmlns,attr"`
-   EncryptionMethod Algorithm        `xml:"EncryptionMethod"` // Reused type
-   KeyInfo          EncryptedKeyInfo `xml:"KeyInfo"`          // Renamed to "EncryptedKeyInfo"
-   CipherData       CipherData       `xml:"CipherData"`       // Reused type
+   XmlNs        string `xml:"xmlns,attr"`
+   EncryptedKey EncryptedKey
 }
 
 type CipherData struct {
-   CipherValue string `xml:"CipherValue"`
-}
-
-type Signature struct {
-   XmlNs          string           `xml:"xmlns,attr"`
-   SignedInfo     *SignedInfo      `xml:"SignedInfo"`
-   SignatureValue string           `xml:"SignatureValue"`
-   KeyInfo        SignatureKeyInfo `xml:"KeyInfo"` // Renamed to "SignatureKeyInfo"
-}
-
-type SignedInfo struct {
-   XmlNs                  string    `xml:"xmlns,attr"`
-   CanonicalizationMethod Algorithm `xml:"CanonicalizationMethod"`
-   SignatureMethod        Algorithm `xml:"SignatureMethod"`
-   Reference              Reference `xml:"Reference"`
+   CipherValue string
 }
 
 type Reference struct {
-   Uri          string    `xml:"URI,attr"`
-   DigestMethod Algorithm `xml:"DigestMethod"`
-   DigestValue  string    `xml:"DigestValue"`
+   Uri          string `xml:"URI,attr"`
+   DigestMethod Algorithm
+   DigestValue  string
+}
+
+type EncryptedKeyInfo struct { // Renamed from KeyInfo
+   XmlNs   string `xml:"xmlns,attr"`
+   KeyName string
+}
+
+type EccKeyValue struct {
+   PublicKey string
 }
 
 type KeyValue struct {
    EccKeyValue EccKeyValue `xml:"ECCKeyValue"`
 }
 
-type EccKeyValue struct {
-   PublicKey string `xml:"PublicKey"`
-}
-
 type SignatureKeyInfo struct { // Renamed from KeyInfo
-   XmlNs    string   `xml:"xmlns,attr"`
-   KeyValue KeyValue `xml:"KeyValue"`
+   XmlNs    string `xml:"xmlns,attr"`
+   KeyValue KeyValue
 }
 
 type WrmHeader struct {
@@ -251,7 +219,39 @@ type WrmHeader struct {
    Data    WrmHeaderData `xml:"DATA"`
 }
 
-type EncryptedKeyInfo struct { // Renamed from KeyInfo
-   XmlNs   string `xml:"xmlns,attr"`
-   KeyName string `xml:"KeyName"`
+type EncryptedKey struct {
+   XmlNs            string `xml:"xmlns,attr"`
+   EncryptionMethod Algorithm
+   KeyInfo          EncryptedKeyInfo
+   CipherData       CipherData
+}
+
+type Signature struct {
+   XmlNs          string `xml:"xmlns,attr"`
+   SignedInfo     *SignedInfo
+   SignatureValue string
+   KeyInfo        SignatureKeyInfo
+}
+
+type SignedInfo struct {
+   XmlNs                  string `xml:"xmlns,attr"`
+   CanonicalizationMethod Algorithm
+   SignatureMethod        Algorithm
+   Reference              Reference
+}
+
+type Envelope struct {
+   XMLName xml.Name `xml:"soap:Envelope"`
+   Xsi     string   `xml:"xsi,attr"`
+   Xsd     string   `xml:"xsd,attr"`
+   Soap    string   `xml:"soap,attr"`
+   Body    Body
+}
+
+type EncryptedData struct {
+   XmlNs            string `xml:"xmlns,attr"`
+   Type             string `xml:"Type,attr"`
+   EncryptionMethod Algorithm
+   KeyInfo          KeyInfo
+   CipherData       CipherData
 }

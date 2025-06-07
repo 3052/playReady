@@ -12,7 +12,18 @@ import (
    "strings"
 )
 
-func (ld LocalDevice) ParseLicense(response string) ([]KeyData, error) {
+type LocalDevice struct {
+   CertificateChain       Chain
+   SigningKey, EncryptKey crypto.EcKey
+   Version                string
+}
+
+func (ld *LocalDevice) GetChallenge(head *Header) (string, error) {
+   var value Challenge
+   return value.Create(&ld.CertificateChain, ld.SigningKey, head)
+}
+
+func (ld *LocalDevice) ParseLicense(response string) ([]KeyData, error) {
    License := etree.NewDocument()
    if err := License.ReadFromString(response); err != nil {
       return nil, err
@@ -49,12 +60,6 @@ type Config struct {
    EncryptKey string `json:"encrypt"`
 }
 
-type LocalDevice struct {
-   CertificateChain       Chain
-   SigningKey, EncryptKey crypto.EcKey
-   Version                string
-}
-
 func (ld *LocalDevice) New(CertChain, EncryptionKey, SigningKey []byte, ClientVersion string) error {
    err := ld.CertificateChain.Decode(CertChain)
    if err != nil {
@@ -64,11 +69,6 @@ func (ld *LocalDevice) New(CertChain, EncryptionKey, SigningKey []byte, ClientVe
    ld.SigningKey.LoadBytes(SigningKey)
    ld.Version = ClientVersion
    return nil
-}
-
-func (ld LocalDevice) GetChallenge(header Header) (string, error) {
-   var Challenge Challenge
-   return Challenge.Create(ld.CertificateChain, ld.SigningKey, header)
 }
 
 func (ld *LocalDevice) Load(path string) error {

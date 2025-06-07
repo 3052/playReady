@@ -33,7 +33,7 @@ func TestLocal(t *testing.T) {
    if err != nil {
       t.Fatal(err)
    }
-   challenge, err := device.GetChallenge(Header{WrmHeader: &head})
+   challenge, err := device.GetChallenge(&Header{WrmHeader: &head})
    if err != nil {
       t.Fatal(err)
    }

@@ -7,6 +7,13 @@ import (
    "github.com/beevik/etree"
 )
 
+type Header struct {
+   PSSHBox   *ProtectionSystemHeaderBox
+   Record    *PlayReadyRecord
+   Object    *PlayReadyObject
+   WrmHeader *WrmHeader
+}
+
 func (w *WrmHeader) Decode(data string) error {
    parsed_wrm := etree.NewDocument()
    if err := parsed_wrm.ReadFromString(data); err != nil {
@@ -69,13 +76,6 @@ type ProtectionSystemHeaderBox struct {
    KeyIds     []license.Guid
    Length     uint32
    Data       []byte
-}
-
-type Header struct {
-   PSSHBox   *ProtectionSystemHeaderBox
-   Record    *PlayReadyRecord
-   Object    *PlayReadyObject
-   WrmHeader *WrmHeader
 }
 
 func (p *PlayReadyRecord) Decode(data []byte) bool {

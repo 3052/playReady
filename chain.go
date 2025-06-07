@@ -11,6 +11,15 @@ import (
    "slices"
 )
 
+type Chain struct {
+   Magic     [4]byte
+   Version   uint32
+   Length    uint32
+   Flags     uint32
+   CertCount uint32
+   Certs     []Cert
+}
+
 func (c *Chain) CreateLeaf(ModelKey, SigningKey, EncryptKey crypto.EcKey) error {
    if !bytes.Equal(c.Certs[0].KeyData.Keys[0].PublicKey[:], ModelKey.PublicBytes()) {
       return errors.New("zgpriv not for cert")
@@ -127,19 +136,8 @@ func (c *Chain) Encode() []byte {
 
 func (c *Chain) LoadFile(path string) error {
    data, err := os.ReadFile(path)
-
    if err != nil {
       return err
    }
-
    return c.Decode(data)
-}
-
-type Chain struct {
-   Magic     [4]byte
-   Version   uint32
-   Length    uint32
-   Flags     uint32
-   CertCount uint32
-   Certs     []Cert
 }

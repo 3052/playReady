@@ -9,7 +9,7 @@ import (
    "strings"
 )
 
-func (Challenge) CipherData(cert_chain Chain, key crypto.XmlKey) ([]byte, error) {
+func (Challenge) CipherData(cert_chain *Chain, key crypto.XmlKey) ([]byte, error) {
    doc := etree.NewDocument()
    doc.WriteSettings.CanonicalEndTags = true
    doc.CreateChild("Data", func(e *etree.Element) {
@@ -42,14 +42,13 @@ func (Challenge) CipherData(cert_chain Chain, key crypto.XmlKey) ([]byte, error)
 }
 
 func (c Challenge) Create(
-   certificate_chain Chain, signing_key crypto.EcKey, head Header,
+   certificate_chain *Chain, signing_key crypto.EcKey, head *Header,
 ) (string, error) {
    var key crypto.XmlKey
    err := key.New()
    if err != nil {
       return "", err
    }
-   //////////////////////////////////////////////////////////////////////////////
    cipher_data, err := c.CipherData(certificate_chain, key)
    if err != nil {
       return "", err
@@ -157,7 +156,7 @@ func (Challenge) Root(
 type Challenge struct{}
 
 func (Challenge) LicenseAcquisition(
-   key crypto.XmlKey, cipher_data []byte, head Header,
+   key crypto.XmlKey, cipher_data []byte, head *Header,
 ) (*etree.Document, error) {
    doc := etree.NewDocument()
    var license_version string
@@ -229,4 +228,3 @@ func (Challenge) LicenseAcquisition(
    doc.Indent(0)
    return doc, nil
 }
-
