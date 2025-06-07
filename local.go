@@ -13,21 +13,15 @@ import (
    "strings"
 )
 
-type LocalDevice struct {
-   CertificateChain       chain.Chain
-   SigningKey, EncryptKey crypto.EcKey
-   Version                string
-}
-
 func (ld *LocalDevice) ParseLicense(response string) ([]KeyData, error) {
    License := etree.NewDocument()
    if err := License.ReadFromString(response); err != nil {
       return nil, err
    }
    var Keys []KeyData
-   for _, e := range License.FindElements("./soap:Envelope/soap:Body/AcquireLicenseResponse/AcquireLicenseResult/Response/LicenseResponse/Licenses/*") {
+   for _, element := range License.FindElements("./soap:Envelope/soap:Body/AcquireLicenseResponse/AcquireLicenseResult/Response/LicenseResponse/Licenses/*") {
       var ParsedLicense license.LicenseResponse
-      err := ParsedLicense.Parse(strings.TrimSpace(e.Text()))
+      err := ParsedLicense.Parse(strings.TrimSpace(element.Text()))
       if err != nil {
          return nil, err
       }
@@ -104,4 +98,11 @@ func (ld *LocalDevice) Load(path string) error {
 type KeyData struct {
    KeyId license.Guid
    Key   license.Guid
+}
+
+
+type LocalDevice struct {
+   CertificateChain       chain.Chain
+   SigningKey, EncryptKey crypto.EcKey
+   Version                string
 }

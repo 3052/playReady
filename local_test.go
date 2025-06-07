@@ -17,7 +17,7 @@ var device_test = struct {
    url     string
 }{
    // THIS URL GETS LOCKED TO DEVICE ON FIRST REQUEST
-   url:     "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=b4eae88d-a4fa-4c3c-9868-b52c4ee5313b",
+   url:     "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=f2296077-3209-40ee-b3ee-33482b2e2d72",
    content: "rakuten.tv/cz?content_type=movies&content_id=transvulcania-the-people-s-run",
    key:     "ab82952e8b567a2359393201e4dde4b4",
    key_id:  "318f7ece69afcfe3e96de31be6b77272",
@@ -25,19 +25,7 @@ var device_test = struct {
 
 const kid = "zn6PMa9p48/pbeMb5rdycg=="
 
-const WrmTest = `
-<WRMHEADER xmlns="http://schemas.microsoft.com/DRM/2007/03/PlayReadyHeader" version="4.0.0.0">
-   <DATA>
-      <PROTECTINFO>
-         <KEYLEN>16</KEYLEN>
-         <ALGID>AESCTR</ALGID>
-      </PROTECTINFO>
-      <KID>zn6PMa9p48/pbeMb5rdycg==</KID>
-   </DATA>
-</WRMHEADER>
-`
-
-func TestFail(t *testing.T) {
+func Test(t *testing.T) {
    var device LocalDevice
    err := device.Load("ignore")
    if err != nil {

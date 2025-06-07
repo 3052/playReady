@@ -52,7 +52,7 @@ func New(
    if err != nil {
       return "", err
    }
-   return `<?xml version="1.0" encoding="utf-8"?>` + string(base), nil
+   return xml.Header + string(base), nil
 }
 
 func (v *La) New(key *crypto.XmlKey, cipher_data []byte, kid string) error {
