@@ -5,56 +5,143 @@ import (
    "encoding/base64"
 )
 
-func (e *Envelope) New() error {
-   *e = Envelope{
-      Xsi:  "http://www.w3.org/2001/XMLSchema-instance",
-      Xsd:  "http://www.w3.org/2001/XMLSchema",
-      Soap: "http://schemas.xmlsoap.org/soap/envelope/",
-      Body: Body{
-         AcquireLicense: AcquireLicense{
-            XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols",
-            Challenge: Challenge{
-               Challenge: InnerChallenge{
-                  XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols/messages",
-                  La: func() La {
-                     var value La
-                     value.New()
-                     return value
-                  }(),
-                  Signature: Signature{
-                     XmlNs: "http://www.w3.org/2000/09/xmldsig#",
-                     SignedInfo: SignedInfo{
-                        XmlNs: "http://www.w3.org/2000/09/xmldsig#",
-                        CanonicalizationMethod: AlgorithmType{
-                           Algorithm: "http://www.w3.org/TR/2001/REC-xml-c14n-20010315",
-                        },
-                        SignatureMethod: AlgorithmType{
-                           Algorithm: "http://schemas.microsoft.com/DRM/2007/03/protocols#ecdsa-sha256",
-                        },
-                        Reference: Reference{
-                           Uri: "#SignedData",
-                           DigestMethod: AlgorithmType{
-                              Algorithm: "http://schemas.microsoft.com/DRM/2007/03/protocols#sha256",
-                           },
-                           DigestValue: "s5fwQ1T0dw9g294q4sAP+bs7mN6sbbz2JZQiRtOQnQQ=",
-                        },
-                     },
-                     SignatureValue: "fdss1cA2jRxNdxuQBxVlv3wpuDbEL4tZv3VNaTkkkhII73fTWNBsdiO2RPKFwUUSxIW34FqbSt0LvtTF+aBU0A==",
-                     KeyInfo: SignatureKeyInfo{
-                        XmlNs: "http://www.w3.org/2000/09/xmldsig#",
-                        KeyValue: KeyValue{
-                           EccKeyValue: EccKeyValue{
-                              PublicKey: "Ri26GuT8GpaLTazyDN1tvh+uNKqXFRSmPTQFw9HP04O1i7sIwTODQoxYU8ccTIUeE0sFaCHkaP4Kl3q/QxPd4Q==",
-                           },
-                        },
-                     },
-                  },
-               },
-            },
+type AcquireLicense struct {
+   Challenge Challenge
+   XmlNs     string `xml:"xmlns,attr"`
+}
+
+type AlgorithmType struct {
+   Algorithm string `xml:"Algorithm,attr"`
+}
+
+type Body struct {
+   AcquireLicense AcquireLicense
+}
+
+type Challenge struct {
+   Challenge InnerChallenge `xml:"challenge"`
+}
+
+type CipherData struct {
+   CipherValue string
+}
+
+type ContentHeader struct {
+   WrmHeader WrmHeader `xml:"WRMHEADER"`
+}
+
+type Data struct {
+   Kid         string      `xml:"KID"`
+   ProtectInfo ProtectInfo `xml:"PROTECTINFO"`
+}
+
+type EccKeyValue struct {
+   PublicKey string
+}
+
+type EncryptedData struct {
+   CipherData       CipherData
+   EncryptionMethod AlgorithmType
+   KeyInfo          KeyInfo
+   Type             string `xml:"Type,attr"`
+   XmlNs            string `xml:"xmlns,attr"`
+}
+
+type EncryptedKey struct {
+   CipherData       CipherData
+   EncryptionMethod AlgorithmType
+   KeyInfo          InnerKeyInfo
+   XmlNs            string `xml:"xmlns,attr"`
+}
+
+type Envelope struct {
+   Body Body
+   Soap string `xml:"xmlns:soap,attr"`
+   Xsd  string `xml:"xmlns:xsd,attr"`
+   Xsi  string `xml:"xmlns:xsi,attr"`
+}
+
+type InnerChallenge struct {
+   La        *La `xml:"LA"`
+   Signature Signature
+   XmlNs     string `xml:"xmlns,attr"`
+}
+
+type InnerKeyInfo struct {
+   KeyName string
+   XmlNs   string `xml:"xmlns,attr"`
+}
+
+type KeyInfo struct {
+   EncryptedKey EncryptedKey
+   XmlNs        string `xml:"xmlns,attr"`
+}
+
+type KeyValue struct {
+   EccKeyValue EccKeyValue `xml:"ECCKeyValue"`
+}
+
+type La struct {
+   ContentHeader ContentHeader
+   EncryptedData EncryptedData
+   Id            string `xml:",attr"`
+   Version       string
+   XmlNs         string `xml:"xmlns,attr"`
+}
+
+type ProtectInfo struct {
+   AlgId  string `xml:"ALGID"`
+   KeyLen string `xml:"KEYLEN"`
+}
+
+type Reference struct {
+   DigestMethod AlgorithmType
+   DigestValue  string
+   Uri          string `xml:"URI,attr"`
+}
+
+type Signature struct {
+   KeyInfo        SignatureKeyInfo
+   SignatureValue string
+   SignedInfo     *SignedInfo
+   XmlNs          string `xml:"xmlns,attr"`
+}
+
+type SignatureKeyInfo struct {
+   KeyValue KeyValue
+   XmlNs    string `xml:"xmlns,attr"`
+}
+
+type SignedInfo struct {
+   CanonicalizationMethod AlgorithmType
+   Reference              Reference
+   SignatureMethod        AlgorithmType
+   XmlNs                  string `xml:"xmlns,attr"`
+}
+
+type WrmHeader struct {
+   Data    Data   `xml:"DATA"`
+   Version string `xml:"version,attr"`
+   XmlNs   string `xml:"xmlns,attr"`
+}
+
+func (s *SignedInfo) New(digest []byte) {
+   *s = SignedInfo{
+      XmlNs: "http://www.w3.org/2000/09/xmldsig#",
+      CanonicalizationMethod: AlgorithmType{
+         Algorithm: "http://www.w3.org/TR/2001/REC-xml-c14n-20010315",
+      },
+      SignatureMethod: AlgorithmType{
+         Algorithm: "http://schemas.microsoft.com/DRM/2007/03/protocols#ecdsa-sha256",
+      },
+      Reference: Reference{
+         Uri: "#SignedData",
+         DigestMethod: AlgorithmType{
+            Algorithm: "http://schemas.microsoft.com/DRM/2007/03/protocols#sha256",
          },
+         DigestValue: base64.StdEncoding.EncodeToString(digest),
       },
    }
-   return nil
 }
 
 func (v *La) New(key crypto.XmlKey, cipher_data []byte, kid string) error {
@@ -115,122 +202,37 @@ func (v *La) New(key crypto.XmlKey, cipher_data []byte, kid string) error {
    return nil
 }
 
-type AcquireLicense struct {
-   Challenge Challenge
-   XmlNs     string `xml:"xmlns,attr"`
-}
+///
 
-type AlgorithmType struct {
-   Algorithm string `xml:"Algorithm,attr"`
-}
-
-type Body struct {
-   AcquireLicense AcquireLicense
-}
-
-type Challenge struct {
-   Challenge InnerChallenge `xml:"challenge"`
-}
-
-type CipherData struct {
-   CipherValue string
-}
-
-type ContentHeader struct {
-   WrmHeader WrmHeader `xml:"WRMHEADER"`
-}
-
-type Data struct {
-   Kid         string      `xml:"KID"`
-   ProtectInfo ProtectInfo `xml:"PROTECTINFO"`
-}
-
-type EccKeyValue struct {
-   PublicKey string
-}
-
-type EncryptedData struct {
-   CipherData       CipherData
-   EncryptionMethod AlgorithmType
-   KeyInfo          KeyInfo
-   Type             string `xml:"Type,attr"`
-   XmlNs            string `xml:"xmlns,attr"`
-}
-
-type EncryptedKey struct {
-   CipherData       CipherData
-   EncryptionMethod AlgorithmType
-   KeyInfo          InnerKeyInfo
-   XmlNs            string `xml:"xmlns,attr"`
-}
-
-type Envelope struct {
-   Body Body
-   Soap string `xml:"xmlns:soap,attr"`
-   Xsd  string `xml:"xmlns:xsd,attr"`
-   Xsi  string `xml:"xmlns:xsi,attr"`
-}
-
-type InnerChallenge struct {
-   La        La `xml:"LA"`
-   Signature Signature
-   XmlNs     string `xml:"xmlns,attr"`
-}
-
-type InnerKeyInfo struct {
-   KeyName string
-   XmlNs   string `xml:"xmlns,attr"`
-}
-
-type KeyInfo struct {
-   EncryptedKey EncryptedKey
-   XmlNs        string `xml:"xmlns,attr"`
-}
-
-type KeyValue struct {
-   EccKeyValue EccKeyValue `xml:"ECCKeyValue"`
-}
-
-type La struct {
-   ContentHeader ContentHeader
-   EncryptedData EncryptedData
-   Id            string `xml:",attr"`
-   Version       string
-   XmlNs         string `xml:"xmlns,attr"`
-}
-
-type ProtectInfo struct {
-   AlgId  string `xml:"ALGID"`
-   KeyLen string `xml:"KEYLEN"`
-}
-
-type Reference struct {
-   DigestMethod AlgorithmType
-   DigestValue  string
-   Uri          string `xml:"URI,attr"`
-}
-
-type Signature struct {
-   KeyInfo        SignatureKeyInfo
-   SignatureValue string
-   SignedInfo     SignedInfo
-   XmlNs          string `xml:"xmlns,attr"`
-}
-
-type SignatureKeyInfo struct {
-   KeyValue KeyValue
-   XmlNs    string `xml:"xmlns,attr"`
-}
-
-type SignedInfo struct {
-   CanonicalizationMethod AlgorithmType
-   Reference              Reference
-   SignatureMethod        AlgorithmType
-   XmlNs                  string `xml:"xmlns,attr"`
-}
-
-type WrmHeader struct {
-   Data    Data   `xml:"DATA"`
-   Version string `xml:"version,attr"`
-   XmlNs   string `xml:"xmlns,attr"`
+func (e *Envelope) New(la_data *La, signed_info *SignedInfo) error {
+   *e = Envelope{
+      Xsi:  "http://www.w3.org/2001/XMLSchema-instance",
+      Xsd:  "http://www.w3.org/2001/XMLSchema",
+      Soap: "http://schemas.xmlsoap.org/soap/envelope/",
+      Body: Body{
+         AcquireLicense: AcquireLicense{
+            XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols",
+            Challenge: Challenge{
+               Challenge: InnerChallenge{
+                  XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols/messages",
+                  La: la_data,
+                  Signature: Signature{
+                     XmlNs: "http://www.w3.org/2000/09/xmldsig#",
+                     SignedInfo: signed_info,
+                     SignatureValue: "fdss1cA2jRxNdxuQBxVlv3wpuDbEL4tZv3VNaTkkkhII73fTWNBsdiO2RPKFwUUSxIW34FqbSt0LvtTF+aBU0A==",
+                     KeyInfo: SignatureKeyInfo{
+                        XmlNs: "http://www.w3.org/2000/09/xmldsig#",
+                        KeyValue: KeyValue{
+                           EccKeyValue: EccKeyValue{
+                              PublicKey: "Ri26GuT8GpaLTazyDN1tvh+uNKqXFRSmPTQFw9HP04O1i7sIwTODQoxYU8ccTIUeE0sFaCHkaP4Kl3q/QxPd4Q==",
+                           },
+                        },
+                     },
+                  },
+               },
+            },
+         },
+      },
+   }
+   return nil
 }
