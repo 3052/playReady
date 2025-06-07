@@ -1,4 +1,4 @@
-package xml
+package challenge
 
 import (
    "encoding/xml"

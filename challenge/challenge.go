@@ -1,53 +1,11 @@
-package xml
+package challenge
 
-func (v *La) New() {
-   *v = La{
-      XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/protocols",
-      Id:      "SignedData",
-      Version: "1",
-      ContentHeader: ContentHeader{
-         WrmHeader: WrmHeader{
-            XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/PlayReadyHeader",
-            Version: "4.0.0.0",
-            Data: Data{
-               ProtectInfo: ProtectInfo{
-                  AlgId:  "AESCTR",
-                  KeyLen: "16",
-               },
-               Kid: "zn6PMa9p48/pbeMb5rdycg==",
-            },
-         },
-      },
-      EncryptedData: EncryptedData{
-         XmlNs: "http://www.w3.org/2001/04/xmlenc#",
-         Type:  "http://www.w3.org/2001/04/xmlenc#Element",
-         EncryptionMethod: AlgorithmType{
-            Algorithm: "http://www.w3.org/2001/04/xmlenc#aes128-cbc",
-         },
-         KeyInfo: KeyInfo{
-            XmlNs: "http://www.w3.org/2000/09/xmldsig#",
-            EncryptedKey: EncryptedKey{
-               XmlNs: "http://www.w3.org/2001/04/xmlenc#",
-               EncryptionMethod: AlgorithmType{
-                  Algorithm: "http://schemas.microsoft.com/DRM/2007/03/protocols#ecc256",
-               },
-               KeyInfo: InnerKeyInfo{
-                  XmlNs:   "http://www.w3.org/2000/09/xmldsig#",
-                  KeyName: "WMRMServer",
-               },
-               CipherData: CipherData{
-                  CipherValue: "axfR8uEsQkf4vOblY6RA8ncDfYEt6zOg9KE5RdiYwpZP40Li/hp/m47n60p8D54WK84zV2sxXs7LtkBoN79R9XEkr5ohMAFWhGEQtZNt8HzA3VerdH2U47YEwu620bxuEVBFFmnGDXepIZctp9Hln1bRncJzL8q4GNoQArjDsSA=",
-               },
-            },
-         },
-         CipherData: CipherData{
-            CipherValue: "Ri26GuT8GpaLTazyDN1tvihzYCrQB7pIhYNKHmdbm",
-         },
-      },
-   }
-}
+import (
+   "41.neocities.org/playReady/crypto"
+   "encoding/base64"
+)
 
-func (e *Envelope) New() {
+func (e *Envelope) New() error {
    *e = Envelope{
       Xsi:  "http://www.w3.org/2001/XMLSchema-instance",
       Xsd:  "http://www.w3.org/2001/XMLSchema",
@@ -96,6 +54,65 @@ func (e *Envelope) New() {
          },
       },
    }
+   return nil
+}
+
+func (v *La) New(key crypto.XmlKey, cipher_data []byte, kid string) error {
+   var ecc_pub_key crypto.WMRM
+   x, y, err := ecc_pub_key.Points()
+   if err != nil {
+      return err
+   }
+   var el_gamal crypto.ElGamal
+   encrypted, err := el_gamal.Encrypt(x, y, key)
+   if err != nil {
+      return err
+   }
+   *v = La{
+      XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/protocols",
+      Id:      "SignedData",
+      Version: "1",
+      ContentHeader: ContentHeader{
+         WrmHeader: WrmHeader{
+            XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/PlayReadyHeader",
+            Version: "4.0.0.0",
+            Data: Data{
+               ProtectInfo: ProtectInfo{
+                  KeyLen: "16",
+                  AlgId:  "AESCTR",
+               },
+               Kid: kid,
+            },
+         },
+      },
+      EncryptedData: EncryptedData{
+         XmlNs: "http://www.w3.org/2001/04/xmlenc#",
+         Type:  "http://www.w3.org/2001/04/xmlenc#Element",
+         EncryptionMethod: AlgorithmType{
+            Algorithm: "http://www.w3.org/2001/04/xmlenc#aes128-cbc",
+         },
+         KeyInfo: KeyInfo{
+            XmlNs: "http://www.w3.org/2000/09/xmldsig#",
+            EncryptedKey: EncryptedKey{
+               XmlNs: "http://www.w3.org/2001/04/xmlenc#",
+               EncryptionMethod: AlgorithmType{
+                  Algorithm: "http://schemas.microsoft.com/DRM/2007/03/protocols#ecc256",
+               },
+               KeyInfo: InnerKeyInfo{
+                  XmlNs:   "http://www.w3.org/2000/09/xmldsig#",
+                  KeyName: "WMRMServer",
+               },
+               CipherData: CipherData{
+                  CipherValue: base64.StdEncoding.EncodeToString(encrypted),
+               },
+            },
+         },
+         CipherData: CipherData{
+            CipherValue: base64.StdEncoding.EncodeToString(cipher_data),
+         },
+      },
+   }
+   return nil
 }
 
 type AcquireLicense struct {
@@ -116,7 +133,7 @@ type Challenge struct {
 }
 
 type CipherData struct {
-   CipherValue string `xml:"CipherValue"`
+   CipherValue string
 }
 
 type ContentHeader struct {
@@ -129,15 +146,15 @@ type Data struct {
 }
 
 type EccKeyValue struct {
-   PublicKey string `xml:"PublicKey"`
+   PublicKey string
 }
 
 type EncryptedData struct {
-   CipherData       CipherData    `xml:"CipherData"`
-   EncryptionMethod AlgorithmType `xml:"EncryptionMethod"`
-   KeyInfo          KeyInfo       `xml:"KeyInfo"`
-   Type             string        `xml:"Type,attr"`
-   XmlNs            string        `xml:"xmlns,attr"`
+   CipherData       CipherData
+   EncryptionMethod AlgorithmType
+   KeyInfo          KeyInfo
+   Type             string `xml:"Type,attr"`
+   XmlNs            string `xml:"xmlns,attr"`
 }
 
 type EncryptedKey struct {
@@ -161,7 +178,7 @@ type InnerChallenge struct {
 }
 
 type InnerKeyInfo struct {
-   KeyName string `xml:"KeyName"`
+   KeyName string
    XmlNs   string `xml:"xmlns,attr"`
 }
 
@@ -188,28 +205,28 @@ type ProtectInfo struct {
 }
 
 type Reference struct {
-   DigestMethod AlgorithmType `xml:"DigestMethod"`
-   DigestValue  string        `xml:"DigestValue"`
-   Uri          string        `xml:"URI,attr"`
+   DigestMethod AlgorithmType
+   DigestValue  string
+   Uri          string `xml:"URI,attr"`
 }
 
 type Signature struct {
-   KeyInfo        SignatureKeyInfo `xml:"KeyInfo"`
-   SignatureValue string           `xml:"SignatureValue"`
-   SignedInfo     SignedInfo       `xml:"SignedInfo"`
-   XmlNs          string           `xml:"xmlns,attr"`
+   KeyInfo        SignatureKeyInfo
+   SignatureValue string
+   SignedInfo     SignedInfo
+   XmlNs          string `xml:"xmlns,attr"`
 }
 
 type SignatureKeyInfo struct {
-   KeyValue KeyValue `xml:"KeyValue"`
-   XmlNs    string   `xml:"xmlns,attr"`
+   KeyValue KeyValue
+   XmlNs    string `xml:"xmlns,attr"`
 }
 
 type SignedInfo struct {
-   CanonicalizationMethod AlgorithmType `xml:"CanonicalizationMethod"`
-   Reference              Reference     `xml:"Reference"`
-   SignatureMethod        AlgorithmType `xml:"SignatureMethod"`
-   XmlNs                  string        `xml:"xmlns,attr"`
+   CanonicalizationMethod AlgorithmType
+   Reference              Reference
+   SignatureMethod        AlgorithmType
+   XmlNs                  string `xml:"xmlns,attr"`
 }
 
 type WrmHeader struct {
