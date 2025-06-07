@@ -9,52 +9,120 @@ import (
    "encoding/xml"
 )
 
-func New(
+type Envelope struct {
+   XMLName xml.Name `xml:"soap:Envelope"`
+   Xsi     string   `xml:"xmlns:xsi,attr"`
+   Xsd     string   `xml:"xmlns:xsd,attr"`
+   Soap    string   `xml:"xmlns:soap,attr"`
+   Body    Body     `xml:"soap:Body"`
+}
+
+func (e *Envelope) New(
    certificate_chain *chain.Chain, signing_key crypto.EcKey, kid string,
-) (string, error) {
+) error {
    var key crypto.XmlKey
    err := key.New()
    if err != nil {
-      return "", err
+      return err
    }
    cipher_data, err := get_cipher_data(certificate_chain, &key)
    if err != nil {
-      return "", err
+      return err
    }
    var la_value La
    err = la_value.New(&key, cipher_data, kid)
    if err != nil {
-      return "", err
+      return err
    }
    la_data, err := xml.Marshal(la_value)
    if err != nil {
-      return "", err
+      return err
    }
    la_digest := sha256.Sum256(la_data)
    var signed_info SignedInfo
    signed_info.New(la_digest[:])
    signed_data, err := xml.Marshal(signed_info)
    if err != nil {
-      return "", err
+      return err
    }
    signed_digest := sha256.Sum256(signed_data)
    r, s, err := ecdsa.Sign(crypto.Fill, signing_key.Key, signed_digest[:])
    if err != nil {
-      return "", err
+      return err
    }
    sig := append(r.Bytes(), s.Bytes()...)
-   var root Envelope
-   err = root.New(&la_value, &signed_info, sig, signing_key.PublicBytes())
-   if err != nil {
-      return "", err
+   *e = Envelope{
+      Xsi:  "http://www.w3.org/2001/XMLSchema-instance",
+      Xsd:  "http://www.w3.org/2001/XMLSchema",
+      Soap: "http://schemas.xmlsoap.org/soap/envelope/",
+      Body: Body{
+         AcquireLicense: AcquireLicense{
+            XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols",
+            Challenge: Challenge{
+               Challenge: InnerChallenge{
+                  XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols/messages",
+                  La: la_value,
+                  Signature: Signature{
+                     XmlNs:          "http://www.w3.org/2000/09/xmldsig#",
+                     SignedInfo:     signed_info,
+                     SignatureValue: base64.StdEncoding.EncodeToString(sig),
+                     KeyInfo: SignatureKeyInfo{
+                        XmlNs: "http://www.w3.org/2000/09/xmldsig#",
+                        KeyValue: KeyValue{
+                           EccKeyValue: EccKeyValue{
+                              PublicKey: base64.StdEncoding.EncodeToString(signing_key.PublicBytes()),
+                           },
+                        },
+                     },
+                  },
+               },
+            },
+         },
+      },
    }
-   base, err := xml.Marshal(root)
-   if err != nil {
-      return "", err
-   }
-   return xml.Header + string(base), nil
+   return nil
 }
 
+func (s *SignedInfo) New(digest []byte) {
+   *s = SignedInfo{
+      XmlNs: "http://www.w3.org/2000/09/xmldsig#",
+      CanonicalizationMethod: Algorithm{
+         Algorithm: "http://www.w3.org/TR/2001/REC-xml-c14n-20010315",
+      },
+      SignatureMethod: Algorithm{
+         Algorithm: "http://schemas.microsoft.com/DRM/2007/03/protocols#ecdsa-sha256",
+      },
+      Reference: Reference{
+         Uri: "#SignedData",
+         DigestMethod: Algorithm{
+            Algorithm: "http://schemas.microsoft.com/DRM/2007/03/protocols#sha256",
+         },
+         DigestValue: base64.StdEncoding.EncodeToString(digest),
+      },
+   }
+}
+
+type La struct {
+   XMLName       xml.Name `xml:"LA"`
+   XmlNs         string   `xml:"xmlns,attr"`
+   Id            string   `xml:"Id,attr"`
+   Version       string
+   ContentHeader ContentHeader
+   EncryptedData EncryptedData
+}
+
+type InnerChallenge struct { // Renamed from Challenge
+   XmlNs     string `xml:"xmlns,attr"`
+   La        La
+   Signature Signature
+}
+
+type Signature struct {
+   XmlNs          string `xml:"xmlns,attr"`
+   SignedInfo     SignedInfo
+   SignatureValue string
+   KeyInfo        SignatureKeyInfo
+}
 func (v *La) New(key *crypto.XmlKey, cipher_data []byte, kid string) error {
    var ecc_pub_key crypto.WMRM
    x, y, err := ecc_pub_key.Points()
@@ -243,88 +311,4 @@ type Data struct {
 
 type CertificateChains struct {
    CertificateChain string
-}
-
-func (e *Envelope) New(
-   la_value *La, signed_info *SignedInfo, signature, signing_public_key []byte,
-) error {
-   *e = Envelope{
-      Xsi:  "http://www.w3.org/2001/XMLSchema-instance",
-      Xsd:  "http://www.w3.org/2001/XMLSchema",
-      Soap: "http://schemas.xmlsoap.org/soap/envelope/",
-      Body: Body{
-         AcquireLicense: AcquireLicense{
-            XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols",
-            Challenge: Challenge{
-               Challenge: InnerChallenge{
-                  XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols/messages",
-                  La:    la_value,
-                  Signature: Signature{
-                     XmlNs:          "http://www.w3.org/2000/09/xmldsig#",
-                     SignedInfo:     signed_info,
-                     SignatureValue: base64.StdEncoding.EncodeToString(signature),
-                     KeyInfo: SignatureKeyInfo{
-                        XmlNs: "http://www.w3.org/2000/09/xmldsig#",
-                        KeyValue: KeyValue{
-                           EccKeyValue: EccKeyValue{
-                              PublicKey: base64.StdEncoding.EncodeToString(signing_public_key),
-                           },
-                        },
-                     },
-                  },
-               },
-            },
-         },
-      },
-   }
-   return nil
-}
-
-func (s *SignedInfo) New(digest []byte) {
-   *s = SignedInfo{
-      XmlNs: "http://www.w3.org/2000/09/xmldsig#",
-      CanonicalizationMethod: Algorithm{
-         Algorithm: "http://www.w3.org/TR/2001/REC-xml-c14n-20010315",
-      },
-      SignatureMethod: Algorithm{
-         Algorithm: "http://schemas.microsoft.com/DRM/2007/03/protocols#ecdsa-sha256",
-      },
-      Reference: Reference{
-         Uri: "#SignedData",
-         DigestMethod: Algorithm{
-            Algorithm: "http://schemas.microsoft.com/DRM/2007/03/protocols#sha256",
-         },
-         DigestValue: base64.StdEncoding.EncodeToString(digest),
-      },
-   }
-}
-
-type Envelope struct {
-   XMLName xml.Name `xml:"soap:Envelope"`
-   Xsi     string   `xml:"xmlns:xsi,attr"`
-   Xsd     string   `xml:"xmlns:xsd,attr"`
-   Soap    string   `xml:"xmlns:soap,attr"`
-   Body    Body     `xml:"soap:Body"`
-}
-
-type La struct {
-   XMLName       xml.Name `xml:"LA"`
-   XmlNs         string   `xml:"xmlns,attr"`
-   Id            string   `xml:"Id,attr"`
-   Version       string
-   ContentHeader ContentHeader
-   EncryptedData EncryptedData
-}
-
-type InnerChallenge struct { // Renamed from Challenge
-   XmlNs     string `xml:"xmlns,attr"`
-   La        *La
-   Signature Signature
-}
-
-type Signature struct {
-   XmlNs          string `xml:"xmlns,attr"`
-   SignedInfo     *SignedInfo
-   SignatureValue string
-   KeyInfo        SignatureKeyInfo
 }

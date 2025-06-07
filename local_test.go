@@ -2,11 +2,11 @@ package playReady
 
 import (
    "41.neocities.org/playReady/challenge"
+   "bytes"
    "encoding/hex"
    "encoding/xml"
    "io"
    "net/http"
-   "strings"
    "testing"
 )
 
@@ -31,11 +31,16 @@ func Test(t *testing.T) {
    if err != nil {
       t.Fatal(err)
    }
-   data, err := challenge.New(&device.CertificateChain, device.SigningKey, kid)
+   var envelope challenge.Envelope
+   err = envelope.New(&device.CertificateChain, device.SigningKey, kid)
    if err != nil {
       t.Fatal(err)
    }
-   resp, err := http.Post(device_test.url, "", strings.NewReader(data))
+   data, err := xml.Marshal(envelope)
+   if err != nil {
+      t.Fatal(err)
+   }
+   resp, err := http.Post(device_test.url, "", bytes.NewReader(data))
    if err != nil {
       t.Fatal(err)
    }
@@ -58,12 +63,10 @@ func Test(t *testing.T) {
       }
       t.Fatal(envelope)
    }
-   //keys, err := device.ParseLicense(string(data1))
    key, err := device.ParseLicense(string(data1))
    if err != nil {
       t.Fatal(err)
    }
-   //key := keys[0]
    if hex.EncodeToString(key.KeyId.Encode()) != device_test.key_id {
       t.Fatal(".KeyId")
    }

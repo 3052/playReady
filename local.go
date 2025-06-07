@@ -12,31 +12,27 @@ import (
    "path/filepath"
 )
 
-type envelope struct {
-   Body struct {
-      AcquireLicenseResponse struct {
-         AcquireLicenseResult struct {
-            Response struct {
-               LicenseResponse struct {
-                  Licenses struct {
-                     License string
+func (ld *LocalDevice) ParseLicense(response string) (*KeyData, error) {
+   var envelope struct {
+      Body struct {
+         AcquireLicenseResponse struct {
+            AcquireLicenseResult struct {
+               Response struct {
+                  LicenseResponse struct {
+                     Licenses struct { License string }
                   }
                }
             }
          }
       }
    }
-}
-
-func (ld *LocalDevice) ParseLicense(response string) (*KeyData, error) {
-   var value envelope
-   err := xml.Unmarshal([]byte(response), &value)
+   err := xml.Unmarshal([]byte(response), &envelope)
    if err != nil {
       return nil, err
    }
    var license1 license.LicenseResponse
    err = license1.Parse(
-      value.
+      envelope.
          Body.
          AcquireLicenseResponse.
          AcquireLicenseResult.
