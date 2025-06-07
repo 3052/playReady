@@ -40,17 +40,16 @@ func TestChain(t *testing.T) {
    if err != nil {
       t.Fatal(err)
    }
-   err = write_file(dir + "/chain.txt", chain1.Encode())
+   err = write_file(dir+"/chain.txt", chain1.Encode())
    if err != nil {
       t.Fatal(err)
    }
-   err = write_file(dir + "/signing_key.txt", signing_key.Private())
+   err = write_file(dir+"/signing_key.txt", signing_key.Private())
    if err != nil {
       t.Fatal(err)
    }
-   err = write_file(dir + "/encrypt_key.txt", encrypt_key.Private())
+   err = write_file(dir+"/encrypt_key.txt", encrypt_key.Private())
    if err != nil {
       t.Fatal(err)
    }
 }
-

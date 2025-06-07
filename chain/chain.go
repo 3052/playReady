@@ -29,15 +29,15 @@ func (c *Chain) CreateLeaf(ModelKey, SigningKey, EncryptKey crypto.EcKey) error 
       return errors.New("cert is not valid")
    }
    var (
-      BuiltKeyInfo cert.KeyInfo
-      CertificateInfo cert.CertInfo
-      SignatureData cert.Signature
-      SignatureFtlv cert.FTLV
-      DeviceFtlv cert.FTLV
-      FeatureFtlv cert.FTLV
-      KeyInfoFtlv cert.FTLV
+      BuiltKeyInfo     cert.KeyInfo
+      CertificateInfo  cert.CertInfo
+      SignatureData    cert.Signature
+      SignatureFtlv    cert.FTLV
+      DeviceFtlv       cert.FTLV
+      FeatureFtlv      cert.FTLV
+      KeyInfoFtlv      cert.FTLV
       ManufacturerFtlv cert.FTLV
-      CertificateFtlv cert.FTLV
+      CertificateFtlv  cert.FTLV
    )
    SigningKeyDigest := sha256.Sum256(SigningKey.PublicBytes())
    CertificateInfo.New(

@@ -149,6 +149,7 @@ func XorKey(root, second []byte) []byte {
    }
    return data
 }
+
 type FTLV struct {
    Flags  uint16
    Type   uint16

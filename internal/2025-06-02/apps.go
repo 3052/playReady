@@ -105,20 +105,20 @@ var details = map[string][]app{
    "100K+ Downloads": {
       {
          playReady: "subscribe",
-         title: "The Criterion Channel",
-         url:   "play.google.com/store/apps/details?id=com.criterionchannel",
+         title:     "The Criterion Channel",
+         url:       "play.google.com/store/apps/details?id=com.criterionchannel",
       },
    },
    "10K+ Downloads": {
       {
          playReady: "log in",
-         title: "CineMember",
-         url:   "play.google.com/store/apps/details?id=nl.peoplesplayground.audienceplayer.cinemember",
+         title:     "CineMember",
+         url:       "play.google.com/store/apps/details?id=nl.peoplesplayground.audienceplayer.cinemember",
       },
       {
          playReady: "join",
-         title: "Draken Film",
-         url:   "play.google.com/store/apps/details?id=com.draken.android",
+         title:     "Draken Film",
+         url:       "play.google.com/store/apps/details?id=com.draken.android",
       },
    },
 }

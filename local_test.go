@@ -46,23 +46,24 @@ func Test(t *testing.T) {
    }
    if resp.StatusCode != http.StatusOK {
       var envelope struct {
-         Body    struct {
+         Body struct {
             Fault struct {
                Fault string `xml:"faultstring"`
             }
          }
-      } 
+      }
       err = xml.Unmarshal(data1, &envelope)
       if err != nil {
          t.Fatal(err)
       }
       t.Fatal(envelope)
    }
-   keys, err := device.ParseLicense(string(data1))
+   //keys, err := device.ParseLicense(string(data1))
+   key, err := device.ParseLicense(string(data1))
    if err != nil {
       t.Fatal(err)
    }
-   key := keys[0]
+   //key := keys[0]
    if hex.EncodeToString(key.KeyId.Encode()) != device_test.key_id {
       t.Fatal(".KeyId")
    }
