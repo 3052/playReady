@@ -13,15 +13,21 @@ import (
    "os"
 )
 
-func (a Aes) EncryptCBC(key XmlKey, data string) ([]byte, error) {
+func (a Aes) EncryptCbc(key *XmlKey, data []byte) ([]byte, error) {
    block, err := aes.NewCipher(key.AesKey[:])
    if err != nil {
       return nil, err
    }
-   padded := a.Pad([]byte(data))
-   ciphertext := make([]byte, len(padded))
-   cipher.NewCBCEncrypter(block, key.AesIv[:]).CryptBlocks(ciphertext, padded)
+   data = a.Pad(data)
+   ciphertext := make([]byte, len(data))
+   cipher.NewCBCEncrypter(block, key.AesIv[:]).CryptBlocks(ciphertext, data)
    return ciphertext, nil
+}
+
+type XmlKey struct {
+   AesIv     [16]byte
+   AesKey    [16]byte
+   PublicKey ecdsa.PublicKey
 }
 
 func (WMRM) Points() (*big.Int, *big.Int, error) {
@@ -100,11 +106,6 @@ func (Aes) Pad(data []byte) []byte {
    return data
 }
 
-type XmlKey struct {
-   PublicKey     ecdsa.PublicKey
-   AesKey, AesIv [16]byte
-}
-
 type WMRM struct{}
 
 var WMRMPublicKey = "C8B6AF16EE941AADAA5389B4AF2C10E356BE42AF175EF3FACE93254E7B0B3D9B982B27B5CB2341326E56AA857DBFD5C634CE2CF9EA74FCA8F2AF5957EFEEA562"
@@ -118,6 +119,7 @@ func (e EcKey) Private() []byte {
 type EcKey struct {
    Key *ecdsa.PrivateKey
 }
+
 var Fill Filler = '!'
 
 type Filler byte
@@ -153,7 +155,7 @@ func (x *XmlKey) New() error {
 }
 
 func (ElGamal) Encrypt(
-   PubX *big.Int, PubY *big.Int, plaintext XmlKey,
+   PubX *big.Int, PubY *big.Int, plaintext *XmlKey,
 ) ([]byte, error) {
    curveData := elliptic.P256()
    curve_int := big.NewInt(1)
@@ -169,4 +171,3 @@ func (ElGamal) Encrypt(
    Encrypted = append(Encrypted, C2X.Bytes()...)
    return append(Encrypted, C2Y.Bytes()...), nil
 }
-

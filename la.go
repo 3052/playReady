@@ -2,6 +2,7 @@ package playReady
 
 import (
    "41.neocities.org/playReady/crypto"
+   "bytes"
    "crypto/ecdsa"
    "crypto/sha256"
    "encoding/base64"
@@ -9,7 +10,9 @@ import (
    "strings"
 )
 
-func (Challenge) CipherData(cert_chain *Chain, key crypto.XmlKey) ([]byte, error) {
+func (Challenge) CipherData(
+   cert_chain *Chain, key *crypto.XmlKey,
+) ([]byte, error) {
    doc := etree.NewDocument()
    doc.WriteSettings.CanonicalEndTags = true
    doc.CreateChild("Data", func(e *etree.Element) {
@@ -28,60 +31,17 @@ func (Challenge) CipherData(cert_chain *Chain, key crypto.XmlKey) ([]byte, error
       })
    })
    doc.Indent(0)
-   base, err := doc.WriteToString()
+   base, err := doc.WriteToBytes()
    if err != nil {
       return nil, err
    }
-   base = strings.Replace(base, "\n", "", -1)
-   var Aes crypto.Aes
-   ciphertext, err := Aes.EncryptCBC(key, base)
+   base = bytes.ReplaceAll(base, []byte{'\n'}, nil)
+   var aes crypto.Aes
+   ciphertext, err := aes.EncryptCbc(key, base)
    if err != nil {
       return nil, err
    }
    return append(key.AesIv[:], ciphertext...), nil
-}
-
-func (c Challenge) Create(
-   certificate_chain *Chain, signing_key crypto.EcKey, head *Header,
-) (string, error) {
-   var key crypto.XmlKey
-   err := key.New()
-   if err != nil {
-      return "", err
-   }
-   cipher_data, err := c.CipherData(certificate_chain, key)
-   if err != nil {
-      return "", err
-   }
-   la, err := c.LicenseAcquisition(key, cipher_data, head)
-   if err != nil {
-      return "", err
-   }
-   la_str, err := la.WriteToString()
-   if err != nil {
-      return "", err
-   }
-   la_str = strings.Replace(la_str, "\n", "", -1)
-   la_digest := sha256.Sum256([]byte(la_str))
-   signed_info := c.SignedInfo(la_digest[:])
-   signed_str, err := signed_info.WriteToString()
-   if err != nil {
-      return "", err
-   }
-   signed_str = strings.Replace(signed_str, "\n", "", -1)
-   signed_digest := sha256.Sum256([]byte(signed_str))
-   r, s, err := ecdsa.Sign(crypto.Fill, signing_key.Key, signed_digest[:])
-   if err != nil {
-      return "", err
-   }
-   sig := append(r.Bytes(), s.Bytes()...)
-   challenge := c.Root(la, signed_info, sig, signing_key.PublicBytes())
-   base, err := challenge.WriteToString()
-   if err != nil {
-      return "", err
-   }
-   challengeStr := `<?xml version="1.0" encoding="utf-8"?>` + base
-   return strings.Replace(challengeStr, "\n", "", -1), nil
 }
 
 func (Challenge) SignedInfo(digest []byte) *etree.Document {
@@ -109,54 +69,10 @@ func (Challenge) SignedInfo(digest []byte) *etree.Document {
    return doc
 }
 
-func (Challenge) Root(
-   la *etree.Document, signed_info *etree.Document,
-   signature, signing_public_key []byte,
-) *etree.Document {
-   doc := etree.NewDocument()
-   doc.WriteSettings.CanonicalEndTags = true
-   doc.CreateChild("soap:Envelope", func(e *etree.Element) {
-      e.CreateAttr("xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance")
-      e.CreateAttr("xmlns:xsd", "http://www.w3.org/2001/XMLSchema")
-      e.CreateAttr("xmlns:soap", "http://schemas.xmlsoap.org/soap/envelope/")
-      e.CreateChild("soap:Body", func(e *etree.Element) {
-         e.CreateChild("AcquireLicense", func(e *etree.Element) {
-            e.CreateAttr("xmlns", "http://schemas.microsoft.com/DRM/2007/03/protocols")
-            e.CreateChild("challenge", func(e *etree.Element) {
-               e.CreateChild("Challenge", func(e *etree.Element) {
-                  e.CreateAttr("xmlns", "http://schemas.microsoft.com/DRM/2007/03/protocols/messages")
-                  e.AddChild(la.Root())
-                  e.CreateChild("Signature", func(e *etree.Element) {
-                     e.CreateAttr("xmlns", "http://www.w3.org/2000/09/xmldsig#")
-                     e.AddChild(signed_info.Root())
-                     e.CreateChild("SignatureValue", func(e *etree.Element) {
-                        e.CreateText(base64.StdEncoding.EncodeToString(signature))
-                     })
-                     e.CreateChild("KeyInfo", func(e *etree.Element) {
-                        e.CreateAttr("xmlns", "http://www.w3.org/2000/09/xmldsig#")
-                        e.CreateChild("KeyValue", func(e *etree.Element) {
-                           e.CreateChild("ECCKeyValue", func(e *etree.Element) {
-                              e.CreateChild("PublicKey", func(e *etree.Element) {
-                                 e.CreateText(base64.StdEncoding.EncodeToString(signing_public_key))
-                              })
-                           })
-                        })
-                     })
-                  })
-                  
-               })
-            })
-         })
-      })
-   })
-   doc.Indent(0)
-   return doc
-}
-
 type Challenge struct{}
 
 func (Challenge) LicenseAcquisition(
-   key crypto.XmlKey, cipher_data []byte, head *Header,
+   key *crypto.XmlKey, cipher_data []byte, head *Header,
 ) (*etree.Document, error) {
    doc := etree.NewDocument()
    var license_version string
@@ -227,4 +143,93 @@ func (Challenge) LicenseAcquisition(
    }
    doc.Indent(0)
    return doc, nil
+}
+
+func (Challenge) Root(
+   la *etree.Document, signed_info *etree.Document,
+   signature, signing_public_key []byte,
+) *etree.Document {
+   doc := etree.NewDocument()
+   doc.WriteSettings.CanonicalEndTags = true
+   doc.CreateChild("soap:Envelope", func(e *etree.Element) {
+      e.CreateAttr("xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance")
+      e.CreateAttr("xmlns:xsd", "http://www.w3.org/2001/XMLSchema")
+      e.CreateAttr("xmlns:soap", "http://schemas.xmlsoap.org/soap/envelope/")
+      e.CreateChild("soap:Body", func(e *etree.Element) {
+         e.CreateChild("AcquireLicense", func(e *etree.Element) {
+            e.CreateAttr("xmlns", "http://schemas.microsoft.com/DRM/2007/03/protocols")
+            e.CreateChild("challenge", func(e *etree.Element) {
+               e.CreateChild("Challenge", func(e *etree.Element) {
+                  e.CreateAttr("xmlns", "http://schemas.microsoft.com/DRM/2007/03/protocols/messages")
+                  e.AddChild(la.Root())
+                  e.CreateChild("Signature", func(e *etree.Element) {
+                     e.CreateAttr("xmlns", "http://www.w3.org/2000/09/xmldsig#")
+                     e.AddChild(signed_info.Root())
+                     e.CreateChild("SignatureValue", func(e *etree.Element) {
+                        e.CreateText(base64.StdEncoding.EncodeToString(signature))
+                     })
+                     e.CreateChild("KeyInfo", func(e *etree.Element) {
+                        e.CreateAttr("xmlns", "http://www.w3.org/2000/09/xmldsig#")
+                        e.CreateChild("KeyValue", func(e *etree.Element) {
+                           e.CreateChild("ECCKeyValue", func(e *etree.Element) {
+                              e.CreateChild("PublicKey", func(e *etree.Element) {
+                                 e.CreateText(base64.StdEncoding.EncodeToString(signing_public_key))
+                              })
+                           })
+                        })
+                     })
+                  })
+                  
+               })
+            })
+         })
+      })
+   })
+   doc.Indent(0)
+   return doc
+}
+
+///
+
+func (c Challenge) Create(
+   certificate_chain *Chain, signing_key crypto.EcKey, head *Header,
+) (string, error) {
+   var key crypto.XmlKey
+   err := key.New()
+   if err != nil {
+      return "", err
+   }
+   cipher_data, err := c.CipherData(certificate_chain, &key)
+   if err != nil {
+      return "", err
+   }
+   la, err := c.LicenseAcquisition(&key, cipher_data, head)
+   if err != nil {
+      return "", err
+   }
+   la_str, err := la.WriteToString()
+   if err != nil {
+      return "", err
+   }
+   la_str = strings.Replace(la_str, "\n", "", -1)
+   la_digest := sha256.Sum256([]byte(la_str))
+   signed_info := c.SignedInfo(la_digest[:])
+   signed_str, err := signed_info.WriteToString()
+   if err != nil {
+      return "", err
+   }
+   signed_str = strings.Replace(signed_str, "\n", "", -1)
+   signed_digest := sha256.Sum256([]byte(signed_str))
+   r, s, err := ecdsa.Sign(crypto.Fill, signing_key.Key, signed_digest[:])
+   if err != nil {
+      return "", err
+   }
+   sig := append(r.Bytes(), s.Bytes()...)
+   challenge := c.Root(la, signed_info, sig, signing_key.PublicBytes())
+   base, err := challenge.WriteToString()
+   if err != nil {
+      return "", err
+   }
+   challengeStr := `<?xml version="1.0" encoding="utf-8"?>` + base
+   return strings.Replace(challengeStr, "\n", "", -1), nil
 }
