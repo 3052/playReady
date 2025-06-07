@@ -5,16 +5,24 @@ import (
    "crypto/ecdsa"
    "crypto/sha256"
    "encoding/base64"
+   "encoding/xml"
    "github.com/beevik/etree"
    "strings"
 )
 
+type Node struct {
+   XMLName xml.Name
+   Attr    []xml.Attr `xml:",attr"`
+   Node    []Node
+   Text    string `xml:",chardata"`
+}
+
 func (Challenge) LicenseAcquisition(
-   key crypto.XmlKey, cipherData []byte, header Header,
+   key crypto.XmlKey, cipherData []byte, head Header,
 ) (*etree.Document, error) {
    doc := etree.NewDocument()
    var LicenseVersion string
-   switch header.WrmHeader.Version {
+   switch head.WrmHeader.Version {
    case "4.2.0.0":
       LicenseVersion = "4"
    case "4.3.0.0":
@@ -23,8 +31,8 @@ func (Challenge) LicenseAcquisition(
       LicenseVersion = "1"
    }
    doc.WriteSettings.CanonicalEndTags = true
-   var WMRMEccPubKey crypto.WMRM
-   x, y, err := WMRMEccPubKey.Points()
+   var ecc_pub_key crypto.WMRM
+   x, y, err := ecc_pub_key.Points()
    if err != nil {
       return nil, err
    }
@@ -36,7 +44,7 @@ func (Challenge) LicenseAcquisition(
          e.CreateText(LicenseVersion)
       })
       e.CreateChild("ContentHeader", func(e *etree.Element) {
-         e.AddChild(header.WrmHeader.Data)
+         e.AddChild(head.WrmHeader.Data)
       })
       e.CreateChild("EncryptedData", func(e *etree.Element) {
          e.CreateAttr("xmlns", "http://www.w3.org/2001/04/xmlenc#")
@@ -84,7 +92,7 @@ func (Challenge) LicenseAcquisition(
 }
 
 func (c Challenge) Create(
-   certificateChain Chain, signing_key crypto.EcKey, header Header,
+   certificateChain Chain, signing_key crypto.EcKey, head Header,
 ) (string, error) {
    var key crypto.XmlKey
    err := key.New()
@@ -95,7 +103,7 @@ func (c Challenge) Create(
    if err != nil {
       return "", err
    }
-   la, err := c.LicenseAcquisition(key, cipherData, header)
+   la, err := c.LicenseAcquisition(key, cipherData, head)
    if err != nil {
       return "", err
    }

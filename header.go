@@ -7,20 +7,6 @@ import (
    "github.com/beevik/etree"
 )
 
-func (h *Header) ParseWrm(Wrm string) error {
-   var header WrmHeader
-
-   err := header.Decode(Wrm)
-
-   if err != nil {
-      return err
-   }
-
-   h.WrmHeader = &header
-
-   return nil
-}
-
 type PlayReadyObject struct {
    Type   uint16
    Length uint16
@@ -31,13 +17,6 @@ type PlayReadyRecord struct {
    Length uint32
    Count  uint16
    Data   []byte
-}
-
-type Header struct {
-   PSSHBox   *ProtectionSystemHeaderBox
-   Record    *PlayReadyRecord
-   Object    *PlayReadyObject
-   WrmHeader *WrmHeader
 }
 
 type ProtectionSystemHeaderBox struct {
@@ -52,62 +31,41 @@ type ProtectionSystemHeaderBox struct {
    Data       []byte
 }
 
-func (p *PlayReadyRecord) Decode(data []byte) bool {
-   p.Length = binary.LittleEndian.Uint32(data)
-
-   if int(p.Length) > len(data) {
-      return false
-   }
-
-   data = data[4:]
-   p.Count = binary.LittleEndian.Uint16(data)
-   data = data[2:]
-
-   p.Data = data
-
-   return true
-}
-
-func (p *ProtectionSystemHeaderBox) Decode(data []byte) {
-   p.Size = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   n := copy(p.Type[:], data)
-   data = data[n:]
-
-   p.Version = data[0]
-   data = data[1:]
-   n = copy(p.Flags[:], data)
-   data = data[n:]
-
-   p.SystemId.Decode(data)
-
-   data = data[16:]
-
-   if p.Version == 1 {
-      p.KeyIdCount = binary.BigEndian.Uint32(data)
-      data = data[4:]
-
-      p.KeyIds = make([]license.Guid, p.KeyIdCount)
-
-      for i := range p.KeyIdCount {
-         var KeyId license.Guid
-         KeyId.Decode(data)
-
-         p.KeyIds[i] = KeyId
-         data = data[16:]
-      }
-   }
-
-   p.Length = binary.BigEndian.Uint32(data)
-   data = data[4:]
-
-   p.Data = data
+type Header struct {
+   PSSHBox   *ProtectionSystemHeaderBox
+   Record    *PlayReadyRecord
+   Object    *PlayReadyObject
+   WrmHeader *WrmHeader
 }
 
 type WrmHeader struct {
    Version string
    KeyIds  []license.Guid
    Data    *etree.Element
+}
+
+///
+
+func (p *PlayReadyRecord) Decode(data []byte) bool {
+   p.Length = binary.LittleEndian.Uint32(data)
+   if int(p.Length) > len(data) {
+      return false
+   }
+   data = data[4:]
+   p.Count = binary.LittleEndian.Uint16(data)
+   data = data[2:]
+   p.Data = data
+   return true
+}
+
+func (h *Header) ParseWrm(Wrm string) error {
+   var head WrmHeader
+   err := head.Decode(Wrm)
+   if err != nil {
+      return err
+   }
+   h.WrmHeader = &head
+   return nil
 }
 
 func (w *WrmHeader) Decode(Wrm string) error {
