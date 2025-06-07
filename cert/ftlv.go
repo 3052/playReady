@@ -3,55 +3,20 @@ package cert
 import (
    "41.neocities.org/playReady/license"
    "encoding/binary"
-   "errors"
    "github.com/beevik/etree"
 )
+
+type WrmHeader struct {
+   Version string
+   KeyIds  []license.Guid
+   Data    *etree.Element
+}
 
 type Header struct {
    PSSHBox   *ProtectionSystemHeaderBox
    Record    *PlayReadyRecord
    Object    *PlayReadyObject
    WrmHeader *WrmHeader
-}
-
-func (w *WrmHeader) Decode(data string) error {
-   parsed_wrm := etree.NewDocument()
-   if err := parsed_wrm.ReadFromString(data); err != nil {
-      return err
-   }
-   version := parsed_wrm.Root().SelectAttrValue("version", "")
-   if version == "" {
-      return errors.New("invalid wrm header")
-   }
-   w.Version = version
-   var key_ids []*etree.Element
-   switch version {
-   case "4.0.0.0":
-      key_ids = parsed_wrm.FindElements("/WRMHEADER/DATA/KID")
-   case "4.1.0.0":
-      key_ids = parsed_wrm.FindElements("/WRMHEADER/DATA/PROTECTINFO/KID")
-   case "4.2.0.0":
-   case "4.3.0.0":
-      key_ids = parsed_wrm.FindElements("/WRMHEADER/DATA/PROTECTINFO/KIDS/*")
-   }
-   w.KeyIds = make([]license.Guid, len(key_ids))
-   for i, element := range key_ids {
-      var key_id license.Guid
-      if element.Text() != "" {
-         err := key_id.Base64Decode(element.Text())
-         if err != nil {
-            return err
-         }
-      } else {
-         err := key_id.Base64Decode(element.SelectAttrValue("VALUE", ""))
-         if err != nil {
-            return err
-         }
-      }
-      w.KeyIds[i] = key_id
-   }
-   w.Data = parsed_wrm.Root()
-   return nil
 }
 
 type PlayReadyObject struct {
@@ -90,11 +55,6 @@ func (p *PlayReadyRecord) Decode(data []byte) bool {
    return true
 }
 
-type WrmHeader struct {
-   Version string
-   KeyIds  []license.Guid
-   Data    *etree.Element
-}
 type Device struct {
    MaxLicenseSize       uint32
    MaxHeaderSize        uint32
