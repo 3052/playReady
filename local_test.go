@@ -16,7 +16,7 @@ var device_test = struct {
    url     string
 }{
    // THIS URL GETS LOCKED TO DEVICE ON FIRST REQUEST
-   url:     "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=94eec1d1-e024-4507-9703-bead7c55ddb0",
+   url:     "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=31aadbc2-e79f-4c8e-a03c-7e2db981aa50",
    content: "rakuten.tv/cz?content_type=movies&content_id=transvulcania-the-people-s-run",
    key:     "ab82952e8b567a2359393201e4dde4b4",
    key_id:  "318f7ece69afcfe3e96de31be6b77272",

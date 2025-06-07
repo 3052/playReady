@@ -1,5 +1,52 @@
 package xml
 
+func (v *La) New() {
+   *v = La{
+      XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/protocols",
+      Id:      "SignedData",
+      Version: "1",
+      ContentHeader: ContentHeader{
+         WrmHeader: WrmHeader{
+            XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/PlayReadyHeader",
+            Version: "4.0.0.0",
+            Data: Data{
+               ProtectInfo: ProtectInfo{
+                  AlgId:  "AESCTR",
+                  KeyLen: "16",
+               },
+               Kid: "zn6PMa9p48/pbeMb5rdycg==",
+            },
+         },
+      },
+      EncryptedData: EncryptedData{
+         XmlNs: "http://www.w3.org/2001/04/xmlenc#",
+         Type:  "http://www.w3.org/2001/04/xmlenc#Element",
+         EncryptionMethod: AlgorithmType{
+            Algorithm: "http://www.w3.org/2001/04/xmlenc#aes128-cbc",
+         },
+         KeyInfo: KeyInfo{
+            XmlNs: "http://www.w3.org/2000/09/xmldsig#",
+            EncryptedKey: EncryptedKey{
+               XmlNs: "http://www.w3.org/2001/04/xmlenc#",
+               EncryptionMethod: AlgorithmType{
+                  Algorithm: "http://schemas.microsoft.com/DRM/2007/03/protocols#ecc256",
+               },
+               KeyInfo: InnerKeyInfo{
+                  XmlNs:   "http://www.w3.org/2000/09/xmldsig#",
+                  KeyName: "WMRMServer",
+               },
+               CipherData: CipherData{
+                  CipherValue: "axfR8uEsQkf4vOblY6RA8ncDfYEt6zOg9KE5RdiYwpZP40Li/hp/m47n60p8D54WK84zV2sxXs7LtkBoN79R9XEkr5ohMAFWhGEQtZNt8HzA3VerdH2U47YEwu620bxuEVBFFmnGDXepIZctp9Hln1bRncJzL8q4GNoQArjDsSA=",
+               },
+            },
+         },
+         CipherData: CipherData{
+            CipherValue: "Ri26GuT8GpaLTazyDN1tvihzYCrQB7pIhYNKHmdbm",
+         },
+      },
+   }
+}
+
 func (e *Envelope) New() {
    *e = Envelope{
       Xsi:  "http://www.w3.org/2001/XMLSchema-instance",
@@ -11,50 +58,11 @@ func (e *Envelope) New() {
             Challenge: Challenge{
                Challenge: InnerChallenge{
                   XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols/messages",
-                  La: La{
-                     XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/protocols",
-                     Id:      "SignedData",
-                     Version: "1",
-                     ContentHeader: ContentHeader{
-                        WrmHeader: WrmHeader{
-                           XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/PlayReadyHeader",
-                           Version: "4.0.0.0",
-                           Data: Data{
-                              ProtectInfo: ProtectInfo{
-                                 AlgId:  "AESCTR",
-                                 KeyLen: "16",
-                              },
-                              Kid: "zn6PMa9p48/pbeMb5rdycg==",
-                           },
-                        },
-                     },
-                     EncryptedData: EncryptedData{
-                        XmlNs: "http://www.w3.org/2001/04/xmlenc#",
-                        Type:  "http://www.w3.org/2001/04/xmlenc#Element",
-                        EncryptionMethod: AlgorithmType{
-                           Algorithm: "http://www.w3.org/2001/04/xmlenc#aes128-cbc",
-                        },
-                        KeyInfo: KeyInfo{
-                           XmlNs: "http://www.w3.org/2000/09/xmldsig#",
-                           EncryptedKey: EncryptedKey{
-                              XmlNs: "http://www.w3.org/2001/04/xmlenc#",
-                              EncryptionMethod: AlgorithmType{
-                                 Algorithm: "http://schemas.microsoft.com/DRM/2007/03/protocols#ecc256",
-                              },
-                              KeyInfo: InnerKeyInfo{
-                                 XmlNs:   "http://www.w3.org/2000/09/xmldsig#",
-                                 KeyName: "WMRMServer",
-                              },
-                              CipherData: CipherData{
-                                 CipherValue: "axfR8uEsQkf4vOblY6RA8ncDfYEt6zOg9KE5RdiYwpZP40Li/hp/m47n60p8D54WK84zV2sxXs7LtkBoN79R9XEkr5ohMAFWhGEQtZNt8HzA3VerdH2U47YEwu620bxuEVBFFmnGDXepIZctp9Hln1bRncJzL8q4GNoQArjDsSA=",
-                              },
-                           },
-                        },
-                        CipherData: CipherData{
-                           CipherValue: "Ri26GuT8GpaLTazyDN1tvihzYCrQB7pIhYNKHmdbm",
-                        },
-                     },
-                  },
+                  La: func() La {
+                     var value La
+                     value.New()
+                     return value
+                  }(),
                   Signature: Signature{
                      XmlNs: "http://www.w3.org/2000/09/xmldsig#",
                      SignedInfo: SignedInfo{
@@ -141,9 +149,9 @@ type EncryptedKey struct {
 
 type Envelope struct {
    Body Body
-   Soap string `xml:"soap,attr"`
-   Xsd  string `xml:"xsd,attr"`
-   Xsi  string `xml:"xsi,attr"`
+   Soap string `xml:"xmlns:soap,attr"`
+   Xsd  string `xml:"xmlns:xsd,attr"`
+   Xsi  string `xml:"xmlns:xsi,attr"`
 }
 
 type InnerChallenge struct {
