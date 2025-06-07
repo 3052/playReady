@@ -2,8 +2,8 @@ package xml
 
 func (e *Envelope) New() {
    *e = Envelope{
-      Xsi: "http://www.w3.org/2001/XMLSchema-instance",
-      Xsd: "http://www.w3.org/2001/XMLSchema",
+      Xsi:  "http://www.w3.org/2001/XMLSchema-instance",
+      Xsd:  "http://www.w3.org/2001/XMLSchema",
       Soap: "http://schemas.xmlsoap.org/soap/envelope/",
       Body: Body{
          AcquireLicense: AcquireLicense{
@@ -12,16 +12,16 @@ func (e *Envelope) New() {
                Challenge: InnerChallenge{
                   XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols/messages",
                   La: La{
-                     XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols",
-                     Id: "SignedData",
+                     XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/protocols",
+                     Id:      "SignedData",
                      Version: "1",
                      ContentHeader: ContentHeader{
                         WrmHeader: WrmHeader{
-                           XmlNs: "http://schemas.microsoft.com/DRM/2007/03/PlayReadyHeader",
+                           XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/PlayReadyHeader",
                            Version: "4.0.0.0",
                            Data: Data{
                               ProtectInfo: ProtectInfo{
-                                 AlgId: "AESCTR",
+                                 AlgId:  "AESCTR",
                                  KeyLen: "16",
                               },
                               Kid: "zn6PMa9p48/pbeMb5rdycg==",
@@ -30,19 +30,19 @@ func (e *Envelope) New() {
                      },
                      EncryptedData: EncryptedData{
                         XmlNs: "http://www.w3.org/2001/04/xmlenc#",
-                        Type: "http://www.w3.org/2001/04/xmlenc#Element",
-                        EncryptionMethod: EncryptionMethod{
+                        Type:  "http://www.w3.org/2001/04/xmlenc#Element",
+                        EncryptionMethod: AlgorithmType{
                            Algorithm: "http://www.w3.org/2001/04/xmlenc#aes128-cbc",
                         },
                         KeyInfo: KeyInfo{
                            XmlNs: "http://www.w3.org/2000/09/xmldsig#",
                            EncryptedKey: EncryptedKey{
                               XmlNs: "http://www.w3.org/2001/04/xmlenc#",
-                              EncryptionMethod: EncryptionMethod{
+                              EncryptionMethod: AlgorithmType{
                                  Algorithm: "http://schemas.microsoft.com/DRM/2007/03/protocols#ecc256",
                               },
                               KeyInfo: InnerKeyInfo{
-                                 XmlNs: "http://www.w3.org/2000/09/xmldsig#",
+                                 XmlNs:   "http://www.w3.org/2000/09/xmldsig#",
                                  KeyName: "WMRMServer",
                               },
                               CipherData: CipherData{
@@ -59,15 +59,15 @@ func (e *Envelope) New() {
                      XmlNs: "http://www.w3.org/2000/09/xmldsig#",
                      SignedInfo: SignedInfo{
                         XmlNs: "http://www.w3.org/2000/09/xmldsig#",
-                        CanonicalizationMethod: CanonicalizationMethod{
+                        CanonicalizationMethod: AlgorithmType{
                            Algorithm: "http://www.w3.org/TR/2001/REC-xml-c14n-20010315",
                         },
-                        SignatureMethod: SignatureMethod{
+                        SignatureMethod: AlgorithmType{
                            Algorithm: "http://schemas.microsoft.com/DRM/2007/03/protocols#ecdsa-sha256",
                         },
                         Reference: Reference{
                            Uri: "#SignedData",
-                           DigestMethod: DigestMethod{
+                           DigestMethod: AlgorithmType{
                               Algorithm: "http://schemas.microsoft.com/DRM/2007/03/protocols#sha256",
                            },
                            DigestValue: "s5fwQ1T0dw9g294q4sAP+bs7mN6sbbz2JZQiRtOQnQQ=",
@@ -77,7 +77,7 @@ func (e *Envelope) New() {
                      KeyInfo: SignatureKeyInfo{
                         XmlNs: "http://www.w3.org/2000/09/xmldsig#",
                         KeyValue: KeyValue{
-                           ECCKeyValue: ECCKeyValue{
+                           EccKeyValue: EccKeyValue{
                               PublicKey: "Ri26GuT8GpaLTazyDN1tvh+uNKqXFRSmPTQFw9HP04O1i7sIwTODQoxYU8ccTIUeE0sFaCHkaP4Kl3q/QxPd4Q==",
                            },
                         },
@@ -90,153 +90,122 @@ func (e *Envelope) New() {
    }
 }
 
-// Envelope represents the root XML structure.
-type Envelope struct {
-   Xsi     string   `xml:"xsi,attr"`
-   Xsd     string   `xml:"xsd,attr"`
-   Soap    string   `xml:"soap,attr"`
-   Body    Body 
-}
-
-// Body represents the soap body.
-type Body struct {
-   AcquireLicense AcquireLicense `xml:"AcquireLicense"`
-}
-
-// AcquireLicense represents the AcquireLicense element within the Body.
 type AcquireLicense struct {
-   XmlNs     string    `xml:"xmlns,attr"`
-   Challenge Challenge `xml:"Challenge"`
+   Challenge Challenge
+   XmlNs     string `xml:"xmlns,attr"`
 }
 
-// Challenge represents the Challenge element within AcquireLicense.
+type AlgorithmType struct {
+   Algorithm string `xml:"Algorithm,attr"`
+}
+
+type Body struct {
+   AcquireLicense AcquireLicense
+}
+
 type Challenge struct {
    Challenge InnerChallenge `xml:"challenge"`
 }
 
-// InnerChallenge represents the inner challenge element.
-type InnerChallenge struct {
-   XmlNs     string    `xml:"xmlns,attr"`
-   La        La        `xml:"LA"`
-   Signature Signature `xml:"Signature"`
-}
-
-type La struct {
-   XmlNs         string        `xml:"xmlns,attr"`
-   Id            string        `xml:",attr"`
-   Version       string        `xml:"Version"`
-   ContentHeader ContentHeader `xml:"ContentHeader"`
-   EncryptedData EncryptedData `xml:"EncryptedData"`
+type CipherData struct {
+   CipherValue string `xml:"CipherValue"`
 }
 
 type ContentHeader struct {
    WrmHeader WrmHeader `xml:"WRMHEADER"`
 }
 
-type WrmHeader struct {
-   XmlNs   string `xml:"xmlns,attr"`
-   Version string `xml:"version,attr"`
-   Data    Data   `xml:"DATA"`
-}
-
 type Data struct {
-   ProtectInfo ProtectInfo `xml:"PROTECTINFO"`
    Kid         string      `xml:"KID"`
+   ProtectInfo ProtectInfo `xml:"PROTECTINFO"`
 }
 
-type ProtectInfo struct {
-   KeyLen string `xml:"KEYLEN"`
-   AlgId  string `xml:"ALGID"`
+type EccKeyValue struct {
+   PublicKey string `xml:"PublicKey"`
 }
 
 type EncryptedData struct {
-   XmlNs            string           `xml:"xmlns,attr"`
-   Type             string           `xml:"Type,attr"`
-   EncryptionMethod EncryptionMethod `xml:"EncryptionMethod"`
-   KeyInfo          KeyInfo          `xml:"KeyInfo"`
-   CipherData       CipherData       `xml:"CipherData"`
+   CipherData       CipherData    `xml:"CipherData"`
+   EncryptionMethod AlgorithmType `xml:"EncryptionMethod"`
+   KeyInfo          KeyInfo       `xml:"KeyInfo"`
+   Type             string        `xml:"Type,attr"`
+   XmlNs            string        `xml:"xmlns,attr"`
 }
 
-// EncryptionMethod represents the EncryptionMethod element.
-type EncryptionMethod struct {
-   Algorithm string `xml:"Algorithm,attr"`
-}
-
-// KeyInfo represents the KeyInfo element within EncryptedData.
-type KeyInfo struct {
-   XmlNs        string       `xml:"xmlns,attr"`
-   EncryptedKey EncryptedKey `xml:"EncryptedKey"`
-}
-
-// EncryptedKey represents the EncryptedKey element within KeyInfo.
 type EncryptedKey struct {
-   XmlNs            string           `xml:"xmlns,attr"`
-   EncryptionMethod EncryptionMethod `xml:"EncryptionMethod"`
-   KeyInfo          InnerKeyInfo     `xml:"KeyInfo"`
-   CipherData       CipherData       `xml:"CipherData"`
+   CipherData       CipherData
+   EncryptionMethod AlgorithmType
+   KeyInfo          InnerKeyInfo
+   XmlNs            string `xml:"xmlns,attr"`
 }
 
-// InnerKeyInfo represents the inner KeyInfo element within EncryptedKey.
+type Envelope struct {
+   Body Body
+   Soap string `xml:"soap,attr"`
+   Xsd  string `xml:"xsd,attr"`
+   Xsi  string `xml:"xsi,attr"`
+}
+
+type InnerChallenge struct {
+   La        La `xml:"LA"`
+   Signature Signature
+   XmlNs     string `xml:"xmlns,attr"`
+}
+
 type InnerKeyInfo struct {
-   XmlNs   string `xml:"xmlns,attr"`
    KeyName string `xml:"KeyName"`
+   XmlNs   string `xml:"xmlns,attr"`
 }
 
-// CipherData represents the CipherData element.
-type CipherData struct {
-   CipherValue string `xml:"CipherValue"`
+type KeyInfo struct {
+   EncryptedKey EncryptedKey
+   XmlNs        string `xml:"xmlns,attr"`
 }
 
-// Signature represents the Signature element within InnerChallenge.
-type Signature struct {
-   XmlNs          string           `xml:"xmlns,attr"`
-   SignedInfo     SignedInfo       `xml:"SignedInfo"`
-   SignatureValue string           `xml:"SignatureValue"`
-   KeyInfo        SignatureKeyInfo `xml:"KeyInfo"`
-}
-
-// SignedInfo represents the SignedInfo element within Signature.
-type SignedInfo struct {
-   XmlNs                  string                 `xml:"xmlns,attr"`
-   CanonicalizationMethod CanonicalizationMethod `xml:"CanonicalizationMethod"`
-   SignatureMethod        SignatureMethod        `xml:"SignatureMethod"`
-   Reference              Reference              `xml:"Reference"`
-}
-
-// CanonicalizationMethod represents the CanonicalizationMethod element.
-type CanonicalizationMethod struct {
-   Algorithm string `xml:"Algorithm,attr"`
-}
-
-// SignatureMethod represents the SignatureMethod element.
-type SignatureMethod struct {
-   Algorithm string `xml:"Algorithm,attr"`
-}
-
-// Reference represents the Reference element within SignedInfo.
-type Reference struct {
-   Uri          string       `xml:"URI,attr"`
-   DigestMethod DigestMethod `xml:"DigestMethod"`
-   DigestValue  string       `xml:"DigestValue"`
-}
-
-// DigestMethod represents the DigestMethod element within Reference.
-type DigestMethod struct {
-   Algorithm string `xml:"Algorithm,attr"`
-}
-
-// SignatureKeyInfo represents the KeyInfo element within Signature.
-type SignatureKeyInfo struct {
-   XmlNs    string   `xml:"xmlns,attr"`
-   KeyValue KeyValue `xml:"KeyValue"`
-}
-
-// KeyValue represents the KeyValue element within SignatureKeyInfo.
 type KeyValue struct {
-   ECCKeyValue ECCKeyValue `xml:"ECCKeyValue"`
+   EccKeyValue EccKeyValue `xml:"ECCKeyValue"`
 }
 
-// ECCKeyValue represents the ECCKeyValue element within KeyValue.
-type ECCKeyValue struct {
-   PublicKey string `xml:"PublicKey"`
+type La struct {
+   ContentHeader ContentHeader
+   EncryptedData EncryptedData
+   Id            string `xml:",attr"`
+   Version       string
+   XmlNs         string `xml:"xmlns,attr"`
+}
+
+type ProtectInfo struct {
+   AlgId  string `xml:"ALGID"`
+   KeyLen string `xml:"KEYLEN"`
+}
+
+type Reference struct {
+   DigestMethod AlgorithmType `xml:"DigestMethod"`
+   DigestValue  string        `xml:"DigestValue"`
+   Uri          string        `xml:"URI,attr"`
+}
+
+type Signature struct {
+   KeyInfo        SignatureKeyInfo `xml:"KeyInfo"`
+   SignatureValue string           `xml:"SignatureValue"`
+   SignedInfo     SignedInfo       `xml:"SignedInfo"`
+   XmlNs          string           `xml:"xmlns,attr"`
+}
+
+type SignatureKeyInfo struct {
+   KeyValue KeyValue `xml:"KeyValue"`
+   XmlNs    string   `xml:"xmlns,attr"`
+}
+
+type SignedInfo struct {
+   CanonicalizationMethod AlgorithmType `xml:"CanonicalizationMethod"`
+   Reference              Reference     `xml:"Reference"`
+   SignatureMethod        AlgorithmType `xml:"SignatureMethod"`
+   XmlNs                  string        `xml:"xmlns,attr"`
+}
+
+type WrmHeader struct {
+   Data    Data   `xml:"DATA"`
+   Version string `xml:"version,attr"`
+   XmlNs   string `xml:"xmlns,attr"`
 }
