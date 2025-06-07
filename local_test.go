@@ -28,12 +28,12 @@ func TestLocal(t *testing.T) {
    if err != nil {
       t.Fatal(err)
    }
-   var head Header
-   err = head.ParseWrm(wrm)
+   var head WrmHeader
+   err = head.Decode(wrm)
    if err != nil {
       t.Fatal(err)
    }
-   challenge, err := device.GetChallenge(head)
+   challenge, err := device.GetChallenge(Header{WrmHeader: &head})
    if err != nil {
       t.Fatal(err)
    }
@@ -83,7 +83,6 @@ const wrm = `
          <ALGID>AESCTR</ALGID>
       </PROTECTINFO>
       <KID>zn6PMa9p48/pbeMb5rdycg==</KID>
-      <CHECKSUM>YbomCXHUUNo=</CHECKSUM>
    </DATA>
 </WRMHEADER>
 `
