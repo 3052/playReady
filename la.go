@@ -3,31 +3,16 @@ package playReady
 import (
    "41.neocities.org/playReady/crypto"
    "crypto/ecdsa"
-   "crypto/rand"
    "crypto/sha256"
    "encoding/base64"
-   "fmt"
    "github.com/beevik/etree"
-   "strconv"
    "strings"
-   "time"
 )
 
 func (Challenge) LicenseAcquisition(
    key crypto.XmlKey, cipherData []byte, header Header,
 ) (*etree.Document, error) {
    doc := etree.NewDocument()
-   doc.WriteSettings.CanonicalEndTags = true
-   LicenseNonce := make([]byte, 16)
-   _, err := rand.Read(LicenseNonce)
-   if err != nil {
-      return nil, err
-   }
-   var WMRMEccPubKey crypto.WMRM
-   x, y, err := WMRMEccPubKey.Points()
-   if err != nil {
-      return nil, err
-   }
    var LicenseVersion string
    switch header.WrmHeader.Version {
    case "4.2.0.0":
@@ -37,29 +22,21 @@ func (Challenge) LicenseAcquisition(
    default:
       LicenseVersion = "1"
    }
-   var elgamal crypto.ElGamal
    doc.WriteSettings.CanonicalEndTags = true
+   var WMRMEccPubKey crypto.WMRM
+   x, y, err := WMRMEccPubKey.Points()
+   if err != nil {
+      return nil, err
+   }
+   // even the order matters
    doc.CreateChild("LA", func(e *etree.Element) {
       e.CreateAttr("xmlns", "http://schemas.microsoft.com/DRM/2007/03/protocols")
       e.CreateAttr("Id", "SignedData")
-      e.CreateAttr("xml:space", "preserve")
       e.CreateChild("Version", func(e *etree.Element) {
          e.CreateText(LicenseVersion)
       })
       e.CreateChild("ContentHeader", func(e *etree.Element) {
          e.AddChild(header.WrmHeader.Data)
-      })
-      e.CreateChild("CLIENTINFO", func(e *etree.Element) {
-         e.CreateChild("CLIENTVERSION", func(e *etree.Element) {
-            e.CreateText("4.0.1.2")
-         })
-      })
-
-      e.CreateChild("LicenseNonce", func(e *etree.Element) {
-         e.CreateText(base64.StdEncoding.EncodeToString(LicenseNonce))
-      })
-      e.CreateChild("ClientTime", func(e *etree.Element) {
-         e.CreateText(strconv.FormatInt(time.Now().Unix(), 10))
       })
       e.CreateChild("EncryptedData", func(e *etree.Element) {
          e.CreateAttr("xmlns", "http://www.w3.org/2001/04/xmlenc#")
@@ -82,7 +59,10 @@ func (Challenge) LicenseAcquisition(
                })
                e.CreateChild("CipherData", func(e *etree.Element) {
                   e.CreateChild("CipherValue", func(e *etree.Element) {
-                     var encrypted []byte
+                     var (
+                        elgamal crypto.ElGamal
+                        encrypted []byte
+                     )
                      encrypted, err = elgamal.Encrypt(x, y, key)
                      e.CreateText(base64.StdEncoding.EncodeToString(encrypted))
                   })
@@ -104,7 +84,7 @@ func (Challenge) LicenseAcquisition(
 }
 
 func (c Challenge) Create(
-   certificateChain Chain, signingKey crypto.EcKey, header Header,
+   certificateChain Chain, signing_key crypto.EcKey, header Header,
 ) (string, error) {
    var key crypto.XmlKey
    err := key.New()
@@ -131,13 +111,13 @@ func (c Challenge) Create(
       return "", err
    }
    signed_str = strings.Replace(signed_str, "\n", "", -1)
-   SignedDigest := sha256.Sum256([]byte(signed_str))
-   r, s, err := ecdsa.Sign(rand.Reader, signingKey.Key, SignedDigest[:])
+   signed_digest := sha256.Sum256([]byte(signed_str))
+   r, s, err := ecdsa.Sign(crypto.Fill, signing_key.Key, signed_digest[:])
    if err != nil {
-      return "", fmt.Errorf("failed to sign: %v", err)
+      return "", err
    }
    sig := append(r.Bytes(), s.Bytes()...)
-   challenge := c.Root(la, signed_info, sig, signingKey.PublicBytes())
+   challenge := c.Root(la, signed_info, sig, signing_key.PublicBytes())
    base, err := challenge.WriteToString()
    if err != nil {
       return "", err

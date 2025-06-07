@@ -2,6 +2,7 @@ package playReady
 
 import (
    "encoding/hex"
+   "encoding/xml"
    "io"
    "net/http"
    "strings"
@@ -15,7 +16,7 @@ var device_test = struct {
    url     string
 }{
    // THIS URL GETS LOCKED TO DEVICE ON FIRST REQUEST
-   url:     "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=3f85f1d4-e0df-4c7b-b857-7ffcdd1bf310",
+   url:     "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=94eec1d1-e024-4507-9703-bead7c55ddb0",
    content: "rakuten.tv/cz?content_type=movies&content_id=transvulcania-the-people-s-run",
    key:     "ab82952e8b567a2359393201e4dde4b4",
    key_id:  "318f7ece69afcfe3e96de31be6b77272",
@@ -48,7 +49,18 @@ func TestLocal(t *testing.T) {
       t.Fatal(err)
    }
    if resp.StatusCode != http.StatusOK {
-      t.Fatal(string(data))
+      var envelope struct {
+         Body    struct {
+            Fault struct {
+               Fault string `xml:"faultstring"`
+            }
+         }
+      } 
+      err = xml.Unmarshal(data, &envelope)
+      if err != nil {
+         t.Fatal(err)
+      }
+      t.Fatal(envelope)
    }
    keys, err := device.ParseLicense(string(data))
    if err != nil {
