@@ -14,95 +14,6 @@ import (
    "math/big"
 )
 
-type Config struct {
-   Version    string `json:"client_version"`
-   CertChain  string `json:"cert_chain"`
-   SigningKey string `json:"signing"`
-   EncryptKey string `json:"encrypt"`
-}
-
-type KeyData struct {
-   KeyId Guid
-   Key   Guid
-}
-
-func (f *FTLV) Encode() []byte {
-   var data []byte
-   data = binary.BigEndian.AppendUint16(data, f.Flags)
-   data = binary.BigEndian.AppendUint16(data, f.Type)
-   data = binary.BigEndian.AppendUint32(data, f.Length)
-   return append(data, f.Value...)
-}
-
-func (f *FTLV) Decode(data []byte) (uint32, error) {
-   var n uint32
-   f.Flags = binary.BigEndian.Uint16(data[n:])
-   n += 2
-   f.Type = binary.BigEndian.Uint16(data[n:])
-   n += 2
-   f.Length = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   f.Value = data[n:][:f.Length-8]
-   n += f.Length - 8
-   return n, nil
-}
-
-type FTLV struct {
-   Flags  uint16
-   Type   uint16
-   Length uint32
-   Value  []byte
-}
-
-type Guid struct {
-   Data1 uint32 // little endian
-   Data2 uint16 // little endian
-   Data3 uint16 // little endian
-   Data4 uint64 // big endian
-}
-
-func (k *Guid) Decode(data []byte) {
-   k.Data1 = binary.LittleEndian.Uint32(data)
-   data = data[4:]
-   k.Data2 = binary.LittleEndian.Uint16(data)
-   data = data[2:]
-   k.Data3 = binary.LittleEndian.Uint16(data)
-   data = data[2:]
-   k.Data4 = binary.BigEndian.Uint64(data)
-}
-
-func (k *Guid) Base64Decode(data string) error {
-   decoded, err := base64.StdEncoding.DecodeString(data)
-   if err != nil {
-      return err
-   }
-   k.Decode(decoded)
-   return nil
-}
-
-func (k *Guid) Encode() []byte {
-   var data []byte
-   data = binary.BigEndian.AppendUint32(data, k.Data1)
-   data = binary.BigEndian.AppendUint16(data, k.Data2)
-   data = binary.BigEndian.AppendUint16(data, k.Data3)
-   return binary.BigEndian.AppendUint64(data, k.Data4)
-}
-
-func (k *Guid) Bytes() []byte {
-   var data []byte
-   data = binary.LittleEndian.AppendUint32(data, k.Data1)
-   data = binary.LittleEndian.AppendUint16(data, k.Data2)
-   data = binary.LittleEndian.AppendUint16(data, k.Data3)
-   return binary.BigEndian.AppendUint64(data, k.Data4)
-}
-
-func (k *Guid) Hex() string {
-   data := k.Encode()
-   dst := make([]byte, hex.EncodedLen(len(data)))
-   hex.Encode(dst, data)
-   return string(dst)
-}
-
 func XorKey(root, second []byte) []byte {
    data := make([]byte, len(second))
    copy(data, root)
@@ -137,6 +48,86 @@ func (a *AuxKeys) Decode(data []byte) error {
 
    return nil
 }
+
+type Config struct {
+   Version    string `json:"client_version"`
+   CertChain  string `json:"cert_chain"`
+   SigningKey string `json:"signing"`
+   EncryptKey string `json:"encrypt"`
+}
+
+func (f *FTLV) Encode() []byte {
+   var data []byte
+   data = binary.BigEndian.AppendUint16(data, f.Flags)
+   data = binary.BigEndian.AppendUint16(data, f.Type)
+   data = binary.BigEndian.AppendUint32(data, f.Length)
+   return append(data, f.Value...)
+}
+
+func (f *FTLV) Decode(data []byte) (uint32, error) {
+   var n uint32
+   f.Flags = binary.BigEndian.Uint16(data[n:])
+   n += 2
+   f.Type = binary.BigEndian.Uint16(data[n:])
+   n += 2
+   f.Length = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   f.Value = data[n:][:f.Length-8]
+   n += f.Length - 8
+   return n, nil
+}
+
+type FTLV struct {
+   Flags  uint16
+   Type   uint16
+   Length uint32
+   Value  []byte
+}
+
+type KeyData struct {
+   KeyId Guid
+   Key   Guid
+}
+
+type Manufacturer struct {
+   Flags            uint32
+   ManufacturerName ManufacturerInfo
+   ModelName        ManufacturerInfo
+   ModelNumber      ManufacturerInfo
+}
+
+func (m *Manufacturer) Encode() []byte {
+   var data []byte
+
+   data = binary.BigEndian.AppendUint32(data, m.Flags)
+   data = append(data, m.ManufacturerName.Encode()...)
+   data = append(data, m.ModelName.Encode()...)
+   data = append(data, m.ModelNumber.Encode()...)
+
+   return data
+}
+
+func (m *Manufacturer) Decode(data []byte) error {
+   m.Flags = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   n, err := m.ManufacturerName.Decode(data)
+   if err != nil {
+      return err
+   }
+   data = data[n:]
+   n, err = m.ModelName.Decode(data)
+   if err != nil {
+      return err
+   }
+   data = data[n:]
+   _, err = m.ModelNumber.Decode(data)
+   if err != nil {
+      return err
+   }
+   return nil
+}
+
+///
 
 type AuxKey struct {
    Location uint32
@@ -494,42 +485,4 @@ type PlayReadyRecord struct {
    Length uint32
    Count  uint16
    Data   []byte
-}
-
-type Manufacturer struct {
-   Flags            uint32
-   ManufacturerName ManufacturerInfo
-   ModelName        ManufacturerInfo
-   ModelNumber      ManufacturerInfo
-}
-
-func (m *Manufacturer) Encode() []byte {
-   var data []byte
-
-   data = binary.BigEndian.AppendUint32(data, m.Flags)
-   data = append(data, m.ManufacturerName.Encode()...)
-   data = append(data, m.ModelName.Encode()...)
-   data = append(data, m.ModelNumber.Encode()...)
-
-   return data
-}
-
-func (m *Manufacturer) Decode(data []byte) error {
-   m.Flags = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   n, err := m.ManufacturerName.Decode(data)
-   if err != nil {
-      return err
-   }
-   data = data[n:]
-   n, err = m.ModelName.Decode(data)
-   if err != nil {
-      return err
-   }
-   data = data[n:]
-   _, err = m.ModelNumber.Decode(data)
-   if err != nil {
-      return err
-   }
-   return nil
 }
