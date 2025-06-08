@@ -6,19 +6,18 @@ import (
    "encoding/base64"
    "encoding/binary"
    "errors"
-   "github.com/chmike/cmac-go"
+   "github.com/deatil/go-cryptobin/mac"
 )
 
 func (l *LicenseResponse) Verify(content_integrity []byte) error {
    data := l.Encode()
    data = data[:len(l.RawData)-int(l.SignatureObject.Length)]
-   hash, err := cmac.New(aes.NewCipher, content_integrity)
+   block, err := aes.NewCipher(content_integrity)
    if err != nil {
       return err
    }
-   // github.com/chmike/cmac-go/blob/v1.1.0/cmac.go#L114-L133
-   hash.Write(data)
-   if !bytes.Equal(hash.Sum(nil), l.SignatureObject.Data) {
+   data = mac.NewCMAC(block, aes.BlockSize).MAC(data)
+   if !bytes.Equal(data, l.SignatureObject.Data) {
       return errors.New("failed to decrypt the keys")
    }
    return nil

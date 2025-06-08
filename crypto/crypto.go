@@ -9,9 +9,18 @@ import (
    "encoding/hex"
    "encoding/pem"
    "fmt"
+   "github.com/deatil/go-cryptobin/mode"
    "math/big"
    "os"
 )
+
+func (a Aes) EncryptECB(key []byte, data []byte) []byte {
+   block, _ := aes.NewCipher(key)
+   ciphertext := make([]byte, len(data))
+   ecbMode := mode.NewECBEncrypter(block)
+   ecbMode.CryptBlocks(ciphertext, data)
+   return ciphertext
+}
 
 func (a Aes) EncryptCbc(key *XmlKey, data []byte) ([]byte, error) {
    block, err := aes.NewCipher(key.AesKey[:])

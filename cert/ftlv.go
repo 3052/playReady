@@ -1,9 +1,6 @@
 package cert
 
-import (
-   "41.neocities.org/playReady/license"
-   "encoding/binary"
-)
+import "encoding/binary"
 
 type Device struct {
    MaxLicenseSize       uint32
@@ -43,10 +40,7 @@ func (f *FTLV) Encode() []byte {
    data = binary.BigEndian.AppendUint16(data, f.Flags)
    data = binary.BigEndian.AppendUint16(data, f.Type)
    data = binary.BigEndian.AppendUint32(data, f.Length)
-
-   data = append(data, f.Value...)
-
-   return data
+   return append(data, f.Value...)
 }
 
 func (f *FTLV) Decode(data []byte) (uint32, error) {
@@ -64,10 +58,8 @@ func (f *FTLV) Decode(data []byte) (uint32, error) {
 }
 
 type Header struct {
-   PSSHBox   *ProtectionSystemHeaderBox
    Record    *PlayReadyRecord
    Object    *PlayReadyObject
-   WrmHeader *WrmHeader
 }
 
 type ManufacturerInfo struct {
@@ -140,21 +132,4 @@ type PlayReadyRecord struct {
    Length uint32
    Count  uint16
    Data   []byte
-}
-
-type ProtectionSystemHeaderBox struct {
-   Size       uint32
-   Type       [4]byte
-   Version    uint8
-   Flags      [3]byte
-   SystemId   license.Guid
-   KeyIdCount uint32
-   KeyIds     []license.Guid
-   Length     uint32
-   Data       []byte
-}
-
-type WrmHeader struct {
-   Version string
-   KeyIds  []license.Guid
 }
