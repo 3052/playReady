@@ -4,12 +4,13 @@ import (
    "encoding/binary"
    "encoding/hex"
    "errors"
+   "github.com/deatil/go-cryptobin/cryptobin/crypto"
 )
 
 func (c *ContentKey) Scalable(key EcKey, aux_keys *AuxKeys) error {
    rootKeyInfo := c.Value[:144]
-   rootKey := rootKeyInfo[128:]
-   leafKeys := c.Value[144:]
+   root_key := rootKeyInfo[128:]
+   leaf_keys := c.Value[144:]
    var el_gamal ElGamal
    decrypted := el_gamal.Decrypt(rootKeyInfo[:128], key.Key.D)
    var CI [16]byte
@@ -18,22 +19,53 @@ func (c *ContentKey) Scalable(key EcKey, aux_keys *AuxKeys) error {
       CI[i] = decrypted[i*2]
       CK[i] = decrypted[i*2+1]
    }
-   magicConstantZero, err := hex.DecodeString("7ee9ed4af773224f00b8ea7efb027cbb")
+   magic_constant_zero, err := hex.DecodeString("7ee9ed4af773224f00b8ea7efb027cbb")
    if err != nil {
       return err
    }
-   rgbUplinkXKey := XorKey(CK[:], magicConstantZero)
-   var aes Aes
-   contentKeyPrime := aes.EncryptECB(CK[:], rgbUplinkXKey)
-   auxKeyCalc := aes.EncryptECB(contentKeyPrime, aux_keys.Keys[0].Key[:])
-   UpLinkXKey := XorKey(auxKeyCalc, new([16]byte)[:])
-   oSecondaryKey := aes.EncryptECB(CK[:], rootKey)
-   rgbKey := aes.EncryptECB(UpLinkXKey, leafKeys)
-   rgbKey = aes.EncryptECB(oSecondaryKey, rgbKey)
-   c.Integrity.Decode(rgbKey[:])
-   rgbKey = rgbKey[16:]
-   c.Key.Decode(rgbKey[:])
+   rgb_uplink_xkey := XorKey(CK[:], magic_constant_zero)
+   var zero [16]byte
+   bin := crypto.New().Aes().ECB().NoPadding()
+   bin = bin.WithData(rgb_uplink_xkey).WithKey(CK[:]).Encrypt()
+   if err := bin.Error(); err != nil {
+      return err
+   }
+   content_key_prime := bin.ToBytes()
+   bin = bin.WithData(aux_keys.Keys[0].Key[:]).
+      WithKey(content_key_prime).Encrypt()
+   if err := bin.Error(); err != nil {
+      return err
+   }
+   aux_key_calc := bin.ToBytes()
+   up_link_xkey := XorKey(aux_key_calc, zero[:])
+   bin = bin.WithData(root_key).WithKey(CK[:]).Encrypt()
+   if err := bin.Error(); err != nil {
+      return err
+   }
+   o_secondary_key := bin.ToBytes()
+   bin = bin.WithData(leaf_keys).WithKey(up_link_xkey).Encrypt()
+   if err := bin.Error(); err != nil {
+      return err
+   }
+   rgb_key := bin.ToBytes()
+   bin = bin.WithData(rgb_key).WithKey(o_secondary_key).Encrypt()
+   if err := bin.Error(); err != nil {
+      return err
+   }
+   rgb_key = bin.ToBytes()
+   c.Integrity.Decode(rgb_key[:])
+   rgb_key = rgb_key[16:]
+   c.Key.Decode(rgb_key[:])
    return nil
+}
+
+func XorKey(root, second []byte) []byte {
+   data := make([]byte, len(second))
+   copy(data, root)
+   for i := range 16 {
+      data[i] ^= second[i]
+   }
+   return data
 }
 
 func (c *ContentKey) Decrypt(key EcKey, aux_keys *AuxKeys) error {

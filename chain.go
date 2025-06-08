@@ -191,7 +191,7 @@ func (e *Envelope) New(
             Challenge: Challenge{
                Challenge: InnerChallenge{
                   XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols/messages",
-                  La: la_value,
+                  La:    la_value,
                   Signature: Signature{
                      SignedInfo:     signed_info,
                      SignatureValue: base64.StdEncoding.EncodeToString(sig),

@@ -9,9 +9,22 @@ import (
    "encoding/binary"
    "encoding/hex"
    "fmt"
-   "github.com/deatil/go-cryptobin/mode"
+   "github.com/deatil/go-cryptobin/padding"
    "math/big"
 )
+
+func (a Aes) EncryptCbc(key *XmlKey, data []byte) ([]byte, error) {
+   block, err := aes.NewCipher(key.AesKey[:])
+   if err != nil {
+      return nil, err
+   }
+   data = padding.PKCS7{}.Padding(data, aes.BlockSize)
+   ciphertext := make([]byte, len(data))
+   cipher.NewCBCEncrypter(block, key.AesIv[:]).CryptBlocks(ciphertext, data)
+   return ciphertext, nil
+}
+
+type Aes struct{}
 
 func (e *EcKey) LoadBytes(data []byte) {
    var public ecdsa.PublicKey
@@ -48,6 +61,7 @@ func (e *EcKey) New() error {
    }
    return nil
 }
+
 type Guid struct {
    Data1 uint32 // little endian
    Data2 uint16 // little endian
@@ -140,15 +154,6 @@ func (c *CertInfo) Encode() []byte {
    data = append(data, c.Digest[:]...)
    data = binary.BigEndian.AppendUint32(data, c.Expiry)
    return append(data, c.ClientId[:]...)
-}
-
-func XorKey(root, second []byte) []byte {
-   data := make([]byte, len(second))
-   copy(data, root)
-   for i := range 16 {
-      data[i] ^= second[i]
-   }
-   return data
 }
 
 type AuxKeys struct {
@@ -287,25 +292,6 @@ type Data struct {
 
 var Fill Filler = '!'
 
-func (a Aes) EncryptECB(key []byte, data []byte) []byte {
-   block, _ := aes.NewCipher(key)
-   ciphertext := make([]byte, len(data))
-   ecbMode := mode.NewECBEncrypter(block)
-   ecbMode.CryptBlocks(ciphertext, data)
-   return ciphertext
-}
-
-func (a Aes) EncryptCbc(key *XmlKey, data []byte) ([]byte, error) {
-   block, err := aes.NewCipher(key.AesKey[:])
-   if err != nil {
-      return nil, err
-   }
-   data = a.Pad(data)
-   ciphertext := make([]byte, len(data))
-   cipher.NewCBCEncrypter(block, key.AesIv[:]).CryptBlocks(ciphertext, data)
-   return ciphertext, nil
-}
-
 type XmlKey struct {
    AesIv     [16]byte
    AesKey    [16]byte
@@ -341,16 +327,6 @@ func (ElGamal) Decrypt(ciphertext []byte, PrivateKey *big.Int) []byte {
    Decrypted := PX.Bytes()
 
    return append(Decrypted, PY.Bytes()...)
-}
-
-type Aes struct{}
-
-func (Aes) Pad(data []byte) []byte {
-   length := aes.BlockSize - len(data)%aes.BlockSize
-   for high := byte(length); length >= 1; length-- {
-      data = append(data, high)
-   }
-   return data
 }
 
 type WMRM struct{}
@@ -430,24 +406,16 @@ type ManufacturerInfo struct {
 }
 
 func (m *ManufacturerInfo) Encode() []byte {
-   var data []byte
-   data = binary.BigEndian.AppendUint32(data, m.Length)
-   data = append(data, []byte(m.Value)...)
-
-   return data
+   data := binary.BigEndian.AppendUint32(nil, m.Length)
+   return append(data, []byte(m.Value)...)
 }
 
 func (m *ManufacturerInfo) Decode(data []byte) (uint32, error) {
    m.Length = binary.BigEndian.Uint32(data)
    var n uint32 = 4
-
-   paddedLength := (m.Length + 3) &^ 3
-
-   m.Value = string(data[n:][:paddedLength])
-
-   n += paddedLength
-
-   return n, nil
+   padded_length := (m.Length + 3) &^ 3
+   m.Value = string(data[n:][:padded_length])
+   return n + padded_length, nil
 }
 
 type ObjType uint16

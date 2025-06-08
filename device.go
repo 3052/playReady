@@ -19,7 +19,7 @@ func (ld *LocalDevice) ParseLicense(response string) (*KeyData, error) {
             AcquireLicenseResult struct {
                Response struct {
                   LicenseResponse struct {
-                     Licenses struct { License string }
+                     Licenses struct{ License string }
                   }
                }
             }

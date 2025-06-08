@@ -123,20 +123,20 @@ type EncryptedData struct {
 }
 
 type Reference struct {
-   Uri          string `xml:"URI,attr"`
-   DigestValue  string
+   Uri         string `xml:"URI,attr"`
+   DigestValue string
 }
 
 type SignedInfo struct {
-   XmlNs                  string `xml:"xmlns,attr"`
-   Reference              Reference
+   XmlNs     string `xml:"xmlns,attr"`
+   Reference Reference
 }
 
 func (s *SignedInfo) New(digest []byte) {
    *s = SignedInfo{
       XmlNs: "http://www.w3.org/2000/09/xmldsig#",
       Reference: Reference{
-         Uri: "#SignedData",
+         Uri:         "#SignedData",
          DigestValue: base64.StdEncoding.EncodeToString(digest),
       },
    }
