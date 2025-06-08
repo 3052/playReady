@@ -10,6 +10,13 @@ import (
    "testing"
 )
 
+var folder = SL2000
+//var folder = SL3000
+
+var SL2000 = "ignore/SL2000/"
+
+var SL3000 = "ignore/SL3000/"
+
 var device_test = struct {
    content string
    key     string
@@ -17,7 +24,7 @@ var device_test = struct {
    url     string
 }{
    // THIS URL GETS LOCKED TO DEVICE ON FIRST REQUEST
-   url:     "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=f2296077-3209-40ee-b3ee-33482b2e2d72",
+   url:     "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=07513603-86ba-41dc-8534-a5156f46cd57",
    content: "rakuten.tv/cz?content_type=movies&content_id=transvulcania-the-people-s-run",
    key:     "ab82952e8b567a2359393201e4dde4b4",
    key_id:  "318f7ece69afcfe3e96de31be6b77272",
@@ -27,7 +34,16 @@ const kid = "zn6PMa9p48/pbeMb5rdycg=="
 
 func Test(t *testing.T) {
    var device LocalDevice
-   err := device.Load("ignore")
+   device.Version = "2.0.1.3"
+   err := device.CertificateChain.LoadFile(folder + "chain.txt")
+   if err != nil {
+      t.Fatal(err)
+   }
+   err = device.SigningKey.LoadFile(folder + "signing_key.txt")
+   if err != nil {
+      t.Fatal(err)
+   }
+   err = device.EncryptKey.LoadFile(folder + "encrypt_key.txt")
    if err != nil {
       t.Fatal(err)
    }

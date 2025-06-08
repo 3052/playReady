@@ -5,11 +5,8 @@ import (
    "41.neocities.org/playReady/crypto"
    "41.neocities.org/playReady/license"
    "bytes"
-   "encoding/json"
    "encoding/xml"
    "errors"
-   "os"
-   "path/filepath"
 )
 
 func (ld *LocalDevice) ParseLicense(response string) (*KeyData, error) {
@@ -75,40 +72,6 @@ func (ld *LocalDevice) New(CertChain, EncryptionKey, SigningKey []byte, ClientVe
    ld.SigningKey.LoadBytes(SigningKey)
    ld.Version = ClientVersion
    return nil
-}
-
-func (ld *LocalDevice) Load(path string) error {
-   config, err := os.ReadFile(path + "/pr.json")
-   if err != nil {
-      return err
-   }
-   var ParsedConfig Config
-   err = json.Unmarshal(config, &ParsedConfig)
-   if err != nil {
-      return err
-   }
-   ld.Version = "2.0.1.3"
-   if ParsedConfig.Version != "" {
-      ld.Version = ParsedConfig.Version
-   }
-   if ParsedConfig.CertChain == "" {
-      return errors.New("missing cert chain")
-   }
-   err = ld.CertificateChain.LoadFile(filepath.Join(path, ParsedConfig.CertChain))
-   if err != nil {
-      return err
-   }
-   if ParsedConfig.SigningKey == "" {
-      return errors.New("missing signing key")
-   }
-   err = ld.SigningKey.LoadFile(filepath.Join(path, ParsedConfig.SigningKey))
-   if err != nil {
-      return err
-   }
-   if ParsedConfig.EncryptKey == "" {
-      return errors.New("missing encryption key")
-   }
-   return ld.EncryptKey.LoadFile(filepath.Join(path, ParsedConfig.EncryptKey))
 }
 
 type KeyData struct {

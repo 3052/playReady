@@ -14,6 +14,8 @@ import (
    "os"
 )
 
+var Fill Filler = '!'
+
 func (a Aes) EncryptECB(key []byte, data []byte) []byte {
    block, _ := aes.NewCipher(key)
    ciphertext := make([]byte, len(data))
@@ -128,8 +130,6 @@ func (e EcKey) Private() []byte {
 type EcKey struct {
    Key *ecdsa.PrivateKey
 }
-
-var Fill Filler = '!'
 
 type Filler byte
 
