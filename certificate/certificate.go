@@ -25,14 +25,11 @@ func (f *Feature) Encode() []byte {
 
 func (f *Feature) Decode(data []byte) (int, error) {
    f.Entries = binary.BigEndian.Uint32(data)
-
    var n = 4
-
    for range f.Entries {
       f.Features = append(f.Features, binary.BigEndian.Uint32(data[n:]))
       n += 4
    }
-
    return n, nil
 }
 
@@ -179,5 +176,3 @@ func (s *Signature) Decode(data []byte) error {
 
    return nil
 }
-
-

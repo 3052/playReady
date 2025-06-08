@@ -5,10 +5,9 @@ import (
    "encoding/xml"
 )
 
-type InnerChallenge struct { // Renamed from Challenge
-   XmlNs     string `xml:"xmlns,attr"`
-   La        La
-   Signature Signature
+type AcquireLicense struct {
+   XmlNs     string    `xml:"xmlns,attr"`
+   Challenge Challenge `xml:"challenge"`
 }
 
 type Algorithm struct {
@@ -19,54 +18,32 @@ type Body struct {
    AcquireLicense AcquireLicense
 }
 
-type AcquireLicense struct {
-   XmlNs     string    `xml:"xmlns,attr"`
-   Challenge Challenge `xml:"challenge"`
+type CertificateChains struct {
+   CertificateChain string
 }
 
 type Challenge struct {
    Challenge InnerChallenge
 }
 
-type ContentHeader struct {
-   WrmHeader WrmHeader `xml:"WRMHEADER"`
-}
-
-type WrmHeaderData struct { // Renamed from DATA
-   ProtectInfo ProtectInfo `xml:"PROTECTINFO"`
-   Kid         string      `xml:"KID"`
-}
-
-type KeyInfo struct { // This is the chosen "KeyInfo" type
-   XmlNs        string `xml:"xmlns,attr"`
-   EncryptedKey EncryptedKey
-}
-
 type CipherData struct {
    CipherValue string
 }
 
-type EncryptedKeyInfo struct { // Renamed from KeyInfo
-   XmlNs   string `xml:"xmlns,attr"`
-   KeyName string
-}
-
-type Signature struct {
-   SignedInfo     SignedInfo
-   SignatureValue string
-}
-
-type La struct {
-   XMLName       xml.Name `xml:"LA"`
-   XmlNs         string   `xml:"xmlns,attr"`
-   Id            string   `xml:"Id,attr"`
-   Version       string
-   ContentHeader ContentHeader
-   EncryptedData EncryptedData
+type ContentHeader struct {
+   WrmHeader WrmHeader `xml:"WRMHEADER"`
 }
 
 type Data struct {
    CertificateChains CertificateChains
+}
+
+type EncryptedData struct {
+   XmlNs            string `xml:"xmlns,attr"`
+   Type             string `xml:"Type,attr"`
+   EncryptionMethod Algorithm
+   KeyInfo          KeyInfo
+   CipherData       CipherData
 }
 
 type EncryptedKey struct {
@@ -76,18 +53,26 @@ type EncryptedKey struct {
    CipherData       CipherData
 }
 
-type CertificateChains struct {
-   CertificateChain string
+type EncryptedKeyInfo struct { // Renamed from KeyInfo
+   XmlNs   string `xml:"xmlns,attr"`
+   KeyName string
 }
 
-func (s *SignedInfo) New(digest []byte) {
-   *s = SignedInfo{
-      XmlNs: "http://www.w3.org/2000/09/xmldsig#",
-      Reference: Reference{
-         Uri: "#SignedData",
-         DigestValue: base64.StdEncoding.EncodeToString(digest),
-      },
-   }
+type Envelope struct {
+   XMLName xml.Name `xml:"soap:Envelope"`
+   Soap    string   `xml:"xmlns:soap,attr"`
+   Body    Body     `xml:"soap:Body"`
+}
+
+type InnerChallenge struct { // Renamed from Challenge
+   XmlNs     string `xml:"xmlns,attr"`
+   La        La
+   Signature Signature
+}
+
+type KeyInfo struct { // This is the chosen "KeyInfo" type
+   XmlNs        string `xml:"xmlns,attr"`
+   EncryptedKey EncryptedKey
 }
 
 func (v *La) New(key *XmlKey, cipher_data []byte, kid string) error {
@@ -148,28 +133,13 @@ func (v *La) New(key *XmlKey, cipher_data []byte, kid string) error {
    return nil
 }
 
-type Reference struct {
-   Uri          string `xml:"URI,attr"`
-   DigestValue  string
-}
-
-type SignedInfo struct {
-   XmlNs                  string `xml:"xmlns,attr"`
-   Reference              Reference
-}
-
-type EncryptedData struct {
-   XmlNs            string `xml:"xmlns,attr"`
-   Type             string `xml:"Type,attr"`
-   EncryptionMethod Algorithm
-   KeyInfo          KeyInfo
-   CipherData       CipherData
-}
-
-type Envelope struct {
-   XMLName xml.Name `xml:"soap:Envelope"`
-   Soap    string   `xml:"xmlns:soap,attr"`
-   Body    Body     `xml:"soap:Body"`
+type La struct {
+   XMLName       xml.Name `xml:"LA"`
+   XmlNs         string   `xml:"xmlns,attr"`
+   Id            string   `xml:"Id,attr"`
+   Version       string
+   ContentHeader ContentHeader
+   EncryptedData EncryptedData
 }
 
 type ProtectInfo struct {
@@ -177,8 +147,38 @@ type ProtectInfo struct {
    AlgId  string `xml:"ALGID"`
 }
 
+type Reference struct {
+   Uri          string `xml:"URI,attr"`
+   DigestValue  string
+}
+
+type Signature struct {
+   SignedInfo     SignedInfo
+   SignatureValue string
+}
+
+type SignedInfo struct {
+   XmlNs                  string `xml:"xmlns,attr"`
+   Reference              Reference
+}
+
+func (s *SignedInfo) New(digest []byte) {
+   *s = SignedInfo{
+      XmlNs: "http://www.w3.org/2000/09/xmldsig#",
+      Reference: Reference{
+         Uri: "#SignedData",
+         DigestValue: base64.StdEncoding.EncodeToString(digest),
+      },
+   }
+}
+
 type WrmHeader struct {
    XmlNs   string        `xml:"xmlns,attr"`
    Version string        `xml:"version,attr"`
    Data    WrmHeaderData `xml:"DATA"`
+}
+
+type WrmHeaderData struct { // Renamed from DATA
+   ProtectInfo ProtectInfo `xml:"PROTECTINFO"`
+   Kid         string      `xml:"KID"`
 }
