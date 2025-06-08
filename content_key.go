@@ -4,7 +4,6 @@ import (
    "encoding/binary"
    "encoding/hex"
    "errors"
-   "github.com/deatil/go-cryptobin/cryptobin/crypto"
 )
 
 func (c *ContentKey) Scalable(key EcKey, aux_keys *AuxKeys) error {
@@ -24,35 +23,30 @@ func (c *ContentKey) Scalable(key EcKey, aux_keys *AuxKeys) error {
       return err
    }
    rgb_uplink_xkey := XorKey(CK[:], magic_constant_zero)
+   content_key_prime, err := aes_ecb_encrypt(rgb_uplink_xkey, CK[:])
+   if err != nil {
+      return err
+   }
+   aux_key_calc, err := aes_ecb_encrypt(
+      aux_keys.Keys[0].Key[:], content_key_prime,
+   )
+   if err != nil {
+      return err
+   }
    var zero [16]byte
-   bin := crypto.New().Aes().ECB().NoPadding()
-   bin = bin.WithData(rgb_uplink_xkey).WithKey(CK[:]).Encrypt()
-   if err := bin.Error(); err != nil {
-      return err
-   }
-   content_key_prime := bin.ToBytes()
-   bin = bin.WithData(aux_keys.Keys[0].Key[:]).
-      WithKey(content_key_prime).Encrypt()
-   if err := bin.Error(); err != nil {
-      return err
-   }
-   aux_key_calc := bin.ToBytes()
    up_link_xkey := XorKey(aux_key_calc, zero[:])
-   bin = bin.WithData(root_key).WithKey(CK[:]).Encrypt()
-   if err := bin.Error(); err != nil {
+   o_secondary_key, err := aes_ecb_encrypt(root_key, CK[:])
+   if err != nil {
       return err
    }
-   o_secondary_key := bin.ToBytes()
-   bin = bin.WithData(leaf_keys).WithKey(up_link_xkey).Encrypt()
-   if err := bin.Error(); err != nil {
+   rgb_key, err := aes_ecb_encrypt(leaf_keys, up_link_xkey)
+   if err != nil {
       return err
    }
-   rgb_key := bin.ToBytes()
-   bin = bin.WithData(rgb_key).WithKey(o_secondary_key).Encrypt()
-   if err := bin.Error(); err != nil {
+   rgb_key, err = aes_ecb_encrypt(rgb_key, o_secondary_key)
+   if err != nil {
       return err
    }
-   rgb_key = bin.ToBytes()
    c.Integrity.Decode(rgb_key[:])
    rgb_key = rgb_key[16:]
    c.Key.Decode(rgb_key[:])

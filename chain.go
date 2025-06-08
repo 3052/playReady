@@ -12,6 +12,24 @@ import (
    "slices"
 )
 
+func get_cipher_data(
+   cert_chain *Chain, key *XmlKey,
+) ([]byte, error) {
+   data1, err := xml.Marshal(Data{
+      CertificateChains: CertificateChains{
+         CertificateChain: base64.StdEncoding.EncodeToString(cert_chain.Encode()),
+      },
+   })
+   if err != nil {
+      return nil, err
+   }
+   data1, err = aes_cbc_padding_encrypt(data1, key.AesKey[:], key.AesIv[:])
+   if err != nil {
+      return nil, err
+   }
+   return append(key.AesIv[:], data1...), nil
+}
+
 type Chain struct {
    Magic     [4]byte
    Version   uint32
@@ -128,25 +146,6 @@ func (c *Chain) Encode() []byte {
       data = append(data, cert1.Encode()...)
    }
    return data
-}
-
-func get_cipher_data(
-   cert_chain *Chain, key *XmlKey,
-) ([]byte, error) {
-   data1, err := xml.Marshal(Data{
-      CertificateChains: CertificateChains{
-         CertificateChain: base64.StdEncoding.EncodeToString(cert_chain.Encode()),
-      },
-   })
-   if err != nil {
-      return nil, err
-   }
-   var aes Aes
-   ciphertext, err := aes.EncryptCbc(key, data1)
-   if err != nil {
-      return nil, err
-   }
-   return append(key.AesIv[:], ciphertext...), nil
 }
 
 func (e *Envelope) New(

@@ -10,7 +10,7 @@ import (
    "testing"
 )
 
-func TestResponse(t *testing.T) {
+func TestDevice(t *testing.T) {
    var device LocalDevice
    device.Version = "2.0.1.3"
    data, err := os.ReadFile(tester.dir + "chain.txt")
@@ -63,7 +63,7 @@ func TestResponse(t *testing.T) {
       }
       t.Fatal(envelope)
    }
-   key, err := device.ParseLicense(string(data1))
+   key, err := device.ParseLicense(data1)
    if err != nil {
       t.Fatal(err)
    }

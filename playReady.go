@@ -1,30 +1,27 @@
 package playReady
 
 import (
-   "crypto/aes"
-   "crypto/cipher"
    "crypto/ecdsa"
    "crypto/elliptic"
    "encoding/base64"
    "encoding/binary"
    "encoding/hex"
    "fmt"
-   "github.com/deatil/go-cryptobin/padding"
+   "github.com/deatil/go-cryptobin/cryptobin/crypto"
    "math/big"
 )
 
-func (a Aes) EncryptCbc(key *XmlKey, data []byte) ([]byte, error) {
-   block, err := aes.NewCipher(key.AesKey[:])
-   if err != nil {
-      return nil, err
-   }
-   data = padding.PKCS7{}.Padding(data, aes.BlockSize)
-   ciphertext := make([]byte, len(data))
-   cipher.NewCBCEncrypter(block, key.AesIv[:]).CryptBlocks(ciphertext, data)
-   return ciphertext, nil
+func aes_ecb_encrypt(data, key []byte) ([]byte, error) {
+   bin := crypto.FromBytes(data).WithKey(key).
+      Aes().ECB().NoPadding().Encrypt()
+   return bin.ToBytes(), bin.Error()
 }
 
-type Aes struct{}
+func aes_cbc_padding_encrypt(data, key, iv []byte) ([]byte, error) {
+   bin := crypto.FromBytes(data).WithKey(key).WithIv(iv).
+      Aes().CBC().PKCS7Padding().Encrypt()
+   return bin.ToBytes(), bin.Error()
+}
 
 func (e *EcKey) LoadBytes(data []byte) {
    var public ecdsa.PublicKey

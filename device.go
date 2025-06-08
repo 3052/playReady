@@ -7,26 +7,29 @@ import (
 )
 
 type LocalDevice struct {
-   CertificateChain       Chain
-   SigningKey, EncryptKey EcKey
-   Version                string
+   CertificateChain Chain
+   EncryptKey       EcKey
+   SigningKey       EcKey
+   Version          string
 }
 
-func (ld *LocalDevice) ParseLicense(response string) (*KeyData, error) {
+func (ld *LocalDevice) ParseLicense(response []byte) (*KeyData, error) {
    var envelope struct {
       Body struct {
          AcquireLicenseResponse struct {
             AcquireLicenseResult struct {
                Response struct {
                   LicenseResponse struct {
-                     Licenses struct{ License string }
+                     Licenses struct {
+                        License string
+                     }
                   }
                }
             }
          }
       }
    }
-   err := xml.Unmarshal([]byte(response), &envelope)
+   err := xml.Unmarshal(response, &envelope)
    if err != nil {
       return nil, err
    }

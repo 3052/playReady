@@ -5,6 +5,16 @@ import (
    "encoding/xml"
 )
 
+type Envelope struct {
+   XMLName xml.Name `xml:"soap:Envelope"`
+   Soap    string   `xml:"xmlns:soap,attr"`
+   Body    Body     `xml:"soap:Body"`
+}
+
+type Body struct {
+   AcquireLicense AcquireLicense
+}
+
 func (v *La) New(key *XmlKey, cipher_data []byte, kid string) error {
    var ecc_pub_key WMRM
    x, y, err := ecc_pub_key.Points()
@@ -61,16 +71,6 @@ func (v *La) New(key *XmlKey, cipher_data []byte, kid string) error {
       },
    }
    return nil
-}
-
-type Envelope struct {
-   XMLName xml.Name `xml:"soap:Envelope"`
-   Soap    string   `xml:"xmlns:soap,attr"`
-   Body    Body     `xml:"soap:Body"`
-}
-
-type Body struct {
-   AcquireLicense AcquireLicense
 }
 
 type AcquireLicense struct {
