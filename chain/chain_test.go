@@ -8,7 +8,6 @@ import (
 )
 
 var device = SL2000
-//var device = SL3000
 
 var SL3000 = tester{
    dir: "../ignore/SL3000/",
@@ -39,18 +38,14 @@ func Test(t *testing.T) {
    if err != nil {
       t.Fatal(err)
    }
-   
-   //crypto.Fill = '@'
-   
+   // crypto.Fill = '@'
    // they downgrade certs from the cert digest (hash of the signing key)
    var signing_key crypto.EcKey
    err = signing_key.New()
    if err != nil {
       t.Fatal(err)
    }
-   
-   //crypto.Fill = '!'
-   
+   // crypto.Fill = '!'
    var encrypt_key crypto.EcKey
    err = encrypt_key.New()
    if err != nil {

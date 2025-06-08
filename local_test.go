@@ -11,7 +11,6 @@ import (
 )
 
 var folder = SL2000
-//var folder = SL3000
 
 var SL2000 = "ignore/SL2000/"
 
