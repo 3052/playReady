@@ -1,6 +1,7 @@
-package cert
+package playReady
 
 import (
+   "41.neocities.org/playReady/certificate"
    "bytes"
    "crypto/ecdsa"
    "crypto/elliptic"
@@ -9,6 +10,19 @@ import (
    "errors"
    "math/big"
 )
+
+type Cert struct {
+   Magic             [4]byte
+   Version           uint32
+   Length            uint32
+   LengthToSignature uint32
+   RawData           []byte
+   CertificateInfo   *CertInfo
+   Features          *certificate.Feature
+   KeyData           *certificate.KeyInfo
+   ManufacturerInfo  *Manufacturer
+   SignatureData     *certificate.Signature
+}
 
 func (c *Cert) Verify(PubKey []byte) bool {
    if !bytes.Equal(c.SignatureData.IssuerKey, PubKey) {
@@ -68,7 +82,7 @@ func (c *Cert) Decode(data []byte) (int, error) {
          }
 
       case FEATURE:
-         c.Features = new(Feature)
+         c.Features = new(certificate.Feature)
 
          _, err := c.Features.Decode(ftlv.Value)
          if err != nil {
@@ -76,9 +90,8 @@ func (c *Cert) Decode(data []byte) (int, error) {
          }
 
       case KEY:
-         c.KeyData = new(KeyInfo)
+         c.KeyData = new(certificate.KeyInfo)
          err := c.KeyData.Decode(ftlv.Value)
-
          if err != nil {
             return 0, err
          }
@@ -93,7 +106,7 @@ func (c *Cert) Decode(data []byte) (int, error) {
          }
 
       case SIGNATURE:
-         c.SignatureData = new(Signature)
+         c.SignatureData = new(certificate.Signature)
          err := c.SignatureData.Decode(ftlv.Value)
 
          if err != nil {
@@ -117,19 +130,6 @@ func (c *Cert) Encode() []byte {
    data = binary.BigEndian.AppendUint32(data, c.LengthToSignature)
 
    return append(data, c.RawData[:]...)
-}
-
-type Cert struct {
-   Magic             [4]byte
-   Version           uint32
-   Length            uint32
-   LengthToSignature uint32
-   RawData           []byte
-   CertificateInfo   *CertInfo
-   Features          *Feature
-   KeyData           *KeyInfo
-   ManufacturerInfo  *Manufacturer
-   SignatureData     *Signature
 }
 
 func (c *Cert) NewNoSig(Value []byte) {

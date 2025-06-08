@@ -1,6 +1,7 @@
-package license
+package playReady
 
 import (
+   "41.neocities.org/playReady/license"
    "bytes"
    "crypto/aes"
    "encoding/base64"
@@ -8,6 +9,19 @@ import (
    "errors"
    "github.com/deatil/go-cryptobin/mac"
 )
+
+type LicenseResponse struct {
+   RawData          []byte
+   Magic            [4]byte
+   Offset           uint16
+   Version          uint16
+   RightsId         [16]byte
+   OuterContainer   FTLV
+   ContentKeyObject *ContentKey
+   ECCKeyObject     *ECCKey
+   SignatureObject  *license.Signature
+   AuxKeyObject     *AuxKeys
+}
 
 func (l *LicenseResponse) Verify(content_integrity []byte) error {
    data := l.Encode()
@@ -87,7 +101,7 @@ func (l *LicenseResponse) Decode(data []byte) error {
             j += k
          }
       case SIGNATURE_ENTRY_TYPE: // 11
-         l.SignatureObject = new(Signature)
+         l.SignatureObject = new(license.Signature)
          err := l.SignatureObject.Decode(ftlv.Value)
          l.SignatureObject.Length = uint16(ftlv.Length)
          if err != nil {
@@ -169,16 +183,3 @@ const (
    UNKNOWN_CONTAINERS_ENTRY_TYPE                XmrType = 65534
    PLAYBACK_UNKNOWN_CONTAINER_ENTRY_TYPE        XmrType = 65534
 )
-
-type LicenseResponse struct {
-   RawData          []byte
-   Magic            [4]byte
-   Offset           uint16
-   Version          uint16
-   RightsId         [16]byte
-   OuterContainer   FTLV
-   ContentKeyObject *ContentKey
-   ECCKeyObject     *ECCKey
-   SignatureObject  *Signature
-   AuxKeyObject     *AuxKeys
-}

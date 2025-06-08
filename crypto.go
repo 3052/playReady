@@ -1,4 +1,4 @@
-package crypto
+package playReady
 
 import (
    "crypto/aes"

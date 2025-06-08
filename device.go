@@ -1,9 +1,7 @@
 package playReady
 
 import (
-   "41.neocities.org/playReady/cert"
-   "41.neocities.org/playReady/crypto"
-   "41.neocities.org/playReady/license"
+   "41.neocities.org/playReady/certificate"
    "bytes"
    "crypto/ecdsa"
    "crypto/sha256"
@@ -14,16 +12,22 @@ import (
    "slices"
 )
 
+type LocalDevice struct {
+   CertificateChain       Chain
+   SigningKey, EncryptKey EcKey
+   Version                string
+}
+
 type Chain struct {
    Magic     [4]byte
    Version   uint32
    Length    uint32
    Flags     uint32
    CertCount uint32
-   Certs     []cert.Cert
+   Certs     []Cert
 }
 
-func (c *Chain) CreateLeaf(ModelKey, SigningKey, EncryptKey crypto.EcKey) error {
+func (c *Chain) CreateLeaf(ModelKey, SigningKey, EncryptKey EcKey) error {
    if !bytes.Equal(c.Certs[0].KeyData.Keys[0].PublicKey[:], ModelKey.PublicBytes()) {
       return errors.New("zgpriv not for cert")
    }
@@ -31,15 +35,15 @@ func (c *Chain) CreateLeaf(ModelKey, SigningKey, EncryptKey crypto.EcKey) error 
       return errors.New("cert is not valid")
    }
    var (
-      BuiltKeyInfo     cert.KeyInfo
-      CertificateInfo  cert.CertInfo
-      SignatureData    cert.Signature
-      SignatureFtlv    cert.FTLV
-      DeviceFtlv       cert.FTLV
-      FeatureFtlv      cert.FTLV
-      KeyInfoFtlv      cert.FTLV
-      ManufacturerFtlv cert.FTLV
-      CertificateFtlv  cert.FTLV
+      BuiltKeyInfo     certificate.KeyInfo
+      CertificateInfo  CertInfo
+      SignatureData    certificate.Signature
+      SignatureFtlv    FTLV
+      DeviceFtlv       FTLV
+      FeatureFtlv      FTLV
+      KeyInfoFtlv      FTLV
+      ManufacturerFtlv FTLV
+      CertificateFtlv  FTLV
    )
    SigningKeyDigest := sha256.Sum256(SigningKey.PublicBytes())
    CertificateInfo.New(
@@ -47,7 +51,7 @@ func (c *Chain) CreateLeaf(ModelKey, SigningKey, EncryptKey crypto.EcKey) error 
    )
    BuiltKeyInfo.New(SigningKey.PublicBytes(), EncryptKey.PublicBytes())
    CertificateFtlv.New(1, 1, CertificateInfo.Encode())
-   var NewDevice cert.Device
+   var NewDevice Device
    NewDevice.New()
    KeyInfoFtlv.New(1, 6, BuiltKeyInfo.Encode())
    ManufacturerFtlv.New(0, 7, c.Certs[0].ManufacturerInfo.Encode())
@@ -58,10 +62,10 @@ func (c *Chain) CreateLeaf(ModelKey, SigningKey, EncryptKey crypto.EcKey) error 
    NewLeafData = append(NewLeafData, FeatureFtlv.Encode()...)
    NewLeafData = append(NewLeafData, KeyInfoFtlv.Encode()...)
    NewLeafData = append(NewLeafData, ManufacturerFtlv.Encode()...)
-   var UnsignedCert cert.Cert
+   var UnsignedCert Cert
    UnsignedCert.NewNoSig(NewLeafData)
    SignatureDigest := sha256.Sum256(UnsignedCert.Encode())
-   r, s, err := ecdsa.Sign(crypto.Fill, ModelKey.Key, SignatureDigest[:])
+   r, s, err := ecdsa.Sign(Fill, ModelKey.Key, SignatureDigest[:])
    if err != nil {
       return err
    }
@@ -109,7 +113,7 @@ func (c *Chain) Decode(data []byte) error {
    data = data[4:]
 
    for range c.CertCount {
-      var cert1 cert.Cert
+      var cert1 Cert
       i, err := cert1.Decode(data)
       if err != nil {
          return err
@@ -139,6 +143,7 @@ func (c *Chain) LoadFile(path string) error {
    }
    return c.Decode(data)
 }
+
 func (ld *LocalDevice) ParseLicense(response string) (*KeyData, error) {
    var envelope struct {
       Body struct {
@@ -157,7 +162,7 @@ func (ld *LocalDevice) ParseLicense(response string) (*KeyData, error) {
    if err != nil {
       return nil, err
    }
-   var license1 license.LicenseResponse
+   var license1 LicenseResponse
    err = license1.Parse(
       envelope.
          Body.
@@ -205,12 +210,7 @@ func (ld *LocalDevice) New(CertChain, EncryptionKey, SigningKey []byte, ClientVe
 }
 
 type KeyData struct {
-   KeyId license.Guid
-   Key   license.Guid
+   KeyId Guid
+   Key   Guid
 }
 
-type LocalDevice struct {
-   CertificateChain       Chain
-   SigningKey, EncryptKey crypto.EcKey
-   Version                string
-}

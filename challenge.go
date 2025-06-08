@@ -1,7 +1,6 @@
-package challenge
+package playReady
 
 import (
-   "41.neocities.org/playReady/crypto"
    "encoding/base64"
    "encoding/xml"
 )
@@ -91,13 +90,13 @@ func (s *SignedInfo) New(digest []byte) {
    }
 }
 
-func (v *La) New(key *crypto.XmlKey, cipher_data []byte, kid string) error {
-   var ecc_pub_key crypto.WMRM
+func (v *La) New(key *XmlKey, cipher_data []byte, kid string) error {
+   var ecc_pub_key WMRM
    x, y, err := ecc_pub_key.Points()
    if err != nil {
       return err
    }
-   var el_gamal crypto.ElGamal
+   var el_gamal ElGamal
    encrypted, err := el_gamal.Encrypt(x, y, key)
    if err != nil {
       return err

@@ -1,7 +1,6 @@
-package license
+package playReady
 
 import (
-   "41.neocities.org/playReady/crypto"
    "encoding/base64"
    "encoding/binary"
    "encoding/hex"
@@ -9,11 +8,39 @@ import (
    "strings"
 )
 
-func (c *ContentKey) Scalable(key crypto.EcKey, aux_keys *AuxKeys) error {
+func (f *FTLV) Encode() []byte {
+   var data []byte
+   data = binary.BigEndian.AppendUint16(data, f.Flags)
+   data = binary.BigEndian.AppendUint16(data, f.Type)
+   data = binary.BigEndian.AppendUint32(data, f.Length)
+   return append(data, f.Value...)
+}
+
+func (f *FTLV) Decode(data []byte) (uint32, error) {
+   var n uint32
+   f.Flags = binary.BigEndian.Uint16(data[n:])
+   n += 2
+   f.Type = binary.BigEndian.Uint16(data[n:])
+   n += 2
+   f.Length = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   f.Value = data[n:][:f.Length-8]
+   n += f.Length - 8
+   return n, nil
+}
+
+type FTLV struct {
+   Flags  uint16
+   Type   uint16
+   Length uint32
+   Value  []byte
+}
+
+func (c *ContentKey) Scalable(key EcKey, aux_keys *AuxKeys) error {
    rootKeyInfo := c.Value[:144]
    rootKey := rootKeyInfo[128:]
    leafKeys := c.Value[144:]
-   var el_gamal crypto.ElGamal
+   var el_gamal ElGamal
    decrypted := el_gamal.Decrypt(rootKeyInfo[:128], key.Key.D)
    var CI [16]byte
    var CK [16]byte
@@ -26,7 +53,7 @@ func (c *ContentKey) Scalable(key crypto.EcKey, aux_keys *AuxKeys) error {
       return err
    }
    rgbUplinkXKey := XorKey(CK[:], magicConstantZero)
-   var aes crypto.Aes
+   var aes Aes
    contentKeyPrime := aes.EncryptECB(CK[:], rgbUplinkXKey)
    auxKeyCalc := aes.EncryptECB(contentKeyPrime, aux_keys.Keys[0].Key[:])
    UpLinkXKey := XorKey(auxKeyCalc, new([16]byte)[:])
@@ -39,7 +66,7 @@ func (c *ContentKey) Scalable(key crypto.EcKey, aux_keys *AuxKeys) error {
    return nil
 }
 
-func (c *ContentKey) Decrypt(key crypto.EcKey, aux_keys *AuxKeys) error {
+func (c *ContentKey) Decrypt(key EcKey, aux_keys *AuxKeys) error {
    switch c.CipherType {
    case 3:
       decrypted := c.ECC256(key)
@@ -123,8 +150,8 @@ func (k *Guid) Uuid() string {
    return b.String()
 }
 
-func (c *ContentKey) ECC256(key crypto.EcKey) []byte {
-   var el_gamal crypto.ElGamal
+func (c *ContentKey) ECC256(key EcKey) []byte {
+   var el_gamal ElGamal
    return el_gamal.Decrypt(c.Value, key.Key.D)
 }
 
@@ -164,35 +191,6 @@ func XorKey(root, second []byte) []byte {
       data[i] ^= second[i]
    }
    return data
-}
-
-type FTLV struct {
-   Flags  uint16
-   Type   uint16
-   Length uint32
-   Value  []byte
-}
-
-func (f *FTLV) Decode(data []byte) (uint32, error) {
-   var n uint32
-   f.Flags = binary.BigEndian.Uint16(data[n:])
-   n += 2
-   f.Type = binary.BigEndian.Uint16(data[n:])
-   n += 2
-   f.Length = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   f.Value = data[n:][:f.Length-8]
-   n += f.Length - 8
-
-   return n, nil
-}
-
-func (f *FTLV) Encode() []byte {
-   var data []byte
-   data = binary.BigEndian.AppendUint16(data, f.Flags)
-   data = binary.BigEndian.AppendUint16(data, f.Type)
-   data = binary.BigEndian.AppendUint32(data, f.Length)
-   return append(data, f.Value...)
 }
 
 type AuxKeys struct {
@@ -250,24 +248,6 @@ func (e *ECCKey) Decode(data []byte) error {
 
    e.Value = make([]byte, e.Length)
    copy(e.Value, data)
-
-   return nil
-}
-
-type Signature struct {
-   Type   uint16
-   Length uint16
-   Data   []byte
-}
-
-func (s *Signature) Decode(data []byte) error {
-   s.Type = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   s.Length = binary.BigEndian.Uint16(data)
-   data = data[2:]
-
-   s.Data = make([]byte, s.Length)
-   copy(s.Data, data)
 
    return nil
 }
