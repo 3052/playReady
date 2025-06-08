@@ -16,7 +16,7 @@ var device_test = struct {
    url     string
 }{
    // THIS URL GETS LOCKED TO DEVICE ON FIRST REQUEST
-   url:     "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=07513603-86ba-41dc-8534-a5156f46cd57",
+   url:     "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=8958caa7-0605-4d05-b490-9f1155851b3d",
    content: "rakuten.tv/cz?content_type=movies&content_id=transvulcania-the-people-s-run",
    key:     "ab82952e8b567a2359393201e4dde4b4",
    key_id:  "318f7ece69afcfe3e96de31be6b77272",
@@ -24,7 +24,7 @@ var device_test = struct {
 
 const kid = "zn6PMa9p48/pbeMb5rdycg=="
 
-func TestLocal(t *testing.T) {
+func TestResponse(t *testing.T) {
    var device LocalDevice
    device.Version = "2.0.1.3"
    err := device.CertificateChain.LoadFile(tester.dir + "chain.txt")

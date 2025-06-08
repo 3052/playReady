@@ -8,11 +8,104 @@ import (
    "encoding/base64"
    "encoding/binary"
    "encoding/hex"
-   "encoding/xml"
    "fmt"
    "github.com/deatil/go-cryptobin/mode"
    "math/big"
 )
+
+type Guid struct {
+   Data1 uint32 // little endian
+   Data2 uint16 // little endian
+   Data3 uint16 // little endian
+   Data4 uint64 // big endian
+}
+
+func (k *Guid) Decode(data []byte) {
+   k.Data1 = binary.LittleEndian.Uint32(data)
+   data = data[4:]
+   k.Data2 = binary.LittleEndian.Uint16(data)
+   data = data[2:]
+   k.Data3 = binary.LittleEndian.Uint16(data)
+   data = data[2:]
+   k.Data4 = binary.BigEndian.Uint64(data)
+}
+
+func (k *Guid) Base64Decode(data string) error {
+   decoded, err := base64.StdEncoding.DecodeString(data)
+   if err != nil {
+      return err
+   }
+   k.Decode(decoded)
+   return nil
+}
+
+func (k *Guid) Encode() []byte {
+   var data []byte
+   data = binary.BigEndian.AppendUint32(data, k.Data1)
+   data = binary.BigEndian.AppendUint16(data, k.Data2)
+   data = binary.BigEndian.AppendUint16(data, k.Data3)
+   return binary.BigEndian.AppendUint64(data, k.Data4)
+}
+
+func (k *Guid) Bytes() []byte {
+   var data []byte
+   data = binary.LittleEndian.AppendUint32(data, k.Data1)
+   data = binary.LittleEndian.AppendUint16(data, k.Data2)
+   data = binary.LittleEndian.AppendUint16(data, k.Data3)
+   return binary.BigEndian.AppendUint64(data, k.Data4)
+}
+
+func (k *Guid) Hex() string {
+   data := k.Encode()
+   dst := make([]byte, hex.EncodedLen(len(data)))
+   hex.Encode(dst, data)
+   return string(dst)
+}
+
+type CertInfo struct {
+   CertificateId [16]byte
+   SecurityLevel uint32
+   Flags         uint32
+   Type          uint32
+   Digest        [32]byte
+   Expiry        uint32
+   ClientId      [16]byte
+}
+
+func (c *CertInfo) New(SecurityLevel uint32, Digest []byte) {
+   c.SecurityLevel = SecurityLevel
+   c.Flags = 0
+   c.Type = 2
+   copy(c.Digest[:], Digest)
+   c.Expiry = 4294967295
+}
+
+func (c *CertInfo) Decode(data []byte) error {
+   n := copy(c.CertificateId[:], data)
+   data = data[n:]
+   c.SecurityLevel = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   c.Flags = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   c.Type = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   n = copy(c.Digest[:], data)
+   data = data[n:]
+   c.Expiry = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   copy(c.ClientId[:], data)
+   return nil
+}
+
+func (c *CertInfo) Encode() []byte {
+   data := c.CertificateId[:]
+   data = binary.BigEndian.AppendUint32(data, c.SecurityLevel)
+   data = binary.BigEndian.AppendUint32(data, c.Flags)
+   data = binary.BigEndian.AppendUint32(data, c.Type)
+   data = append(data, c.Digest[:]...)
+   data = binary.BigEndian.AppendUint32(data, c.Expiry)
+   return append(data, c.ClientId[:]...)
+}
 
 func XorKey(root, second []byte) []byte {
    data := make([]byte, len(second))
@@ -45,15 +138,7 @@ func (a *AuxKeys) Decode(data []byte) error {
 
       data = data[i:]
    }
-
    return nil
-}
-
-type Config struct {
-   Version    string `json:"client_version"`
-   CertChain  string `json:"cert_chain"`
-   SigningKey string `json:"signing"`
-   EncryptKey string `json:"encrypt"`
 }
 
 func (f *FTLV) Encode() []byte {
@@ -98,13 +183,10 @@ type Manufacturer struct {
 
 func (m *Manufacturer) Encode() []byte {
    var data []byte
-
    data = binary.BigEndian.AppendUint32(data, m.Flags)
    data = append(data, m.ManufacturerName.Encode()...)
    data = append(data, m.ModelName.Encode()...)
-   data = append(data, m.ModelNumber.Encode()...)
-
-   return data
+   return append(data, m.ModelNumber.Encode()...)
 }
 
 func (m *Manufacturer) Decode(data []byte) error {
@@ -126,8 +208,6 @@ func (m *Manufacturer) Decode(data []byte) error {
    }
    return nil
 }
-
-///
 
 type AuxKey struct {
    Location uint32
@@ -161,116 +241,15 @@ func (e *ECCKey) Decode(data []byte) error {
 
    return nil
 }
-type AcquireLicense struct {
-   XmlNs     string    `xml:"xmlns,attr"`
-   Challenge Challenge `xml:"challenge"`
-}
-
-type Algorithm struct {
-   Algorithm string `xml:"Algorithm,attr"`
-}
-
-type Body struct {
-   AcquireLicense AcquireLicense
-}
 
 type CertificateChains struct {
    CertificateChain string
-}
-
-type Challenge struct {
-   Challenge InnerChallenge
-}
-
-type CipherData struct {
-   CipherValue string
-}
-
-type ContentHeader struct {
-   WrmHeader WrmHeader `xml:"WRMHEADER"`
 }
 
 type Data struct {
    CertificateChains CertificateChains
 }
 
-type EncryptedData struct {
-   XmlNs            string `xml:"xmlns,attr"`
-   Type             string `xml:"Type,attr"`
-   EncryptionMethod Algorithm
-   KeyInfo          KeyInfo
-   CipherData       CipherData
-}
-
-type EncryptedKey struct {
-   XmlNs            string `xml:"xmlns,attr"`
-   EncryptionMethod Algorithm
-   KeyInfo          EncryptedKeyInfo
-   CipherData       CipherData
-}
-
-type EncryptedKeyInfo struct { // Renamed from KeyInfo
-   XmlNs   string `xml:"xmlns,attr"`
-   KeyName string
-}
-
-type Envelope struct {
-   XMLName xml.Name `xml:"soap:Envelope"`
-   Soap    string   `xml:"xmlns:soap,attr"`
-   Body    Body     `xml:"soap:Body"`
-}
-
-type InnerChallenge struct { // Renamed from Challenge
-   XmlNs     string `xml:"xmlns,attr"`
-   La        La
-   Signature Signature
-}
-
-type KeyInfo struct { // This is the chosen "KeyInfo" type
-   XmlNs        string `xml:"xmlns,attr"`
-   EncryptedKey EncryptedKey
-}
-
-type ProtectInfo struct {
-   KeyLen string `xml:"KEYLEN"`
-   AlgId  string `xml:"ALGID"`
-}
-
-type Reference struct {
-   Uri          string `xml:"URI,attr"`
-   DigestValue  string
-}
-
-type Signature struct {
-   SignedInfo     SignedInfo
-   SignatureValue string
-}
-
-type SignedInfo struct {
-   XmlNs                  string `xml:"xmlns,attr"`
-   Reference              Reference
-}
-
-func (s *SignedInfo) New(digest []byte) {
-   *s = SignedInfo{
-      XmlNs: "http://www.w3.org/2000/09/xmldsig#",
-      Reference: Reference{
-         Uri: "#SignedData",
-         DigestValue: base64.StdEncoding.EncodeToString(digest),
-      },
-   }
-}
-
-type WrmHeader struct {
-   XmlNs   string        `xml:"xmlns,attr"`
-   Version string        `xml:"version,attr"`
-   Data    WrmHeaderData `xml:"DATA"`
-}
-
-type WrmHeaderData struct { // Renamed from DATA
-   ProtectInfo ProtectInfo `xml:"PROTECTINFO"`
-   Kid         string      `xml:"KID"`
-}
 var Fill Filler = '!'
 
 func (a Aes) EncryptECB(key []byte, data []byte) []byte {
@@ -408,11 +387,6 @@ func (f *FTLV) New(Flags, Type int, Value []byte) {
    f.Type = uint16(Type)
    f.Length = uint32(len(Value) + 8)
    f.Value = Value
-}
-
-type Header struct {
-   Record    *PlayReadyRecord
-   Object    *PlayReadyObject
 }
 
 type ManufacturerInfo struct {
