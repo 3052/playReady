@@ -5,16 +5,13 @@ import (
    "crypto/cipher"
    "crypto/ecdsa"
    "crypto/elliptic"
-   "crypto/x509"
    "encoding/base64"
    "encoding/binary"
    "encoding/hex"
-   "encoding/pem"
    "encoding/xml"
    "fmt"
    "github.com/deatil/go-cryptobin/mode"
    "math/big"
-   "os"
 )
 
 type Config struct {
@@ -320,41 +317,6 @@ func (WMRM) Points() (*big.Int, *big.Int, error) {
    return x, y, nil
 }
 
-func (e *EcKey) LoadBytes(data []byte) {
-   var public ecdsa.PublicKey
-   public.Curve = elliptic.P256()
-   public.X, public.Y = public.Curve.ScalarBaseMult(data)
-   var private ecdsa.PrivateKey
-   private.D = new(big.Int).SetBytes(data)
-   private.PublicKey = public
-   e.Key = &private
-}
-
-func (e *EcKey) LoadFile(path string) error {
-   keyFile, err := os.ReadFile(path)
-   if err != nil {
-      return err
-   }
-   block, _ := pem.Decode(keyFile)
-   if block == nil {
-      e.LoadBytes(keyFile)
-      return nil
-   }
-   key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
-   if err != nil {
-      return err
-   }
-   e.Key = key.(*ecdsa.PrivateKey)
-   return nil
-}
-
-func (e *EcKey) PublicBytes() []byte {
-   SigningX, SigningY := e.Key.PublicKey.X.Bytes(), e.Key.PublicKey.Y.Bytes()
-   SigningPublicKey := SigningX
-   SigningPublicKey = append(SigningPublicKey, SigningY...)
-   return SigningPublicKey
-}
-
 type ElGamal struct{}
 
 func (ElGamal) Decrypt(ciphertext []byte, PrivateKey *big.Int) []byte {
@@ -390,16 +352,6 @@ type WMRM struct{}
 
 var WMRMPublicKey = "C8B6AF16EE941AADAA5389B4AF2C10E356BE42AF175EF3FACE93254E7B0B3D9B982B27B5CB2341326E56AA857DBFD5C634CE2CF9EA74FCA8F2AF5957EFEEA562"
 
-func (e EcKey) Private() []byte {
-   var data [32]byte
-   e.Key.D.FillBytes(data[:])
-   return data[:]
-}
-
-type EcKey struct {
-   Key *ecdsa.PrivateKey
-}
-
 type Filler byte
 
 // github.com/golang/go/issues/58454
@@ -408,15 +360,6 @@ func (f Filler) Read(data []byte) (int, error) {
       data[index] = byte(f)
    }
    return len(data), nil
-}
-
-func (e *EcKey) New() error {
-   var err error
-   e.Key, err = ecdsa.GenerateKey(elliptic.P256(), Fill)
-   if err != nil {
-      return err
-   }
-   return nil
 }
 
 func (x *XmlKey) New() error {
@@ -551,51 +494,6 @@ type PlayReadyRecord struct {
    Length uint32
    Count  uint16
    Data   []byte
-}
-
-type CertInfo struct {
-   CertificateId [16]byte
-   SecurityLevel uint32
-   Flags         uint32
-   Type          uint32
-   Digest        [32]byte
-   Expiry        uint32
-   ClientId      [16]byte
-}
-
-func (c *CertInfo) New(SecurityLevel uint32, Digest []byte) {
-   c.SecurityLevel = SecurityLevel
-   c.Flags = 0
-   c.Type = 2
-   copy(c.Digest[:], Digest)
-   c.Expiry = 4294967295
-}
-
-func (c *CertInfo) Decode(data []byte) error {
-   n := copy(c.CertificateId[:], data)
-   data = data[n:]
-   c.SecurityLevel = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   c.Flags = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   c.Type = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   n = copy(c.Digest[:], data)
-   data = data[n:]
-   c.Expiry = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   copy(c.ClientId[:], data)
-   return nil
-}
-
-func (c *CertInfo) Encode() []byte {
-   data := c.CertificateId[:]
-   data = binary.BigEndian.AppendUint32(data, c.SecurityLevel)
-   data = binary.BigEndian.AppendUint32(data, c.Flags)
-   data = binary.BigEndian.AppendUint32(data, c.Type)
-   data = append(data, c.Digest[:]...)
-   data = binary.BigEndian.AppendUint32(data, c.Expiry)
-   return append(data, c.ClientId[:]...)
 }
 
 type Manufacturer struct {
