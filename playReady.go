@@ -1,13 +1,11 @@
 package playReady
 
 import (
-   "41.neocities.org/playReady/certificate"
    "bytes"
    "crypto/aes"
    "crypto/cipher"
    "crypto/ecdsa"
    "crypto/elliptic"
-   "crypto/sha256"
    "crypto/x509"
    "encoding/base64"
    "encoding/binary"
@@ -20,55 +18,6 @@ import (
    "math/big"
    "os"
    "strings"
-)
-
-type XmrType uint16
-
-const (
-   OUTER_CONTAINER_ENTRY_TYPE                   XmrType = 1
-   GLOBAL_POLICY_CONTAINER_ENTRY_TYPE           XmrType = 2
-   PLAYBACK_POLICY_CONTAINER_ENTRY_TYPE         XmrType = 4
-   MINIMUM_OUTPUT_PROTECTION_LEVELS_ENTRY_TYPE  XmrType = 5
-   EXPLICIT_ANALOG_VIDEO_PROTECTION_ENTRY_TYPE  XmrType = 7
-   ANALOG_VIDEO_OPL_ENTRY_TYPE                  XmrType = 8
-   KEY_MATERIAL_CONTAINER_ENTRY_TYPE            XmrType = 9
-   CONTENT_KEY_ENTRY_TYPE                       XmrType = 10
-   SIGNATURE_ENTRY_TYPE                         XmrType = 11
-   SERIAL_NUMBER_ENTRY_TYPE                     XmrType = 12
-   RIGHTS_ENTRY_TYPE                            XmrType = 13
-   EXPIRATION_ENTRY_TYPE                        XmrType = 18
-   ISSUEDATE_ENTRY_TYPE                         XmrType = 19
-   METERING_ENTRY_TYPE                          XmrType = 22
-   GRACEPERIOD_ENTRY_TYPE                       XmrType = 26
-   SOURCEID_ENTRY_TYPE                          XmrType = 34
-   RESTRICTED_SOURCEID_ENTRY_TYPE               XmrType = 40
-   DOMAIN_ID_ENTRY_TYPE                         XmrType = 41
-   DEVICE_KEY_ENTRY_TYPE                        XmrType = 42
-   POLICY_METADATA_ENTRY_TYPE                   XmrType = 44
-   OPTIMIZED_CONTENT_KEY_ENTRY_TYPE             XmrType = 45
-   EXPLICIT_DIGITAL_AUDIO_PROTECTION_ENTRY_TYPE XmrType = 46
-   EXPIRE_AFTER_FIRST_USE_ENTRY_TYPE            XmrType = 48
-   DIGITAL_AUDIO_OPL_ENTRY_TYPE                 XmrType = 49
-   REVOCATION_INFO_VERSION_ENTRY_TYPE           XmrType = 50
-   EMBEDDING_BEHAVIOR_ENTRY_TYPE                XmrType = 51
-   SECURITY_LEVEL_ENTRY_TYPE                    XmrType = 52
-   MOVE_ENABLER_ENTRY_TYPE                      XmrType = 55
-   UPLINK_KID_ENTRY_TYPE                        XmrType = 59
-   COPY_POLICIES_CONTAINER_ENTRY_TYPE           XmrType = 60
-   COPY_COUNT_ENTRY_TYPE                        XmrType = 61
-   REMOVAL_DATE_ENTRY_TYPE                      XmrType = 80
-   AUX_KEY_ENTRY_TYPE                           XmrType = 81
-   UPLINKX_ENTRY_TYPE                           XmrType = 82
-   REAL_TIME_EXPIRATION_ENTRY_TYPE              XmrType = 85
-   EXPLICIT_DIGITAL_VIDEO_PROTECTION_ENTRY_TYPE XmrType = 88
-   DIGITAL_VIDEO_OPL_ENTRY_TYPE                 XmrType = 89
-   SECURESTOP_ENTRY_TYPE                        XmrType = 90
-   COPY_UNKNOWN_OBJECT_ENTRY_TYPE               XmrType = 65533
-   GLOBAL_POLICY_UNKNOWN_OBJECT_ENTRY_TYPE      XmrType = 65533
-   PLAYBACK_UNKNOWN_OBJECT_ENTRY_TYPE           XmrType = 65533
-   COPY_UNKNOWN_CONTAINER_ENTRY_TYPE            XmrType = 65534
-   UNKNOWN_CONTAINERS_ENTRY_TYPE                XmrType = 65534
-   PLAYBACK_UNKNOWN_CONTAINER_ENTRY_TYPE        XmrType = 65534
 )
 
 type LocalDevice struct {
@@ -836,135 +785,6 @@ type PlayReadyRecord struct {
    Length uint32
    Count  uint16
    Data   []byte
-}
-type Cert struct {
-   Magic             [4]byte
-   Version           uint32
-   Length            uint32
-   LengthToSignature uint32
-   RawData           []byte
-   CertificateInfo   *CertInfo
-   Features          *certificate.Feature
-   KeyData           *certificate.KeyInfo
-   ManufacturerInfo  *Manufacturer
-   SignatureData     *certificate.Signature
-}
-
-func (c *Cert) Verify(PubKey []byte) bool {
-   if !bytes.Equal(c.SignatureData.IssuerKey, PubKey) {
-      return false
-   }
-   data := c.Encode()
-   data = data[:c.LengthToSignature]
-   x := new(big.Int).SetBytes(PubKey[:32])
-   y := new(big.Int).SetBytes(PubKey[32:])
-   PublicKey := &ecdsa.PublicKey{
-      Curve: elliptic.P256(),
-      X:     x,
-      Y:     y,
-   }
-   Sig := c.SignatureData.SignatureData
-   SignatureDigest := sha256.Sum256(data)
-   r, s := new(big.Int).SetBytes(Sig[:32]), new(big.Int).SetBytes(Sig[32:])
-   return ecdsa.Verify(PublicKey, SignatureDigest[:], r, s)
-}
-
-func (c *Cert) Decode(data []byte) (int, error) {
-   n := copy(c.Magic[:], data)
-
-   if string(c.Magic[:]) != "CERT" {
-      return 0, errors.New("failed to find cert magic")
-   }
-
-   c.Version = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   c.Length = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   c.LengthToSignature = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   c.RawData = data[n:][:c.Length-16]
-   n += len(c.RawData)
-
-   var sum uint32
-   for sum < c.Length-16 {
-      var ftlv FTLV
-
-      j, err := ftlv.Decode(c.RawData[sum:])
-
-      if err != nil {
-         return 0, err
-      }
-
-      var ObjectType = ObjType(ftlv.Type)
-
-      switch ObjectType {
-      case BASIC:
-         c.CertificateInfo = new(CertInfo)
-
-         err := c.CertificateInfo.Decode(ftlv.Value)
-
-         if err != nil {
-            return 0, err
-         }
-
-      case FEATURE:
-         c.Features = new(certificate.Feature)
-
-         _, err := c.Features.Decode(ftlv.Value)
-         if err != nil {
-            return 0, err
-         }
-
-      case KEY:
-         c.KeyData = new(certificate.KeyInfo)
-         err := c.KeyData.Decode(ftlv.Value)
-         if err != nil {
-            return 0, err
-         }
-
-      case MANUFACTURER:
-         c.ManufacturerInfo = new(Manufacturer)
-
-         err := c.ManufacturerInfo.Decode(ftlv.Value)
-
-         if err != nil {
-            return 0, err
-         }
-
-      case SIGNATURE:
-         c.SignatureData = new(certificate.Signature)
-         err := c.SignatureData.Decode(ftlv.Value)
-
-         if err != nil {
-            return 0, err
-         }
-
-      }
-
-      sum += j
-   }
-
-   return n, nil
-}
-
-func (c *Cert) Encode() []byte {
-   var data []byte
-   data = append(data, c.Magic[:]...)
-
-   data = binary.BigEndian.AppendUint32(data, c.Version)
-   data = binary.BigEndian.AppendUint32(data, c.Length)
-   data = binary.BigEndian.AppendUint32(data, c.LengthToSignature)
-
-   return append(data, c.RawData[:]...)
-}
-
-func (c *Cert) NewNoSig(Value []byte) {
-   copy(c.Magic[:], "CERT")
-   c.Version = 1
-   c.Length = uint32(len(Value)) + 16 + 144
-   c.LengthToSignature = uint32(len(Value)) + 16
-   c.RawData = make([]byte, len(Value))
-   copy(c.RawData, Value)
 }
 
 type CertInfo struct {
