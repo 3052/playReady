@@ -1,7 +1,6 @@
 package playReady
 
 import (
-   "bytes"
    "crypto/aes"
    "crypto/cipher"
    "crypto/ecdsa"
@@ -12,83 +11,17 @@ import (
    "encoding/hex"
    "encoding/pem"
    "encoding/xml"
-   "errors"
    "fmt"
    "github.com/deatil/go-cryptobin/mode"
    "math/big"
    "os"
 )
 
-type LocalDevice struct {
-   CertificateChain       Chain
-   SigningKey, EncryptKey EcKey
-   Version                string
-}
-
-func (ld *LocalDevice) ParseLicense(response string) (*KeyData, error) {
-   var envelope struct {
-      Body struct {
-         AcquireLicenseResponse struct {
-            AcquireLicenseResult struct {
-               Response struct {
-                  LicenseResponse struct {
-                     Licenses struct { License string }
-                  }
-               }
-            }
-         }
-      }
-   }
-   err := xml.Unmarshal([]byte(response), &envelope)
-   if err != nil {
-      return nil, err
-   }
-   var license1 LicenseResponse
-   err = license1.Parse(
-      envelope.
-         Body.
-         AcquireLicenseResponse.
-         AcquireLicenseResult.
-         Response.
-         LicenseResponse.
-         Licenses.
-         License,
-   )
-   if err != nil {
-      return nil, err
-   }
-   if !bytes.Equal(license1.ECCKeyObject.Value, ld.EncryptKey.PublicBytes()) {
-      return nil, errors.New("license response is not for this device")
-   }
-   err = license1.ContentKeyObject.Decrypt(ld.EncryptKey, license1.AuxKeyObject)
-   if err != nil {
-      return nil, err
-   }
-   err = license1.Verify(license1.ContentKeyObject.Integrity.Bytes())
-   if err != nil {
-      return nil, err
-   }
-   return &KeyData{
-      license1.ContentKeyObject.KeyId, license1.ContentKeyObject.Key,
-   }, nil
-}
-
 type Config struct {
    Version    string `json:"client_version"`
    CertChain  string `json:"cert_chain"`
    SigningKey string `json:"signing"`
    EncryptKey string `json:"encrypt"`
-}
-
-func (ld *LocalDevice) New(CertChain, EncryptionKey, SigningKey []byte, ClientVersion string) error {
-   err := ld.CertificateChain.Decode(CertChain)
-   if err != nil {
-      return err
-   }
-   ld.EncryptKey.LoadBytes(EncryptionKey)
-   ld.SigningKey.LoadBytes(SigningKey)
-   ld.Version = ClientVersion
-   return nil
 }
 
 type KeyData struct {
@@ -308,73 +241,6 @@ type InnerChallenge struct { // Renamed from Challenge
 type KeyInfo struct { // This is the chosen "KeyInfo" type
    XmlNs        string `xml:"xmlns,attr"`
    EncryptedKey EncryptedKey
-}
-
-func (v *La) New(key *XmlKey, cipher_data []byte, kid string) error {
-   var ecc_pub_key WMRM
-   x, y, err := ecc_pub_key.Points()
-   if err != nil {
-      return err
-   }
-   var el_gamal ElGamal
-   encrypted, err := el_gamal.Encrypt(x, y, key)
-   if err != nil {
-      return err
-   }
-   *v = La{
-      XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/protocols",
-      Id:      "SignedData",
-      Version: "1",
-      ContentHeader: ContentHeader{
-         WrmHeader: WrmHeader{
-            XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/PlayReadyHeader",
-            Version: "4.0.0.0",
-            Data: WrmHeaderData{
-               ProtectInfo: ProtectInfo{
-                  KeyLen: "16",
-                  AlgId:  "AESCTR",
-               },
-               Kid: kid,
-            },
-         },
-      },
-      EncryptedData: EncryptedData{
-         XmlNs: "http://www.w3.org/2001/04/xmlenc#",
-         Type:  "http://www.w3.org/2001/04/xmlenc#Element",
-         EncryptionMethod: Algorithm{
-            Algorithm: "http://www.w3.org/2001/04/xmlenc#aes128-cbc",
-         },
-         KeyInfo: KeyInfo{
-            XmlNs: "http://www.w3.org/2000/09/xmldsig#",
-            EncryptedKey: EncryptedKey{
-               XmlNs: "http://www.w3.org/2001/04/xmlenc#",
-               EncryptionMethod: Algorithm{
-                  Algorithm: "http://schemas.microsoft.com/DRM/2007/03/protocols#ecc256",
-               },
-               KeyInfo: EncryptedKeyInfo{
-                  XmlNs:   "http://www.w3.org/2000/09/xmldsig#",
-                  KeyName: "WMRMServer",
-               },
-               CipherData: CipherData{
-                  CipherValue: base64.StdEncoding.EncodeToString(encrypted),
-               },
-            },
-         },
-         CipherData: CipherData{
-            CipherValue: base64.StdEncoding.EncodeToString(cipher_data),
-         },
-      },
-   }
-   return nil
-}
-
-type La struct {
-   XMLName       xml.Name `xml:"LA"`
-   XmlNs         string   `xml:"xmlns,attr"`
-   Id            string   `xml:"Id,attr"`
-   Version       string
-   ContentHeader ContentHeader
-   EncryptedData EncryptedData
 }
 
 type ProtectInfo struct {
