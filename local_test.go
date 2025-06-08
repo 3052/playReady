@@ -1,7 +1,6 @@
 package playReady
 
 import (
-   "41.neocities.org/playReady/challenge"
    "bytes"
    "encoding/hex"
    "encoding/xml"
@@ -9,12 +8,6 @@ import (
    "net/http"
    "testing"
 )
-
-var folder = SL2000
-
-var SL2000 = "ignore/SL2000/"
-
-var SL3000 = "ignore/SL3000/"
 
 var device_test = struct {
    content string
@@ -31,23 +24,22 @@ var device_test = struct {
 
 const kid = "zn6PMa9p48/pbeMb5rdycg=="
 
-func Test(t *testing.T) {
+func TestLocal(t *testing.T) {
    var device LocalDevice
    device.Version = "2.0.1.3"
-   err := device.CertificateChain.LoadFile(folder + "chain.txt")
+   err := device.CertificateChain.LoadFile(tester.dir + "chain.txt")
    if err != nil {
       t.Fatal(err)
    }
-   err = device.SigningKey.LoadFile(folder + "signing_key.txt")
+   err = device.SigningKey.LoadFile(tester.dir + "signing_key.txt")
    if err != nil {
       t.Fatal(err)
    }
-   err = device.EncryptKey.LoadFile(folder + "encrypt_key.txt")
+   err = device.EncryptKey.LoadFile(tester.dir + "encrypt_key.txt")
    if err != nil {
       t.Fatal(err)
    }
-   var envelope challenge.Envelope
-   err = envelope.New(&device.CertificateChain, device.SigningKey, kid)
+   envelope, err := device.CertificateChain.envelope(device.SigningKey, kid)
    if err != nil {
       t.Fatal(err)
    }

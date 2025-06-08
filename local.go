@@ -1,7 +1,6 @@
 package playReady
 
 import (
-   "41.neocities.org/playReady/chain"
    "41.neocities.org/playReady/crypto"
    "41.neocities.org/playReady/license"
    "bytes"
@@ -80,7 +79,7 @@ type KeyData struct {
 }
 
 type LocalDevice struct {
-   CertificateChain       chain.Chain
+   CertificateChain       Chain
    SigningKey, EncryptKey crypto.EcKey
    Version                string
 }
