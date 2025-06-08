@@ -1,6 +1,7 @@
-package playReady
+package challenge
 
 import (
+   "41.neocities.org/playReady"
    "bytes"
    "encoding/hex"
    "encoding/xml"
@@ -25,7 +26,7 @@ var device_test = struct {
 const kid = "zn6PMa9p48/pbeMb5rdycg=="
 
 func TestLocal(t *testing.T) {
-   var device LocalDevice
+   var device playReady.LocalDevice
    device.Version = "2.0.1.3"
    err := device.CertificateChain.LoadFile(tester.dir + "chain.txt")
    if err != nil {
@@ -39,11 +40,12 @@ func TestLocal(t *testing.T) {
    if err != nil {
       t.Fatal(err)
    }
-   envelope, err := device.CertificateChain.envelope(device.SigningKey, kid)
+   var value Envelope
+   err = value.New(&device.CertificateChain, device.SigningKey, kid)
    if err != nil {
       t.Fatal(err)
    }
-   data, err := xml.Marshal(envelope)
+   data, err := xml.Marshal(value)
    if err != nil {
       t.Fatal(err)
    }
