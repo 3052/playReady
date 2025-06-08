@@ -9,7 +9,6 @@ import (
    "encoding/binary"
    "encoding/xml"
    "errors"
-   "os"
    "slices"
 )
 
@@ -129,14 +128,6 @@ func (c *Chain) Encode() []byte {
       data = append(data, cert1.Encode()...)
    }
    return data
-}
-
-func (c *Chain) LoadFile(path string) error {
-   data, err := os.ReadFile(path)
-   if err != nil {
-      return err
-   }
-   return c.Decode(data)
 }
 
 func get_cipher_data(

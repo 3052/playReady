@@ -13,6 +13,41 @@ import (
    "math/big"
 )
 
+func (e *EcKey) LoadBytes(data []byte) {
+   var public ecdsa.PublicKey
+   public.Curve = elliptic.P256()
+   public.X, public.Y = public.Curve.ScalarBaseMult(data)
+   var private ecdsa.PrivateKey
+   private.D = new(big.Int).SetBytes(data)
+   private.PublicKey = public
+   e.Key = &private
+}
+
+func (e *EcKey) PublicBytes() []byte {
+   SigningX, SigningY := e.Key.PublicKey.X.Bytes(), e.Key.PublicKey.Y.Bytes()
+   SigningPublicKey := SigningX
+   SigningPublicKey = append(SigningPublicKey, SigningY...)
+   return SigningPublicKey
+}
+
+func (e EcKey) Private() []byte {
+   var data [32]byte
+   e.Key.D.FillBytes(data[:])
+   return data[:]
+}
+
+type EcKey struct {
+   Key *ecdsa.PrivateKey
+}
+
+func (e *EcKey) New() error {
+   var err error
+   e.Key, err = ecdsa.GenerateKey(elliptic.P256(), Fill)
+   if err != nil {
+      return err
+   }
+   return nil
+}
 type Guid struct {
    Data1 uint32 // little endian
    Data2 uint16 // little endian

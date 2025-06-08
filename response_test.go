@@ -6,45 +6,37 @@ import (
    "encoding/xml"
    "io"
    "net/http"
+   "os"
    "testing"
 )
-
-var device_test = struct {
-   content string
-   key     string
-   key_id  string
-   url     string
-}{
-   // THIS URL GETS LOCKED TO DEVICE ON FIRST REQUEST
-   url:     "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=8958caa7-0605-4d05-b490-9f1155851b3d",
-   content: "rakuten.tv/cz?content_type=movies&content_id=transvulcania-the-people-s-run",
-   key:     "ab82952e8b567a2359393201e4dde4b4",
-   key_id:  "318f7ece69afcfe3e96de31be6b77272",
-}
-
-const kid = "zn6PMa9p48/pbeMb5rdycg=="
 
 func TestResponse(t *testing.T) {
    var device LocalDevice
    device.Version = "2.0.1.3"
-   err := device.CertificateChain.LoadFile(tester.dir + "chain.txt")
+   data, err := os.ReadFile(tester.dir + "chain.txt")
    if err != nil {
       t.Fatal(err)
    }
-   err = device.SigningKey.LoadFile(tester.dir + "signing_key.txt")
+   err = device.CertificateChain.Decode(data)
    if err != nil {
       t.Fatal(err)
    }
-   err = device.EncryptKey.LoadFile(tester.dir + "encrypt_key.txt")
+   data, err = os.ReadFile(tester.dir + "signing_key.txt")
    if err != nil {
       t.Fatal(err)
    }
+   device.SigningKey.LoadBytes(data)
+   data, err = os.ReadFile(tester.dir + "encrypt_key.txt")
+   if err != nil {
+      t.Fatal(err)
+   }
+   device.EncryptKey.LoadBytes(data)
    var envelope1 Envelope
    err = envelope1.New(&device.CertificateChain, device.SigningKey, kid)
    if err != nil {
       t.Fatal(err)
    }
-   data, err := xml.Marshal(envelope1)
+   data, err = xml.Marshal(envelope1)
    if err != nil {
       t.Fatal(err)
    }
@@ -82,3 +74,18 @@ func TestResponse(t *testing.T) {
       t.Fatal(".Key")
    }
 }
+
+var device_test = struct {
+   content string
+   key     string
+   key_id  string
+   url     string
+}{
+   // THIS URL GETS LOCKED TO DEVICE ON FIRST REQUEST
+   url:     "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=8958caa7-0605-4d05-b490-9f1155851b3d",
+   content: "rakuten.tv/cz?content_type=movies&content_id=transvulcania-the-people-s-run",
+   key:     "ab82952e8b567a2359393201e4dde4b4",
+   key_id:  "318f7ece69afcfe3e96de31be6b77272",
+}
+
+const kid = "zn6PMa9p48/pbeMb5rdycg=="
