@@ -10,6 +10,21 @@ import (
    "testing"
 )
 
+var device_test = struct {
+   content string
+   key     string
+   key_id  string
+   url     string
+}{
+   // THIS URL GETS LOCKED TO DEVICE ON FIRST REQUEST
+   url:     "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=685ddc6f-f207-4671-a572-0af64771e357",
+   content: "rakuten.tv/cz?content_type=movies&content_id=transvulcania-the-people-s-run",
+   key:     "ab82952e8b567a2359393201e4dde4b4",
+   key_id:  "318f7ece69afcfe3e96de31be6b77272",
+}
+
+const kid = "zn6PMa9p48/pbeMb5rdycg=="
+
 func TestDevice(t *testing.T) {
    var device LocalDevice
    device.Version = "2.0.1.3"
@@ -74,18 +89,3 @@ func TestDevice(t *testing.T) {
       t.Fatal(".Key")
    }
 }
-
-var device_test = struct {
-   content string
-   key     string
-   key_id  string
-   url     string
-}{
-   // THIS URL GETS LOCKED TO DEVICE ON FIRST REQUEST
-   url:     "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=8958caa7-0605-4d05-b490-9f1155851b3d",
-   content: "rakuten.tv/cz?content_type=movies&content_id=transvulcania-the-people-s-run",
-   key:     "ab82952e8b567a2359393201e4dde4b4",
-   key_id:  "318f7ece69afcfe3e96de31be6b77272",
-}
-
-const kid = "zn6PMa9p48/pbeMb5rdycg=="

@@ -7,19 +7,15 @@ import (
    "testing"
 )
 
-type envelope_value struct {
-   XMLName xml.Name `xml:"soap:Envelope"`
-   Body struct {
-      AcquireLicense *struct{}
-      AcquireLicenseResponse *struct{}
-   } `xml:"soap:Body"`
-}
-
 const envelope_data = `<soap:Envelope>
  <soap:Body>
-  <AcquireLicense></AcquireLicense>
+  <AcquireLicenseResponse></AcquireLicenseResponse>
  </soap:Body>
 </soap:Envelope>`
+
+type envelope_value struct {
+   XMLName xml.Name `xml:"soap:Envelope"`
+}
 
 func TestEnvelopeResponse(t *testing.T) {
    var value envelope_value
@@ -32,7 +28,6 @@ func TestEnvelopeResponse(t *testing.T) {
 
 func TestEnvelopeRequest(t *testing.T) {
    var value envelope_value
-   value.Body.AcquireLicense = &struct{}{}
    encode := xml.NewEncoder(os.Stdout)
    encode.Indent("", " ")
    err := encode.Encode(value)
