@@ -50,15 +50,6 @@ type EcKey struct {
    Key *ecdsa.PrivateKey
 }
 
-func (e *EcKey) New() error {
-   var err error
-   e.Key, err = ecdsa.GenerateKey(elliptic.P256(), Fill)
-   if err != nil {
-      return err
-   }
-   return nil
-}
-
 type Guid struct {
    Data1 uint32 // little endian
    Data2 uint16 // little endian
@@ -287,8 +278,6 @@ type Data struct {
    CertificateChains CertificateChains
 }
 
-var Fill Filler = '!'
-
 type XmlKey struct {
    AesIv     [16]byte
    AesKey    [16]byte
@@ -329,29 +318,6 @@ func (ElGamal) Decrypt(ciphertext []byte, PrivateKey *big.Int) []byte {
 type WMRM struct{}
 
 var WMRMPublicKey = "C8B6AF16EE941AADAA5389B4AF2C10E356BE42AF175EF3FACE93254E7B0B3D9B982B27B5CB2341326E56AA857DBFD5C634CE2CF9EA74FCA8F2AF5957EFEEA562"
-
-type Filler byte
-
-// github.com/golang/go/issues/58454
-func (f Filler) Read(data []byte) (int, error) {
-   for index := range data {
-      data[index] = byte(f)
-   }
-   return len(data), nil
-}
-
-func (x *XmlKey) New() error {
-   key, err := ecdsa.GenerateKey(elliptic.P256(), Fill)
-   if err != nil {
-      return err
-   }
-   x.PublicKey = key.PublicKey
-   Aes := x.PublicKey.X.Bytes()
-   n := copy(x.AesIv[:], Aes)
-   Aes = Aes[n:]
-   copy(x.AesKey[:], Aes)
-   return nil
-}
 
 func (ElGamal) Encrypt(
    PubX *big.Int, PubY *big.Int, plaintext *XmlKey,

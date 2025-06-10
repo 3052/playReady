@@ -15,13 +15,13 @@ type LocalDevice struct {
 }
 
 func (ld *LocalDevice) ParseLicense(data []byte) (*KeyData, error) {
-   var value EnvelopeResponse
-   err := xml.Unmarshal(data, &value)
+   var response EnvelopeResponse
+   err := xml.Unmarshal(data, &response)
    if err != nil {
       return nil, err
    }
    var license LicenseResponse
-   err = license.Parse(value.
+   err = license.Parse(response.
       Body.
       AcquireLicenseResponse.
       AcquireLicenseResult.
@@ -48,6 +48,7 @@ func (ld *LocalDevice) ParseLicense(data []byte) (*KeyData, error) {
       license.ContentKeyObject.KeyId, license.ContentKeyObject.Key,
    }, nil
 }
+
 func (c *ContentKey) Scalable(key EcKey, aux_keys *AuxKeys) error {
    rootKeyInfo := c.Value[:144]
    root_key := rootKeyInfo[128:]
