@@ -17,7 +17,7 @@ var device_test = struct {
    url     string
 }{
    // THIS URL GETS LOCKED TO DEVICE ON FIRST REQUEST
-   url:     "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=078af5e4-8ffe-4462-b388-c0ff2a15f485",
+   url:     "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=8e19eb98-3700-490f-97b9-dab1856eb359",
    content: "rakuten.tv/cz?content_type=movies&content_id=transvulcania-the-people-s-run",
    key:     "ab82952e8b567a2359393201e4dde4b4",
    key_id:  "318f7ece69afcfe3e96de31be6b77272",
@@ -27,7 +27,6 @@ const kid = "zn6PMa9p48/pbeMb5rdycg=="
 
 func TestDevice(t *testing.T) {
    var device LocalDevice
-   device.Version = "2.0.1.3"
    data, err := os.ReadFile(tester.dir + "chain.txt")
    if err != nil {
       t.Fatal(err)

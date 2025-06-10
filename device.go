@@ -2,6 +2,8 @@ package playReady
 
 import (
    "bytes"
+   "encoding/binary"
+   "encoding/hex"
    "encoding/xml"
    "errors"
 )
@@ -10,66 +12,142 @@ type LocalDevice struct {
    CertificateChain Chain
    EncryptKey       EcKey
    SigningKey       EcKey
-   Version          string
 }
 
-func (ld *LocalDevice) ParseLicense(response []byte) (*KeyData, error) {
-   var envelope struct {
-      Body struct {
-         AcquireLicenseResponse struct {
-            AcquireLicenseResult struct {
-               Response struct {
-                  LicenseResponse struct {
-                     Licenses struct {
-                        License string
-                     }
-                  }
-               }
-            }
-         }
-      }
-   }
-   err := xml.Unmarshal(response, &envelope)
+func (ld *LocalDevice) ParseLicense(data []byte) (*KeyData, error) {
+   var value EnvelopeResponse
+   err := xml.Unmarshal(data, &value)
    if err != nil {
       return nil, err
    }
-   var license1 LicenseResponse
-   err = license1.Parse(
-      envelope.
-         Body.
-         AcquireLicenseResponse.
-         AcquireLicenseResult.
-         Response.
-         LicenseResponse.
-         Licenses.
-         License,
+   var license LicenseResponse
+   err = license.Parse(value.
+      Body.
+      AcquireLicenseResponse.
+      AcquireLicenseResult.
+      Response.
+      LicenseResponse.
+      Licenses.
+      License,
    )
    if err != nil {
       return nil, err
    }
-   if !bytes.Equal(license1.ECCKeyObject.Value, ld.EncryptKey.PublicBytes()) {
+   if !bytes.Equal(license.ECCKeyObject.Value, ld.EncryptKey.PublicBytes()) {
       return nil, errors.New("license response is not for this device")
    }
-   err = license1.ContentKeyObject.Decrypt(ld.EncryptKey, license1.AuxKeyObject)
+   err = license.ContentKeyObject.Decrypt(ld.EncryptKey, license.AuxKeyObject)
    if err != nil {
       return nil, err
    }
-   err = license1.Verify(license1.ContentKeyObject.Integrity.Bytes())
+   err = license.Verify(license.ContentKeyObject.Integrity.Bytes())
    if err != nil {
       return nil, err
    }
    return &KeyData{
-      license1.ContentKeyObject.KeyId, license1.ContentKeyObject.Key,
+      license.ContentKeyObject.KeyId, license.ContentKeyObject.Key,
    }, nil
 }
-
-func (ld *LocalDevice) New(CertChain, EncryptionKey, SigningKey []byte, ClientVersion string) error {
-   err := ld.CertificateChain.Decode(CertChain)
+func (c *ContentKey) Scalable(key EcKey, aux_keys *AuxKeys) error {
+   rootKeyInfo := c.Value[:144]
+   root_key := rootKeyInfo[128:]
+   leaf_keys := c.Value[144:]
+   var el_gamal ElGamal
+   decrypted := el_gamal.Decrypt(rootKeyInfo[:128], key.Key.D)
+   var CI [16]byte
+   var CK [16]byte
+   for i := range 16 {
+      CI[i] = decrypted[i*2]
+      CK[i] = decrypted[i*2+1]
+   }
+   magic_constant_zero, err := hex.DecodeString("7ee9ed4af773224f00b8ea7efb027cbb")
    if err != nil {
       return err
    }
-   ld.EncryptKey.LoadBytes(EncryptionKey)
-   ld.SigningKey.LoadBytes(SigningKey)
-   ld.Version = ClientVersion
+   rgb_uplink_xkey := XorKey(CK[:], magic_constant_zero)
+   content_key_prime, err := aes_ecb_encrypt(rgb_uplink_xkey, CK[:])
+   if err != nil {
+      return err
+   }
+   aux_key_calc, err := aes_ecb_encrypt(
+      aux_keys.Keys[0].Key[:], content_key_prime,
+   )
+   if err != nil {
+      return err
+   }
+   var zero [16]byte
+   up_link_xkey := XorKey(aux_key_calc, zero[:])
+   o_secondary_key, err := aes_ecb_encrypt(root_key, CK[:])
+   if err != nil {
+      return err
+   }
+   rgb_key, err := aes_ecb_encrypt(leaf_keys, up_link_xkey)
+   if err != nil {
+      return err
+   }
+   rgb_key, err = aes_ecb_encrypt(rgb_key, o_secondary_key)
+   if err != nil {
+      return err
+   }
+   c.Integrity.Decode(rgb_key[:])
+   rgb_key = rgb_key[16:]
+   c.Key.Decode(rgb_key[:])
+   return nil
+}
+
+func XorKey(root, second []byte) []byte {
+   data := make([]byte, len(second))
+   copy(data, root)
+   for i := range 16 {
+      data[i] ^= second[i]
+   }
+   return data
+}
+
+func (c *ContentKey) Decrypt(key EcKey, aux_keys *AuxKeys) error {
+   switch c.CipherType {
+   case 3:
+      decrypted := c.ECC256(key)
+      c.Integrity.Decode(decrypted)
+      decrypted = decrypted[16:]
+      c.Key.Decode(decrypted)
+      return nil
+   case 6:
+      return c.Scalable(key, aux_keys)
+   }
+   return errors.New("cant decrypt key")
+}
+
+func (c *ContentKey) ECC256(key EcKey) []byte {
+   var el_gamal ElGamal
+   return el_gamal.Decrypt(c.Value, key.Key.D)
+}
+
+type ContentKey struct {
+   KeyId      Guid
+   KeyType    uint16
+   CipherType uint16
+   Length     uint16
+   Value      []byte
+   Integrity  Guid
+   Key        Guid
+}
+
+func (c *ContentKey) Decode(data []byte) error {
+   c.KeyId.Decode(data[:])
+   data = data[16:]
+   c.KeyType = binary.BigEndian.Uint16(data)
+   data = data[2:]
+
+   c.CipherType = binary.BigEndian.Uint16(data)
+   data = data[2:]
+
+   c.Length = binary.BigEndian.Uint16(data)
+   data = data[2:]
+
+   c.Value = make([]byte, c.Length)
+
+   copy(c.Value[:], data)
+
    return nil
 }
