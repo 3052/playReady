@@ -12,6 +12,61 @@ import (
    "slices"
 )
 
+func (e *Envelope) New(
+   cert_chain *Chain, signing_key EcKey, kid string,
+) error {
+   var key XmlKey
+   err := key.New()
+   if err != nil {
+      return err
+   }
+   cipher_data, err := get_cipher_data(cert_chain, &key)
+   if err != nil {
+      return err
+   }
+   var la_value La
+   err = la_value.New(&key, cipher_data, kid)
+   if err != nil {
+      return err
+   }
+   la_data, err := xml.Marshal(la_value)
+   if err != nil {
+      return err
+   }
+   la_digest := sha256.Sum256(la_data)
+   var signed_info SignedInfo
+   signed_info.New(la_digest[:])
+   signed_data, err := xml.Marshal(signed_info)
+   if err != nil {
+      return err
+   }
+   signed_digest := sha256.Sum256(signed_data)
+   r, s, err := ecdsa.Sign(Fill, signing_key.Key, signed_digest[:])
+   if err != nil {
+      return err
+   }
+   sig := append(r.Bytes(), s.Bytes()...)
+   *e = Envelope{
+      Soap: "http://schemas.xmlsoap.org/soap/envelope/",
+      Body: Body{
+         AcquireLicense: &AcquireLicense{
+            XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols",
+            Challenge: Challenge{
+               Challenge: InnerChallenge{
+                  XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols/messages",
+                  La:    la_value,
+                  Signature: Signature{
+                     SignedInfo:     signed_info,
+                     SignatureValue: base64.StdEncoding.EncodeToString(sig),
+                  },
+               },
+            },
+         },
+      },
+   }
+   return nil
+}
+
 func get_cipher_data(
    cert_chain *Chain, key *XmlKey,
 ) ([]byte, error) {
@@ -146,59 +201,4 @@ func (c *Chain) Encode() []byte {
       data = append(data, cert1.Encode()...)
    }
    return data
-}
-
-func (e *Envelope) New(
-   cert_chain *Chain, signing_key EcKey, kid string,
-) error {
-   var key XmlKey
-   err := key.New()
-   if err != nil {
-      return err
-   }
-   cipher_data, err := get_cipher_data(cert_chain, &key)
-   if err != nil {
-      return err
-   }
-   var la_value La
-   err = la_value.New(&key, cipher_data, kid)
-   if err != nil {
-      return err
-   }
-   la_data, err := xml.Marshal(la_value)
-   if err != nil {
-      return err
-   }
-   la_digest := sha256.Sum256(la_data)
-   var signed_info SignedInfo
-   signed_info.New(la_digest[:])
-   signed_data, err := xml.Marshal(signed_info)
-   if err != nil {
-      return err
-   }
-   signed_digest := sha256.Sum256(signed_data)
-   r, s, err := ecdsa.Sign(Fill, signing_key.Key, signed_digest[:])
-   if err != nil {
-      return err
-   }
-   sig := append(r.Bytes(), s.Bytes()...)
-   *e = Envelope{
-      Soap: "http://schemas.xmlsoap.org/soap/envelope/",
-      Body: Body{
-         AcquireLicense: AcquireLicense{
-            XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols",
-            Challenge: Challenge{
-               Challenge: InnerChallenge{
-                  XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols/messages",
-                  La:    la_value,
-                  Signature: Signature{
-                     SignedInfo:     signed_info,
-                     SignatureValue: base64.StdEncoding.EncodeToString(sig),
-                  },
-               },
-            },
-         },
-      },
-   }
-   return nil
 }

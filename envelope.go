@@ -6,13 +6,31 @@ import (
 )
 
 type Envelope struct {
-   XMLName xml.Name `xml:"soap:Envelope"`
-   Soap    string   `xml:"xmlns:soap,attr"`
-   Body    Body     `xml:"soap:Body"`
+   XMLName xml.Name
+   Soap    Soap `xml:"soap,attr"`
+   Body    Body `xml:"soap:Body"`
 }
 
 type Body struct {
-   AcquireLicense AcquireLicense
+   AcquireLicense *AcquireLicense
+}
+
+type Soap string
+
+func (s Soap) MarshalXMLAttr(name xml.Name) (xml.Attr, error) {
+   name.Local = "xmlns:soap"
+   return xml.Attr{name, string(s)}, nil
+}
+
+func (e Envelope) MarshalXML(encode *xml.Encoder, _ xml.StartElement) error {
+   type value Envelope
+   e.XMLName = xml.Name{Local: "soap:Envelope"}
+   return encode.Encode(value(e))
+}
+
+type AcquireLicense struct {
+   XmlNs     string    `xml:"xmlns,attr"`
+   Challenge Challenge `xml:"challenge"`
 }
 
 func (v *La) New(key *XmlKey, cipher_data []byte, kid string) error {
@@ -71,11 +89,6 @@ func (v *La) New(key *XmlKey, cipher_data []byte, kid string) error {
       },
    }
    return nil
-}
-
-type AcquireLicense struct {
-   XmlNs     string    `xml:"xmlns,attr"`
-   Challenge Challenge `xml:"challenge"`
 }
 
 type Challenge struct {
