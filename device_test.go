@@ -72,6 +72,7 @@ func TestDevice(t *testing.T) {
       t.Fatal(".Key")
    }
 }
+
 var device_test = struct {
    content string
    key     string
