@@ -120,6 +120,9 @@ type Body struct {
          }
       }
    }
+   Fault *struct {
+      Fault string `xml:"faultstring"`
+   }
 }
 
 func (v *La) New(key *XmlKey, cipher_data []byte, kid string) error {

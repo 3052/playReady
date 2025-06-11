@@ -8,6 +8,86 @@ import (
    "errors"
 )
 
+func (ld *LocalDevice) ParseLicense(data []byte) (*KeyData, error) {
+   var response EnvelopeResponse
+   err := xml.Unmarshal(data, &response)
+   if err != nil {
+      return nil, err
+   }
+   if fault := response.Body.Fault; fault != nil {
+      return nil, errors.New(fault.Fault)
+   }
+   var license LicenseResponse
+   err = license.Parse(response.
+      Body.
+      AcquireLicenseResponse.
+      AcquireLicenseResult.
+      Response.
+      LicenseResponse.
+      Licenses.
+      License,
+   )
+   if err != nil {
+      return nil, err
+   }
+   if !bytes.Equal(license.ECCKeyObject.Value, ld.EncryptKey.PublicBytes()) {
+      return nil, errors.New("license response is not for this device")
+   }
+   err = license.ContentKeyObject.Decrypt(ld.EncryptKey, license.AuxKeyObject)
+   if err != nil {
+      return nil, err
+   }
+   err = license.Verify(license.ContentKeyObject.Integrity.Bytes())
+   if err != nil {
+      return nil, err
+   }
+   return &KeyData{
+      license.ContentKeyObject.KeyId, license.ContentKeyObject.Key,
+   }, nil
+}
+
+func XorKey(root, second []byte) []byte {
+   data := make([]byte, len(second))
+   copy(data, root)
+   for i := range 16 {
+      data[i] ^= second[i]
+   }
+   return data
+}
+
+func (c *ContentKey) ECC256(key EcKey) []byte {
+   var el_gamal ElGamal
+   return el_gamal.Decrypt(c.Value, key.Key.D)
+}
+
+type ContentKey struct {
+   KeyId      Guid
+   KeyType    uint16
+   CipherType uint16
+   Length     uint16
+   Value      []byte
+   Integrity  Guid
+   Key        Guid
+}
+
+func (c *ContentKey) Decode(data []byte) error {
+   c.KeyId.Decode(data[:])
+   data = data[16:]
+   c.KeyType = binary.BigEndian.Uint16(data)
+   data = data[2:]
+
+   c.CipherType = binary.BigEndian.Uint16(data)
+   data = data[2:]
+
+   c.Length = binary.BigEndian.Uint16(data)
+   data = data[2:]
+
+   c.Value = make([]byte, c.Length)
+
+   copy(c.Value[:], data)
+
+   return nil
+}
 // testweb.playready.microsoft.com
 // https://test.playready.microsoft.com/service/rightsmanager.asmx?cfg=(persist:false,ck:AAAAAAAAAAAAAAAAAAAAAA==,ckt:aescbc)
 // that url will force it as scalable response
@@ -81,80 +161,3 @@ type LocalDevice struct {
    SigningKey       EcKey
 }
 
-func (ld *LocalDevice) ParseLicense(data []byte) (*KeyData, error) {
-   var response EnvelopeResponse
-   err := xml.Unmarshal(data, &response)
-   if err != nil {
-      return nil, err
-   }
-   var license LicenseResponse
-   err = license.Parse(response.
-      Body.
-      AcquireLicenseResponse.
-      AcquireLicenseResult.
-      Response.
-      LicenseResponse.
-      Licenses.
-      License,
-   )
-   if err != nil {
-      return nil, err
-   }
-   if !bytes.Equal(license.ECCKeyObject.Value, ld.EncryptKey.PublicBytes()) {
-      return nil, errors.New("license response is not for this device")
-   }
-   err = license.ContentKeyObject.Decrypt(ld.EncryptKey, license.AuxKeyObject)
-   if err != nil {
-      return nil, err
-   }
-   err = license.Verify(license.ContentKeyObject.Integrity.Bytes())
-   if err != nil {
-      return nil, err
-   }
-   return &KeyData{
-      license.ContentKeyObject.KeyId, license.ContentKeyObject.Key,
-   }, nil
-}
-
-func XorKey(root, second []byte) []byte {
-   data := make([]byte, len(second))
-   copy(data, root)
-   for i := range 16 {
-      data[i] ^= second[i]
-   }
-   return data
-}
-
-func (c *ContentKey) ECC256(key EcKey) []byte {
-   var el_gamal ElGamal
-   return el_gamal.Decrypt(c.Value, key.Key.D)
-}
-
-type ContentKey struct {
-   KeyId      Guid
-   KeyType    uint16
-   CipherType uint16
-   Length     uint16
-   Value      []byte
-   Integrity  Guid
-   Key        Guid
-}
-
-func (c *ContentKey) Decode(data []byte) error {
-   c.KeyId.Decode(data[:])
-   data = data[16:]
-   c.KeyType = binary.BigEndian.Uint16(data)
-   data = data[2:]
-
-   c.CipherType = binary.BigEndian.Uint16(data)
-   data = data[2:]
-
-   c.Length = binary.BigEndian.Uint16(data)
-   data = data[2:]
-
-   c.Value = make([]byte, c.Length)
-
-   copy(c.Value[:], data)
-
-   return nil
-}

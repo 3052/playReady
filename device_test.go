@@ -43,25 +43,11 @@ func TestScalable(t *testing.T) {
       t.Fatal(err)
    }
    defer resp.Body.Close()
-   data1, err := io.ReadAll(resp.Body)
+   data, err = io.ReadAll(resp.Body)
    if err != nil {
       t.Fatal(err)
    }
-   if resp.StatusCode != http.StatusOK {
-      var envelope struct {
-         Body struct {
-            Fault struct {
-               Fault string `xml:"faultstring"`
-            }
-         }
-      }
-      err = xml.Unmarshal(data1, &envelope)
-      if err != nil {
-         t.Fatal(err)
-      }
-      t.Fatal(envelope)
-   }
-   key, err := device.ParseLicense(data1)
+   key, err := device.ParseLicense(data)
    if err != nil {
       t.Fatal(err)
    }
@@ -106,25 +92,11 @@ func TestDevice(t *testing.T) {
       t.Fatal(err)
    }
    defer resp.Body.Close()
-   data1, err := io.ReadAll(resp.Body)
+   data, err = io.ReadAll(resp.Body)
    if err != nil {
       t.Fatal(err)
    }
-   if resp.StatusCode != http.StatusOK {
-      var envelope struct {
-         Body struct {
-            Fault struct {
-               Fault string `xml:"faultstring"`
-            }
-         }
-      }
-      err = xml.Unmarshal(data1, &envelope)
-      if err != nil {
-         t.Fatal(err)
-      }
-      t.Fatal(envelope)
-   }
-   key, err := device.ParseLicense(data1)
+   key, err := device.ParseLicense(data)
    if err != nil {
       t.Fatal(err)
    }
@@ -143,7 +115,7 @@ var device_test = struct {
    url     string
 }{
    // THIS URL GETS LOCKED TO DEVICE ON FIRST REQUEST
-   url:     "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=8e19eb98-3700-490f-97b9-dab1856eb359",
+   url:     "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=1b1e3d8c-abf2-440b-a139-5621cecd13bc",
    content: "rakuten.tv/cz?content_type=movies&content_id=transvulcania-the-people-s-run",
    key:     "ab82952e8b567a2359393201e4dde4b4",
    key_id:  "318f7ece69afcfe3e96de31be6b77272",
