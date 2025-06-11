@@ -11,7 +11,65 @@ import (
    "encoding/xml"
    "errors"
    "slices"
+   // "crypto/rand"
 )
+
+func (v *LocalDevice) envelope(kid string) (*Envelope, error) {
+   var key XmlKey
+   err := key.New()
+   if err != nil {
+      return nil, err
+   }
+   cipher_data, err := get_cipher_data(&v.CertificateChain, &key)
+   if err != nil {
+      return nil, err
+   }
+   var la_value La
+   err = la_value.New(&key, cipher_data, kid)
+   if err != nil {
+      return nil, err
+   }
+   la_data, err := xml.Marshal(la_value)
+   if err != nil {
+      return nil, err
+   }
+   la_digest := sha256.Sum256(la_data)
+   signed_info := SignedInfo{
+      XmlNs: "http://www.w3.org/2000/09/xmldsig#",
+      Reference: Reference{
+         Uri:         "#SignedData",
+         DigestValue: base64.StdEncoding.EncodeToString(la_digest[:]),
+      },
+   }
+   signed_data, err := xml.Marshal(signed_info)
+   if err != nil {
+      return nil, err
+   }
+   signed_digest := sha256.Sum256(signed_data)
+   r, s, err := ecdsa.Sign(Fill, v.SigningKey.Key, signed_digest[:])
+   if err != nil {
+      return nil, err
+   }
+   sign := append(r.Bytes(), s.Bytes()...)
+   return &Envelope{
+      Soap: "http://schemas.xmlsoap.org/soap/envelope/",
+      Body: Body{
+         AcquireLicense: &AcquireLicense{
+            XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols",
+            Challenge: Challenge{
+               Challenge: InnerChallenge{
+                  XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols/messages",
+                  La:    la_value,
+                  Signature: Signature{
+                     SignedInfo:     signed_info,
+                     SignatureValue: base64.StdEncoding.EncodeToString(sign),
+                  },
+               },
+            },
+         },
+      },
+   }, nil
+}
 
 func (c *Chain) Verify() bool {
    ModelBase := c.Certs[len(c.Certs)-1].SignatureData.IssuerKey
@@ -63,9 +121,8 @@ func (c *Chain) Encode() []byte {
    }
    return data
 }
-func get_cipher_data(
-   cert_chain *Chain, key *XmlKey,
-) ([]byte, error) {
+
+func get_cipher_data(cert_chain *Chain, key *XmlKey) ([]byte, error) {
    data1, err := xml.Marshal(Data{
       CertificateChains: CertificateChains{
          CertificateChain: base64.StdEncoding.EncodeToString(cert_chain.Encode()),
@@ -81,15 +138,6 @@ func get_cipher_data(
    return append(key.AesIv[:], data1...), nil
 }
 
-type Chain struct {
-   Magic     [4]byte
-   Version   uint32
-   Length    uint32
-   Flags     uint32
-   CertCount uint32
-   Certs     []Cert
-}
-
 type Filler byte
 
 // github.com/golang/go/issues/58454
@@ -100,13 +148,21 @@ func (f Filler) Read(data []byte) (int, error) {
    return len(data), nil
 }
 
-var Fill Filler = '!'
+type Chain struct {
+   Magic     [4]byte
+   Version   uint32
+   Length    uint32
+   Flags     uint32
+   CertCount uint32
+   Certs     []Cert
+}
 
-///
+var Fill Filler = '!'
 
 func (e *EcKey) New() error {
    var err error
    e.Key, err = ecdsa.GenerateKey(elliptic.P256(), Fill)
+   //e.Key, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
    if err != nil {
       return err
    }
@@ -115,6 +171,7 @@ func (e *EcKey) New() error {
 
 func (x *XmlKey) New() error {
    key, err := ecdsa.GenerateKey(elliptic.P256(), Fill)
+   //key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
    if err != nil {
       return err
    }
@@ -123,61 +180,6 @@ func (x *XmlKey) New() error {
    n := copy(x.AesIv[:], Aes)
    Aes = Aes[n:]
    copy(x.AesKey[:], Aes)
-   return nil
-}
-
-func (e *Envelope) New(
-   cert_chain *Chain, signing_key EcKey, kid string,
-) error {
-   var key XmlKey
-   err := key.New()
-   if err != nil {
-      return err
-   }
-   cipher_data, err := get_cipher_data(cert_chain, &key)
-   if err != nil {
-      return err
-   }
-   var la_value La
-   err = la_value.New(&key, cipher_data, kid)
-   if err != nil {
-      return err
-   }
-   la_data, err := xml.Marshal(la_value)
-   if err != nil {
-      return err
-   }
-   la_digest := sha256.Sum256(la_data)
-   var signed_info SignedInfo
-   signed_info.New(la_digest[:])
-   signed_data, err := xml.Marshal(signed_info)
-   if err != nil {
-      return err
-   }
-   signed_digest := sha256.Sum256(signed_data)
-   r, s, err := ecdsa.Sign(Fill, signing_key.Key, signed_digest[:])
-   if err != nil {
-      return err
-   }
-   sig := append(r.Bytes(), s.Bytes()...)
-   *e = Envelope{
-      Soap: "http://schemas.xmlsoap.org/soap/envelope/",
-      Body: Body{
-         AcquireLicense: &AcquireLicense{
-            XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols",
-            Challenge: Challenge{
-               Challenge: InnerChallenge{
-                  XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols/messages",
-                  La:    la_value,
-                  Signature: Signature{
-                     SignedInfo:     signed_info,
-                     SignatureValue: base64.StdEncoding.EncodeToString(sig),
-                  },
-               },
-            },
-         },
-      },
-   }
    return nil
 }
 
@@ -211,25 +213,25 @@ func (c *Chain) CreateLeaf(ModelKey, SigningKey, EncryptKey EcKey) error {
    ManufacturerFtlv.New(0, 7, c.Certs[0].ManufacturerInfo.Encode())
    FeatureFtlv.New(1, 5, c.Certs[0].Features.Encode())
    DeviceFtlv.New(1, 4, NewDevice.Encode())
-   NewLeafData := CertificateFtlv.Encode()
-   NewLeafData = append(NewLeafData, DeviceFtlv.Encode()...)
-   NewLeafData = append(NewLeafData, FeatureFtlv.Encode()...)
-   NewLeafData = append(NewLeafData, KeyInfoFtlv.Encode()...)
-   NewLeafData = append(NewLeafData, ManufacturerFtlv.Encode()...)
+   leaf_data := CertificateFtlv.Encode()
+   leaf_data = append(leaf_data, DeviceFtlv.Encode()...)
+   leaf_data = append(leaf_data, FeatureFtlv.Encode()...)
+   leaf_data = append(leaf_data, KeyInfoFtlv.Encode()...)
+   leaf_data = append(leaf_data, ManufacturerFtlv.Encode()...)
    var UnsignedCert Cert
-   UnsignedCert.NewNoSig(NewLeafData)
+   UnsignedCert.NewNoSig(leaf_data)
    SignatureDigest := sha256.Sum256(UnsignedCert.Encode())
    r, s, err := ecdsa.Sign(Fill, ModelKey.Key, SignatureDigest[:])
+   //r, s, err := ecdsa.Sign(rand.Reader, ModelKey.Key, SignatureDigest[:])
    if err != nil {
       return err
    }
-   sig := r.Bytes()
-   sig = append(sig, s.Bytes()...)
-   SignatureData.New(sig, ModelKey.PublicBytes())
+   sign := append(r.Bytes(), s.Bytes()...)
+   SignatureData.New(sign, ModelKey.PublicBytes())
    SignatureFtlv.New(1, 8, SignatureData.Encode())
-   NewLeafData = append(NewLeafData, SignatureFtlv.Encode()...)
-   UnsignedCert.Length = uint32(len(NewLeafData)) + 16
-   UnsignedCert.RawData = NewLeafData
+   leaf_data = append(leaf_data, SignatureFtlv.Encode()...)
+   UnsignedCert.Length = uint32(len(leaf_data)) + 16
+   UnsignedCert.RawData = leaf_data
    c.Length += UnsignedCert.Length
    c.CertCount += 1
    c.Certs = slices.Insert(c.Certs, 0, UnsignedCert)

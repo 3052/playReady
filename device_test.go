@@ -10,21 +10,6 @@ import (
    "testing"
 )
 
-var device_test = struct {
-   content string
-   key     string
-   key_id  string
-   url     string
-}{
-   // THIS URL GETS LOCKED TO DEVICE ON FIRST REQUEST
-   url:     "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=8e19eb98-3700-490f-97b9-dab1856eb359",
-   content: "rakuten.tv/cz?content_type=movies&content_id=transvulcania-the-people-s-run",
-   key:     "ab82952e8b567a2359393201e4dde4b4",
-   key_id:  "318f7ece69afcfe3e96de31be6b77272",
-}
-
-const kid = "zn6PMa9p48/pbeMb5rdycg=="
-
 func TestDevice(t *testing.T) {
    var device LocalDevice
    data, err := os.ReadFile(tester.dir + "chain.txt")
@@ -45,8 +30,7 @@ func TestDevice(t *testing.T) {
       t.Fatal(err)
    }
    device.EncryptKey.LoadBytes(data)
-   var envelope1 Envelope
-   err = envelope1.New(&device.CertificateChain, device.SigningKey, kid)
+   envelope1, err := device.envelope(kid)
    if err != nil {
       t.Fatal(err)
    }
@@ -88,3 +72,18 @@ func TestDevice(t *testing.T) {
       t.Fatal(".Key")
    }
 }
+var device_test = struct {
+   content string
+   key     string
+   key_id  string
+   url     string
+}{
+   // THIS URL GETS LOCKED TO DEVICE ON FIRST REQUEST
+   url:     "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=8e19eb98-3700-490f-97b9-dab1856eb359",
+   content: "rakuten.tv/cz?content_type=movies&content_id=transvulcania-the-people-s-run",
+   key:     "ab82952e8b567a2359393201e4dde4b4",
+   key_id:  "318f7ece69afcfe3e96de31be6b77272",
+}
+
+const kid = "zn6PMa9p48/pbeMb5rdycg=="
+
