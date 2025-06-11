@@ -8,6 +8,73 @@ import (
    "errors"
 )
 
+// testweb.playready.microsoft.com
+// https://test.playready.microsoft.com/service/rightsmanager.asmx?cfg=(persist:false,ck:AAAAAAAAAAAAAAAAAAAAAA==,ckt:aescbc)
+// that url will force it as scalable response
+// with key as all 0s
+func (c *ContentKey) Scalable(key EcKey, aux_keys *AuxKeys) error {
+   rootKeyInfo := c.Value[:144]
+   root_key := rootKeyInfo[128:]
+   leaf_keys := c.Value[144:]
+   var el_gamal ElGamal
+   decrypted := el_gamal.Decrypt(rootKeyInfo[:128], key.Key.D)
+   var (
+      CI [16]byte
+      CK [16]byte
+   )
+   for i := range 16 {
+      CI[i] = decrypted[i*2]
+      CK[i] = decrypted[i*2+1]
+   }
+   magic_constant_zero, err := hex.DecodeString("7ee9ed4af773224f00b8ea7efb027cbb")
+   if err != nil {
+      return err
+   }
+   rgb_uplink_xkey := XorKey(CK[:], magic_constant_zero)
+   content_key_prime, err := aes_ecb_encrypt(rgb_uplink_xkey, CK[:])
+   if err != nil {
+      return err
+   }
+   aux_key_calc, err := aes_ecb_encrypt(
+      aux_keys.Keys[0].Key[:], content_key_prime,
+   )
+   if err != nil {
+      return err
+   }
+   var zero [16]byte
+   up_link_xkey := XorKey(aux_key_calc, zero[:])
+   o_secondary_key, err := aes_ecb_encrypt(root_key, CK[:])
+   if err != nil {
+      return err
+   }
+   rgb_key, err := aes_ecb_encrypt(leaf_keys, up_link_xkey)
+   if err != nil {
+      return err
+   }
+   rgb_key, err = aes_ecb_encrypt(rgb_key, o_secondary_key)
+   if err != nil {
+      return err
+   }
+   c.Integrity.Decode(rgb_key[:])
+   rgb_key = rgb_key[16:]
+   c.Key.Decode(rgb_key[:])
+   return nil
+}
+
+func (c *ContentKey) Decrypt(key EcKey, aux_keys *AuxKeys) error {
+   switch c.CipherType {
+   case 3:
+      decrypted := c.ECC256(key)
+      c.Integrity.Decode(decrypted)
+      decrypted = decrypted[16:]
+      c.Key.Decode(decrypted)
+      return nil
+   case 6:
+      return c.Scalable(key, aux_keys)
+   }
+   return errors.New("cant decrypt key")
+}
+
 type LocalDevice struct {
    CertificateChain Chain
    EncryptKey       EcKey
@@ -49,53 +116,6 @@ func (ld *LocalDevice) ParseLicense(data []byte) (*KeyData, error) {
    }, nil
 }
 
-func (c *ContentKey) Scalable(key EcKey, aux_keys *AuxKeys) error {
-   rootKeyInfo := c.Value[:144]
-   root_key := rootKeyInfo[128:]
-   leaf_keys := c.Value[144:]
-   var el_gamal ElGamal
-   decrypted := el_gamal.Decrypt(rootKeyInfo[:128], key.Key.D)
-   var CI [16]byte
-   var CK [16]byte
-   for i := range 16 {
-      CI[i] = decrypted[i*2]
-      CK[i] = decrypted[i*2+1]
-   }
-   magic_constant_zero, err := hex.DecodeString("7ee9ed4af773224f00b8ea7efb027cbb")
-   if err != nil {
-      return err
-   }
-   rgb_uplink_xkey := XorKey(CK[:], magic_constant_zero)
-   content_key_prime, err := aes_ecb_encrypt(rgb_uplink_xkey, CK[:])
-   if err != nil {
-      return err
-   }
-   aux_key_calc, err := aes_ecb_encrypt(
-      aux_keys.Keys[0].Key[:], content_key_prime,
-   )
-   if err != nil {
-      return err
-   }
-   var zero [16]byte
-   up_link_xkey := XorKey(aux_key_calc, zero[:])
-   o_secondary_key, err := aes_ecb_encrypt(root_key, CK[:])
-   if err != nil {
-      return err
-   }
-   rgb_key, err := aes_ecb_encrypt(leaf_keys, up_link_xkey)
-   if err != nil {
-      return err
-   }
-   rgb_key, err = aes_ecb_encrypt(rgb_key, o_secondary_key)
-   if err != nil {
-      return err
-   }
-   c.Integrity.Decode(rgb_key[:])
-   rgb_key = rgb_key[16:]
-   c.Key.Decode(rgb_key[:])
-   return nil
-}
-
 func XorKey(root, second []byte) []byte {
    data := make([]byte, len(second))
    copy(data, root)
@@ -103,20 +123,6 @@ func XorKey(root, second []byte) []byte {
       data[i] ^= second[i]
    }
    return data
-}
-
-func (c *ContentKey) Decrypt(key EcKey, aux_keys *AuxKeys) error {
-   switch c.CipherType {
-   case 3:
-      decrypted := c.ECC256(key)
-      c.Integrity.Decode(decrypted)
-      decrypted = decrypted[16:]
-      c.Key.Decode(decrypted)
-      return nil
-   case 6:
-      return c.Scalable(key, aux_keys)
-   }
-   return errors.New("cant decrypt key")
 }
 
 func (c *ContentKey) ECC256(key EcKey) []byte {

@@ -10,6 +10,69 @@ import (
    "testing"
 )
 
+func TestScalable(t *testing.T) {
+   var device LocalDevice
+   data, err := os.ReadFile(tester.dir + "chain.txt")
+   if err != nil {
+      t.Fatal(err)
+   }
+   err = device.CertificateChain.Decode(data)
+   if err != nil {
+      t.Fatal(err)
+   }
+   data, err = os.ReadFile(tester.dir + "signing_key.txt")
+   if err != nil {
+      t.Fatal(err)
+   }
+   device.SigningKey.LoadBytes(data)
+   data, err = os.ReadFile(tester.dir + "encrypt_key.txt")
+   if err != nil {
+      t.Fatal(err)
+   }
+   device.EncryptKey.LoadBytes(data)
+   envelope1, err := device.envelope(kid)
+   if err != nil {
+      t.Fatal(err)
+   }
+   data, err = xml.Marshal(envelope1)
+   if err != nil {
+      t.Fatal(err)
+   }
+   resp, err := http.Post(device_test.url, "", bytes.NewReader(data))
+   if err != nil {
+      t.Fatal(err)
+   }
+   defer resp.Body.Close()
+   data1, err := io.ReadAll(resp.Body)
+   if err != nil {
+      t.Fatal(err)
+   }
+   if resp.StatusCode != http.StatusOK {
+      var envelope struct {
+         Body struct {
+            Fault struct {
+               Fault string `xml:"faultstring"`
+            }
+         }
+      }
+      err = xml.Unmarshal(data1, &envelope)
+      if err != nil {
+         t.Fatal(err)
+      }
+      t.Fatal(envelope)
+   }
+   key, err := device.ParseLicense(data1)
+   if err != nil {
+      t.Fatal(err)
+   }
+   if hex.EncodeToString(key.KeyId.Encode()) != device_test.key_id {
+      t.Fatal(".KeyId")
+   }
+   if hex.EncodeToString(key.Key.Bytes()) != device_test.key {
+      t.Fatal(".Key")
+   }
+}
+
 func TestDevice(t *testing.T) {
    var device LocalDevice
    data, err := os.ReadFile(tester.dir + "chain.txt")
@@ -87,4 +150,3 @@ var device_test = struct {
 }
 
 const kid = "zn6PMa9p48/pbeMb5rdycg=="
-
