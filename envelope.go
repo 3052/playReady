@@ -7,6 +7,10 @@ import (
    "encoding/xml"
 )
 
+type Data struct {
+   CertificateChains CertificateChains
+}
+
 func get_cipher_data(cert_chain *Chain, key *XmlKey) ([]byte, error) {
    data1, err := xml.Marshal(Data{
       CertificateChains: CertificateChains{
@@ -78,10 +82,6 @@ func (v *LocalDevice) envelope(kid string) (*Envelope, error) {
          },
       },
    }, nil
-}
-
-type Data struct {
-   CertificateChains CertificateChains
 }
 
 type Envelope struct {
