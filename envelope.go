@@ -261,7 +261,7 @@ func get_cipher_data(cert_chain *Chain, key *XmlKey) ([]byte, error) {
          CertificateChain: base64.StdEncoding.EncodeToString(cert_chain.Encode()),
       },
       Features: Features{
-         Feature: Feature{"AESCBC"},
+         Feature: Feature{"AESCBC"}, // SCALABLE
       },
    })
    if err != nil {

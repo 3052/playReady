@@ -78,19 +78,19 @@ func (l *LicenseResponse) Decode(data []byte) error {
             }
             switch XmrType(ftlv2.Type) {
             case CONTENT_KEY_ENTRY_TYPE: // 10
-               l.ContentKeyObject = new(ContentKey)
+               l.ContentKeyObject = &ContentKey{}
                err = l.ContentKeyObject.Decode(ftlv2.Value)
                if err != nil {
                   return err
                }
             case DEVICE_KEY_ENTRY_TYPE: // 42
-               l.ECCKeyObject = new(ECCKey)
+               l.ECCKeyObject = &ECCKey{}
                err = l.ECCKeyObject.Decode(ftlv2.Value)
                if err != nil {
                   return err
                }
             case AUX_KEY_ENTRY_TYPE: // 81
-               l.AuxKeyObject = new(AuxKeys)
+               l.AuxKeyObject = &AuxKeys{}
                err = l.AuxKeyObject.Decode(ftlv2.Value)
                if err != nil {
                   return err
@@ -101,7 +101,7 @@ func (l *LicenseResponse) Decode(data []byte) error {
             j += k
          }
       case SIGNATURE_ENTRY_TYPE: // 11
-         l.SignatureObject = new(license.Signature)
+         l.SignatureObject = &license.Signature{}
          err := l.SignatureObject.Decode(ftlv.Value)
          l.SignatureObject.Length = uint16(ftlv.Length)
          if err != nil {

@@ -11,8 +11,23 @@ import (
    "testing"
 )
 
-// var tester = SL2000
+// some SL2000 do not work with scalable
 var tester = SL3000
+
+var rakuten = struct {
+   content string
+   key     string
+   url     string
+   kid_wv  string
+   kid_pr  string
+}{
+   // THIS URL GETS LOCKED TO DEVICE ON FIRST REQUEST
+   url:     "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=54ccdcfc-17a0-49ba-8d4d-a9c145f14e7b",
+   content: "rakuten.tv/cz?content_type=movies&content_id=transvulcania-the-people-s-run",
+   key:     "ab82952e8b567a2359393201e4dde4b4",
+   kid_wv:  "318f7ece69afcfe3e96de31be6b77272",
+   kid_pr:  "zn6PMa9p48/pbeMb5rdycg==",
+}
 
 var SL2000 = device_tester{
    dir: "ignore/SL2000/",
@@ -135,19 +150,4 @@ func TestRakuten(t *testing.T) {
    if hex.EncodeToString(key.Key[:]) != rakuten.key {
       t.Fatal(".Key")
    }
-}
-
-var rakuten = struct {
-   content string
-   key     string
-   url     string
-   kid_wv  string
-   kid_pr  string
-}{
-   // THIS URL GETS LOCKED TO DEVICE ON FIRST REQUEST
-   url:     "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=c8fdafa9-3587-4c58-9bda-8aacd5f5c507",
-   content: "rakuten.tv/cz?content_type=movies&content_id=transvulcania-the-people-s-run",
-   key:     "ab82952e8b567a2359393201e4dde4b4",
-   kid_wv:  "318f7ece69afcfe3e96de31be6b77272",
-   kid_pr:  "zn6PMa9p48/pbeMb5rdycg==",
 }
