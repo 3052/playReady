@@ -11,6 +11,27 @@ import (
    "testing"
 )
 
+// var tester = SL2000
+var tester = SL3000
+
+var SL2000 = device_tester{
+   dir: "ignore/SL2000/",
+   g1:  "g1",
+   z1:  "z1",
+}
+
+var SL3000 = device_tester{
+   dir: "ignore/SL3000/",
+   g1:  "bgroupcert.dat",
+   z1:  "zgpriv.dat",
+}
+
+type device_tester struct {
+   dir string
+   g1  string
+   z1  string
+}
+
 func TestScalable(t *testing.T) {
    var device LocalDevice
    data, err := os.ReadFile(tester.dir + "chain.txt")
@@ -43,8 +64,7 @@ func TestScalable(t *testing.T) {
       t.Fatal(err)
    }
    resp, err := http.Post(
-      // https://test.playready.microsoft.com/service/rightsmanager.asmx?cfg=(persist:false,ck:AAAAAAAAAAAAAAAAAAAAAA==,ckt:aescbc)
-      "https://test.playready.microsoft.com/service/rightsmanager.asmx",
+      "https://test.playready.microsoft.com/service/rightsmanager.asmx?cfg=(persist:false,ck:AAAAAAAAAAAAAAAAAAAAAA==,ckt:aescbc)",
       "text/xml", bytes.NewReader(data),
    )
    if err != nil {
@@ -62,12 +82,10 @@ func TestScalable(t *testing.T) {
    if !bytes.Equal(key.KeyId.Guid(), key_id[:]) {
       t.Fatal(".KeyId")
    }
-   println(
-      hex.EncodeToString(key.Key[:]),
-   )
-   //if hex.EncodeToString(key.Key.Uuid()) != rakuten.key {
-   //   t.Fatal(".Key")
-   //}
+   var zero [16]byte
+   if !bytes.Equal(key.Key[:], zero[:]) {
+      t.Fatal(".Key")
+   }
 }
 
 func TestRakuten(t *testing.T) {
@@ -133,4 +151,3 @@ var rakuten = struct {
    kid_wv:  "318f7ece69afcfe3e96de31be6b77272",
    kid_pr:  "zn6PMa9p48/pbeMb5rdycg==",
 }
-

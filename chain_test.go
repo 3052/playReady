@@ -51,26 +51,6 @@ func TestChain(t *testing.T) {
    }
 }
 
-var SL2000 = device_tester{
-   dir: "ignore/SL2000/",
-   g1:  "g1",
-   z1:  "z1",
-}
-
-var SL3000 = device_tester{
-   dir: "ignore/SL3000/",
-   g1:  "bgroupcert.dat",
-   z1:  "zgpriv.dat",
-}
-
-var tester = SL2000
-
-type device_tester struct {
-   dir string
-   g1  string
-   z1  string
-}
-
 func write_file(name string, data []byte) error {
    log.Println("WriteFile", name)
    return os.WriteFile(name, data, os.ModePerm)

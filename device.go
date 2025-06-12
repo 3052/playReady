@@ -8,20 +8,20 @@ import (
    "errors"
 )
 
-type ContentKey struct {
-   KeyId      Guid
-   KeyType    uint16
-   CipherType uint16
-   Length     uint16
-   Value      []byte
-   Integrity  Guid
-   Key        [16]byte
+func (c *ContentKey) Decrypt(key EcKey, aux_keys *AuxKeys) error {
+   switch c.CipherType {
+   case 3:
+      decrypted := c.ECC256(key)
+      c.Integrity.Decode(decrypted)
+      decrypted = decrypted[16:]
+      copy(c.Key[:], decrypted)
+      return nil
+   case 6:
+      return c.Scalable(key, aux_keys)
+   }
+   return errors.New("cant decrypt key")
 }
 
-// testweb.playready.microsoft.com
-// https://test.playready.microsoft.com/service/rightsmanager.asmx?cfg=(persist:false,ck:AAAAAAAAAAAAAAAAAAAAAA==,ckt:aescbc)
-// that url will force it as scalable response
-// with key as all 0s
 func (c *ContentKey) Scalable(key EcKey, aux_keys *AuxKeys) error {
    rootKeyInfo := c.Value[:144]
    root_key := rootKeyInfo[128:]
@@ -71,18 +71,14 @@ func (c *ContentKey) Scalable(key EcKey, aux_keys *AuxKeys) error {
    return nil
 }
 
-func (c *ContentKey) Decrypt(key EcKey, aux_keys *AuxKeys) error {
-   switch c.CipherType {
-   case 3:
-      decrypted := c.ECC256(key)
-      c.Integrity.Decode(decrypted)
-      decrypted = decrypted[16:]
-      copy(c.Key[:], decrypted)
-      return nil
-   case 6:
-      return c.Scalable(key, aux_keys)
-   }
-   return errors.New("cant decrypt key")
+type ContentKey struct {
+   KeyId      Guid
+   KeyType    uint16
+   CipherType uint16
+   Length     uint16
+   Value      []byte
+   Integrity  Guid
+   Key        [16]byte
 }
 
 type LocalDevice struct {

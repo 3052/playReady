@@ -1,9 +1,113 @@
 package playReady
 
 import (
+   "crypto/ecdsa"
+   "crypto/sha256"
    "encoding/base64"
    "encoding/xml"
 )
+
+func get_cipher_data(cert_chain *Chain, key *XmlKey) ([]byte, error) {
+   data1, err := xml.Marshal(Data{
+      CertificateChains: CertificateChains{
+         CertificateChain: base64.StdEncoding.EncodeToString(cert_chain.Encode()),
+      },
+   })
+   if err != nil {
+      return nil, err
+   }
+   data1, err = aes_cbc_padding_encrypt(data1, key.AesKey[:], key.AesIv[:])
+   if err != nil {
+      return nil, err
+   }
+   return append(key.AesIv[:], data1...), nil
+}
+
+func (v *LocalDevice) envelope(kid string) (*Envelope, error) {
+   var key XmlKey
+   err := key.New()
+   if err != nil {
+      return nil, err
+   }
+   cipher_data, err := get_cipher_data(&v.CertificateChain, &key)
+   if err != nil {
+      return nil, err
+   }
+   var la_value La
+   err = la_value.New(&key, cipher_data, kid)
+   if err != nil {
+      return nil, err
+   }
+   la_data, err := xml.Marshal(la_value)
+   if err != nil {
+      return nil, err
+   }
+   la_digest := sha256.Sum256(la_data)
+   signed_info := SignedInfo{
+      XmlNs: "http://www.w3.org/2000/09/xmldsig#",
+      Reference: Reference{
+         Uri:         "#SignedData",
+         DigestValue: base64.StdEncoding.EncodeToString(la_digest[:]),
+      },
+   }
+   signed_data, err := xml.Marshal(signed_info)
+   if err != nil {
+      return nil, err
+   }
+   signed_digest := sha256.Sum256(signed_data)
+   r, s, err := ecdsa.Sign(Fill, v.SigningKey.Key, signed_digest[:])
+   if err != nil {
+      return nil, err
+   }
+   sign := append(r.Bytes(), s.Bytes()...)
+   return &Envelope{
+      Soap: "http://schemas.xmlsoap.org/soap/envelope/",
+      Body: Body{
+         AcquireLicense: &AcquireLicense{
+            XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols",
+            Challenge: Challenge{
+               Challenge: InnerChallenge{
+                  XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols/messages",
+                  La:    la_value,
+                  Signature: Signature{
+                     SignedInfo:     signed_info,
+                     SignatureValue: base64.StdEncoding.EncodeToString(sign),
+                  },
+               },
+            },
+         },
+      },
+   }, nil
+}
+
+type Data struct {
+   CertificateChains CertificateChains
+}
+
+type Envelope struct {
+   XMLName xml.Name `xml:"soap:Envelope"`
+   Soap    string   `xml:"xmlns:soap,attr"`
+   Body    Body     `xml:"soap:Body"`
+}
+
+type Reference struct {
+   Uri         string `xml:"URI,attr"`
+   DigestValue string
+}
+
+type Signature struct {
+   SignedInfo     SignedInfo
+   SignatureValue string
+}
+
+type SignedInfo struct {
+   XmlNs     string `xml:"xmlns,attr"`
+   Reference Reference
+}
+
+type EnvelopeResponse struct {
+   Body Body
+}
 
 type AcquireLicense struct {
    XmlNs     string    `xml:"xmlns,attr"`
@@ -29,11 +133,6 @@ type La struct {
    EncryptedData EncryptedData
 }
 
-type Signature struct {
-   SignedInfo     SignedInfo
-   SignatureValue string
-}
-
 type ContentHeader struct {
    WrmHeader WrmHeader `xml:"WRMHEADER"`
 }
@@ -52,16 +151,6 @@ type EncryptedData struct {
    EncryptionMethod Algorithm
    KeyInfo          KeyInfo
    CipherData       CipherData
-}
-
-type Reference struct {
-   Uri         string `xml:"URI,attr"`
-   DigestValue string
-}
-
-type SignedInfo struct {
-   XmlNs     string `xml:"xmlns,attr"`
-   Reference Reference
 }
 
 type WrmHeader struct {
@@ -95,16 +184,6 @@ type EncryptedKey struct {
    EncryptionMethod Algorithm
    KeyInfo          EncryptedKeyInfo
    CipherData       CipherData
-}
-
-type Envelope struct {
-   XMLName xml.Name `xml:"soap:Envelope"`
-   Soap    string   `xml:"xmlns:soap,attr"`
-   Body    Body     `xml:"soap:Body"`
-}
-
-type EnvelopeResponse struct {
-   Body Body
 }
 
 type Body struct {

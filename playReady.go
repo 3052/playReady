@@ -310,10 +310,6 @@ type CertificateChains struct {
    CertificateChain string
 }
 
-type Data struct {
-   CertificateChains CertificateChains
-}
-
 type XmlKey struct {
    AesIv     [16]byte
    AesKey    [16]byte
