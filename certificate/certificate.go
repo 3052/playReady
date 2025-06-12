@@ -2,6 +2,25 @@ package certificate
 
 import "encoding/binary"
 
+func (f *Feature) New(Type int) {
+   f.Entries = 1
+   f.Features = []uint32{uint32(Type)}
+}
+
+func (k *KeyInfo) New(SigningKey, EncryptKey []byte) {
+   k.Entries = 2
+   k.Keys = make([]Key, 2)
+   k.Keys[0].New(SigningKey, 1)
+   k.Keys[1].New(EncryptKey, 2)
+}
+
+func (k *Key) New(Key []byte, Type int) {
+   k.Type = 1
+   k.Length = 512
+   copy(k.PublicKey[:], Key)
+   k.Usage.New(Type)
+}
+
 type Key struct {
    Type      uint16
    Length    uint16
@@ -29,18 +48,6 @@ func (k *Key) Decode(data []byte) (int, error) {
    }
    n += n1
    return n, nil
-}
-
-func (k *Key) New(Key []byte, Type int) {
-   k.Type = 1
-   k.Length = 512
-   copy(k.PublicKey[:], Key)
-   k.Usage.New(Type)
-}
-
-func (f *Feature) New(Type int) {
-   f.Entries = 1
-   f.Features = append(f.Features, uint32(Type))
 }
 
 func (f *Feature) Encode() []byte {
@@ -80,13 +87,6 @@ func (k *Key) Encode() []byte {
 type KeyInfo struct {
    Entries uint32
    Keys    []Key
-}
-
-func (k *KeyInfo) New(SigningKey, EncryptKey []byte) {
-   k.Entries = uint32(2)
-   k.Keys = make([]Key, 2)
-   k.Keys[0].New(SigningKey, 1)
-   k.Keys[1].New(EncryptKey, 2)
 }
 
 func (k *KeyInfo) Encode() []byte {

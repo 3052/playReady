@@ -191,7 +191,7 @@ func (v *LocalDevice) envelope(kid string) (*Envelope, error) {
    if err != nil {
       return nil, err
    }
-   cipher_data, err := get_cipher_data(&v.CertificateChain, &key)
+   cipher_data, err := v.CertificateChain.cipher_data(&key)
    if err != nil {
       return nil, err
    }
@@ -253,23 +253,4 @@ type Feature struct {
 type Data struct {
    CertificateChains CertificateChains
    Features          Features
-}
-
-func get_cipher_data(cert_chain *Chain, key *XmlKey) ([]byte, error) {
-   data1, err := xml.Marshal(Data{
-      CertificateChains: CertificateChains{
-         CertificateChain: base64.StdEncoding.EncodeToString(cert_chain.Encode()),
-      },
-      Features: Features{
-         Feature: Feature{"AESCBC"}, // SCALABLE
-      },
-   })
-   if err != nil {
-      return nil, err
-   }
-   data1, err = aes_cbc_padding_encrypt(data1, key.AesKey[:], key.AesIv[:])
-   if err != nil {
-      return nil, err
-   }
-   return append(key.AesIv[:], data1...), nil
 }

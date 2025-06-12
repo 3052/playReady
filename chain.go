@@ -4,12 +4,32 @@ import (
    "41.neocities.org/playReady/certificate"
    "bytes"
    "crypto/ecdsa"
-   "crypto/elliptic"
    "crypto/sha256"
+   "encoding/base64"
    "encoding/binary"
+   "encoding/xml"
    "errors"
    "slices"
 )
+
+func (c *Chain) cipher_data(key *XmlKey) ([]byte, error) {
+   data1, err := xml.Marshal(Data{
+      CertificateChains: CertificateChains{
+         CertificateChain: base64.StdEncoding.EncodeToString(c.Encode()),
+      },
+      Features: Features{
+         Feature: Feature{"AESCBC"}, // SCALABLE
+      },
+   })
+   if err != nil {
+      return nil, err
+   }
+   data1, err = aes_cbc_padding_encrypt(data1, key.AesKey[:], key.AesIv[:])
+   if err != nil {
+      return nil, err
+   }
+   return append(key.AesIv[:], data1...), nil
+}
 
 func (c *Chain) CreateLeaf(ModelKey, SigningKey, EncryptKey EcKey) error {
    if !bytes.Equal(c.Certs[0].KeyData.Keys[0].PublicKey[:], ModelKey.PublicBytes()) {
@@ -39,6 +59,12 @@ func (c *Chain) CreateLeaf(ModelKey, SigningKey, EncryptKey EcKey) error {
    NewDevice.New()
    KeyInfoFtlv.New(1, 6, BuiltKeyInfo.Encode())
    ManufacturerFtlv.New(0, 7, c.Certs[0].ManufacturerInfo.Encode())
+   // SCALABLE with SL2000 /////////////////////////////////////////////
+   feature := c.Certs[0].Features
+   feature.Entries++
+   feature.Features = append(feature.Features, 13)
+   c.Certs[0].Features = feature
+   ///////////////////////////////////////////////////////////////////////
    FeatureFtlv.New(1, 5, c.Certs[0].Features.Encode())
    DeviceFtlv.New(1, 4, NewDevice.Encode())
    leaf_data := CertificateFtlv.Encode()
@@ -86,6 +112,18 @@ func (c *Chain) Verify() bool {
    return true
 }
 
+func (c *Chain) Encode() []byte {
+   data := c.Magic[:]
+   data = binary.BigEndian.AppendUint32(data, c.Version)
+   data = binary.BigEndian.AppendUint32(data, c.Length)
+   data = binary.BigEndian.AppendUint32(data, c.Flags)
+   data = binary.BigEndian.AppendUint32(data, c.CertCount)
+   for _, cert1 := range c.Certs {
+      data = append(data, cert1.Encode()...)
+   }
+   return data
+}
+
 func (c *Chain) Decode(data []byte) error {
    n := copy(c.Magic[:], data)
    if string(c.Magic[:]) != "CHAI" {
@@ -110,51 +148,5 @@ func (c *Chain) Decode(data []byte) error {
       data = data[i:]
       c.Certs = append(c.Certs, cert1)
    }
-   return nil
-}
-
-func (c *Chain) Encode() []byte {
-   data := c.Magic[:]
-   data = binary.BigEndian.AppendUint32(data, c.Version)
-   data = binary.BigEndian.AppendUint32(data, c.Length)
-   data = binary.BigEndian.AppendUint32(data, c.Flags)
-   data = binary.BigEndian.AppendUint32(data, c.CertCount)
-   for _, cert1 := range c.Certs {
-      data = append(data, cert1.Encode()...)
-   }
-   return data
-}
-
-func (e *EcKey) New() error {
-   var err error
-   e.Key, err = ecdsa.GenerateKey(elliptic.P256(), Fill)
-   if err != nil {
-      return err
-   }
-   return nil
-}
-
-type Filler byte
-
-// github.com/golang/go/issues/58454
-func (f Filler) Read(data []byte) (int, error) {
-   for index := range data {
-      data[index] = byte(f)
-   }
-   return len(data), nil
-}
-
-var Fill Filler = '!'
-
-func (x *XmlKey) New() error {
-   key, err := ecdsa.GenerateKey(elliptic.P256(), Fill)
-   if err != nil {
-      return err
-   }
-   x.PublicKey = key.PublicKey
-   Aes := x.PublicKey.X.Bytes()
-   n := copy(x.AesIv[:], Aes)
-   Aes = Aes[n:]
-   copy(x.AesKey[:], Aes)
    return nil
 }

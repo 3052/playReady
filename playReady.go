@@ -10,6 +10,40 @@ import (
    "math/big"
 )
 
+func (x *XmlKey) New() error {
+   key, err := ecdsa.GenerateKey(elliptic.P256(), Fill)
+   if err != nil {
+      return err
+   }
+   x.PublicKey = key.PublicKey
+   Aes := x.PublicKey.X.Bytes()
+   n := copy(x.AesIv[:], Aes)
+   Aes = Aes[n:]
+   copy(x.AesKey[:], Aes)
+   return nil
+}
+
+func (e *EcKey) New() error {
+   var err error
+   e.Key, err = ecdsa.GenerateKey(elliptic.P256(), Fill)
+   if err != nil {
+      return err
+   }
+   return nil
+}
+
+type Filler byte
+
+// github.com/golang/go/issues/58454
+func (f Filler) Read(data []byte) (int, error) {
+   for index := range data {
+      data[index] = byte(f)
+   }
+   return len(data), nil
+}
+
+var Fill Filler = '!'
+
 type XmrType uint16
 
 const (

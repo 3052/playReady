@@ -8,6 +8,39 @@ import (
    "errors"
 )
 
+func XorKey(root, second []byte) []byte {
+   data := make([]byte, len(second))
+   copy(data, root)
+   for i := range 16 {
+      data[i] ^= second[i]
+   }
+   return data
+}
+
+func (c *ContentKey) ECC256(key EcKey) []byte {
+   var el_gamal ElGamal
+   return el_gamal.Decrypt(c.Value, key.Key.D)
+}
+
+func (c *ContentKey) Decode(data []byte) error {
+   c.KeyId.Decode(data[:])
+   data = data[16:]
+   c.KeyType = binary.BigEndian.Uint16(data)
+   data = data[2:]
+
+   c.CipherType = binary.BigEndian.Uint16(data)
+   data = data[2:]
+
+   c.Length = binary.BigEndian.Uint16(data)
+   data = data[2:]
+
+   c.Value = make([]byte, c.Length)
+
+   copy(c.Value[:], data)
+
+   return nil
+}
+
 func (c *ContentKey) Decrypt(key EcKey, aux_keys *AuxKeys) error {
    switch c.CipherType {
    case 3:
@@ -123,37 +156,4 @@ func (ld *LocalDevice) ParseLicense(data []byte) (*KeyData, error) {
    return &KeyData{
       license.ContentKeyObject.KeyId, license.ContentKeyObject.Key,
    }, nil
-}
-
-func XorKey(root, second []byte) []byte {
-   data := make([]byte, len(second))
-   copy(data, root)
-   for i := range 16 {
-      data[i] ^= second[i]
-   }
-   return data
-}
-
-func (c *ContentKey) ECC256(key EcKey) []byte {
-   var el_gamal ElGamal
-   return el_gamal.Decrypt(c.Value, key.Key.D)
-}
-
-func (c *ContentKey) Decode(data []byte) error {
-   c.KeyId.Decode(data[:])
-   data = data[16:]
-   c.KeyType = binary.BigEndian.Uint16(data)
-   data = data[2:]
-
-   c.CipherType = binary.BigEndian.Uint16(data)
-   data = data[2:]
-
-   c.Length = binary.BigEndian.Uint16(data)
-   data = data[2:]
-
-   c.Value = make([]byte, c.Length)
-
-   copy(c.Value[:], data)
-
-   return nil
 }
