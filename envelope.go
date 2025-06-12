@@ -7,89 +7,6 @@ import (
    "encoding/xml"
 )
 
-type Data struct {
-   CertificateChains CertificateChains
-}
-
-func get_cipher_data(cert_chain *Chain, key *XmlKey) ([]byte, error) {
-   data1, err := xml.Marshal(Data{
-      CertificateChains: CertificateChains{
-         CertificateChain: base64.StdEncoding.EncodeToString(cert_chain.Encode()),
-      },
-   })
-   if err != nil {
-      return nil, err
-   }
-   data1, err = aes_cbc_padding_encrypt(data1, key.AesKey[:], key.AesIv[:])
-   if err != nil {
-      return nil, err
-   }
-   return append(key.AesIv[:], data1...), nil
-}
-
-func (v *LocalDevice) envelope(kid string) (*Envelope, error) {
-   var key XmlKey
-   err := key.New()
-   if err != nil {
-      return nil, err
-   }
-   cipher_data, err := get_cipher_data(&v.CertificateChain, &key)
-   if err != nil {
-      return nil, err
-   }
-   var la_value La
-   err = la_value.New(&key, cipher_data, kid)
-   if err != nil {
-      return nil, err
-   }
-   la_data, err := xml.Marshal(la_value)
-   if err != nil {
-      return nil, err
-   }
-   la_digest := sha256.Sum256(la_data)
-   signed_info := SignedInfo{
-      XmlNs: "http://www.w3.org/2000/09/xmldsig#",
-      Reference: Reference{
-         Uri:         "#SignedData",
-         DigestValue: base64.StdEncoding.EncodeToString(la_digest[:]),
-      },
-   }
-   signed_data, err := xml.Marshal(signed_info)
-   if err != nil {
-      return nil, err
-   }
-   signed_digest := sha256.Sum256(signed_data)
-   r, s, err := ecdsa.Sign(Fill, v.SigningKey.Key, signed_digest[:])
-   if err != nil {
-      return nil, err
-   }
-   sign := append(r.Bytes(), s.Bytes()...)
-   return &Envelope{
-      Soap: "http://schemas.xmlsoap.org/soap/envelope/",
-      Body: Body{
-         AcquireLicense: &AcquireLicense{
-            XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols",
-            Challenge: Challenge{
-               Challenge: InnerChallenge{
-                  XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols/messages",
-                  La:    la_value,
-                  Signature: Signature{
-                     SignedInfo:     signed_info,
-                     SignatureValue: base64.StdEncoding.EncodeToString(sign),
-                  },
-               },
-            },
-         },
-      },
-   }, nil
-}
-
-type Envelope struct {
-   XMLName xml.Name `xml:"soap:Envelope"`
-   Soap    string   `xml:"xmlns:soap,attr"`
-   Body    Body     `xml:"soap:Body"`
-}
-
 type Reference struct {
    Uri         string `xml:"URI,attr"`
    DigestValue string
@@ -260,4 +177,99 @@ func (v *La) New(key *XmlKey, cipher_data []byte, kid string) error {
       },
    }
    return nil
+}
+
+type Envelope struct {
+   XMLName xml.Name `xml:"soap:Envelope"`
+   Soap    string   `xml:"xmlns:soap,attr"`
+   Body    Body     `xml:"soap:Body"`
+}
+
+func (v *LocalDevice) envelope(kid string) (*Envelope, error) {
+   var key XmlKey
+   err := key.New()
+   if err != nil {
+      return nil, err
+   }
+   cipher_data, err := get_cipher_data(&v.CertificateChain, &key)
+   if err != nil {
+      return nil, err
+   }
+   var la_value La
+   err = la_value.New(&key, cipher_data, kid)
+   if err != nil {
+      return nil, err
+   }
+   la_data, err := xml.Marshal(la_value)
+   if err != nil {
+      return nil, err
+   }
+   la_digest := sha256.Sum256(la_data)
+   signed_info := SignedInfo{
+      XmlNs: "http://www.w3.org/2000/09/xmldsig#",
+      Reference: Reference{
+         Uri:         "#SignedData",
+         DigestValue: base64.StdEncoding.EncodeToString(la_digest[:]),
+      },
+   }
+   signed_data, err := xml.Marshal(signed_info)
+   if err != nil {
+      return nil, err
+   }
+   signed_digest := sha256.Sum256(signed_data)
+   r, s, err := ecdsa.Sign(Fill, v.SigningKey.Key, signed_digest[:])
+   if err != nil {
+      return nil, err
+   }
+   sign := append(r.Bytes(), s.Bytes()...)
+   return &Envelope{
+      Soap: "http://schemas.xmlsoap.org/soap/envelope/",
+      Body: Body{
+         AcquireLicense: &AcquireLicense{
+            XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols",
+            Challenge: Challenge{
+               Challenge: InnerChallenge{
+                  XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols/messages",
+                  La:    la_value,
+                  Signature: Signature{
+                     SignedInfo:     signed_info,
+                     SignatureValue: base64.StdEncoding.EncodeToString(sign),
+                  },
+               },
+            },
+         },
+      },
+   }, nil
+}
+
+type Features struct {
+   Feature Feature
+}
+
+type Feature struct {
+   Name string `xml:",attr"`
+}
+
+type Data struct {
+   CertificateChains CertificateChains
+   Features          Features
+}
+
+func get_cipher_data(cert_chain *Chain, key *XmlKey) ([]byte, error) {
+   data1, err := xml.Marshal(Data{
+      CertificateChains: CertificateChains{
+         CertificateChain: base64.StdEncoding.EncodeToString(cert_chain.Encode()),
+      },
+      Features: Features{
+         Feature: Feature{"AESCBC"},
+      },
+   })
+   if err != nil {
+      return nil, err
+   }
+   data1, err = aes_cbc_padding_encrypt(data1, key.AesKey[:], key.AesIv[:])
+   if err != nil {
+      return nil, err
+   }
+   return append(key.AesIv[:], data1...), nil
 }
