@@ -1,13 +1,12 @@
-package playReady
+package soap
 
 import (
+   "41.neocities.org/playReady/a"
+   "41.neocities.org/playReady/c"
    "bytes"
-   "crypto/aes"
-   "crypto/cipher"
    "encoding/base64"
    "encoding/hex"
    "encoding/xml"
-   "github.com/deatil/go-cryptobin/cryptobin/crypto"
    "io"
    "log"
    "net/http"
@@ -15,13 +14,37 @@ import (
    "testing"
 )
 
+var rakuten = struct {
+   content string
+   key     string
+   url     string
+   kid_wv  string
+   kid_pr  string
+}{
+   url:     "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=d41801ef-92a6-476b-a0f2-c88461316e80",
+   content: "rakuten.tv/cz?content_type=movies&content_id=transvulcania-the-people-s-run",
+   key:     "ab82952e8b567a2359393201e4dde4b4",
+   kid_wv:  "318f7ece69afcfe3e96de31be6b77272",
+   kid_pr:  "zn6PMa9p48/pbeMb5rdycg==",
+}
+
+var SL2000 = struct{
+   dir string
+   g1  string
+   z1  string
+}{
+   dir: "../ignore/",
+   g1:  "g1",
+   z1:  "z1",
+}
+
 func TestChain(t *testing.T) {
    data, err := os.ReadFile(SL2000.dir + SL2000.g1)
    if err != nil {
       t.Fatal(err)
    }
-   var chain1 Chain
-   err = chain1.Decode(data)
+   var chain c.Chain
+   err = chain.Decode(data)
    if err != nil {
       t.Fatal(err)
    }
@@ -29,24 +52,24 @@ func TestChain(t *testing.T) {
    if err != nil {
       t.Fatal(err)
    }
-   var z1 EcKey
+   var z1 a.EcKey
    z1.LoadBytes(data)
    // they downgrade certs from the cert digest (hash of the signing key)
-   var signing_key EcKey
+   var signing_key a.EcKey
    err = signing_key.New()
    if err != nil {
       t.Fatal(err)
    }
-   var encrypt_key EcKey
+   var encrypt_key a.EcKey
    err = encrypt_key.New()
    if err != nil {
       t.Fatal(err)
    }
-   err = chain1.CreateLeaf(z1, signing_key, encrypt_key)
+   err = chain.CreateLeaf(z1, signing_key, encrypt_key)
    if err != nil {
       t.Fatal(err)
    }
-   err = write_file(SL2000.dir+"chain.txt", chain1.Encode())
+   err = write_file(SL2000.dir+"chain.txt", chain.Encode())
    if err != nil {
       t.Fatal(err)
    }
@@ -64,23 +87,9 @@ func write_file(name string, data []byte) error {
    log.Println("WriteFile", name)
    return os.WriteFile(name, data, os.ModePerm)
 }
-var rakuten = struct {
-   content string
-   key     string
-   url     string
-   kid_wv  string
-   kid_pr  string
-}{
-   // THIS URL GETS LOCKED TO DEVICE ON FIRST REQUEST
-   url:     "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=54ccdcfc-17a0-49ba-8d4d-a9c145f14e7b",
-   content: "rakuten.tv/cz?content_type=movies&content_id=transvulcania-the-people-s-run",
-   key:     "ab82952e8b567a2359393201e4dde4b4",
-   kid_wv:  "318f7ece69afcfe3e96de31be6b77272",
-   kid_pr:  "zn6PMa9p48/pbeMb5rdycg==",
-}
 
 func TestScalable(t *testing.T) {
-   var device LocalDevice
+   var device c.LocalDevice
    data, err := os.ReadFile(SL2000.dir + "chain.txt")
    if err != nil {
       t.Fatal(err)
@@ -100,8 +109,8 @@ func TestScalable(t *testing.T) {
    }
    device.EncryptKey.LoadBytes(data)
    key_id := [16]byte{1}
-   envelope1, err := device.envelope(
-      base64.StdEncoding.EncodeToString(key_id[:]),
+   envelope1, err := new_envelope(
+      &device, base64.StdEncoding.EncodeToString(key_id[:]),
    )
    if err != nil {
       t.Fatal(err)
@@ -122,7 +131,7 @@ func TestScalable(t *testing.T) {
    if err != nil {
       t.Fatal(err)
    }
-   key, err := device.ParseLicense(data)
+   key, err := ParseLicense(&device, data)
    if err != nil {
       t.Fatal(err)
    }
@@ -136,7 +145,7 @@ func TestScalable(t *testing.T) {
 }
 
 func TestRakuten(t *testing.T) {
-   var device LocalDevice
+   var device c.LocalDevice
    data, err := os.ReadFile(SL2000.dir + "chain.txt")
    if err != nil {
       t.Fatal(err)
@@ -155,7 +164,7 @@ func TestRakuten(t *testing.T) {
       t.Fatal(err)
    }
    device.EncryptKey.LoadBytes(data)
-   envelope1, err := device.envelope(rakuten.kid_pr)
+   envelope1, err := new_envelope(&device, rakuten.kid_pr)
    if err != nil {
       t.Fatal(err)
    }
@@ -172,7 +181,7 @@ func TestRakuten(t *testing.T) {
    if err != nil {
       t.Fatal(err)
    }
-   key, err := device.ParseLicense(data)
+   key, err := ParseLicense(&device, data)
    if err != nil {
       t.Fatal(err)
    }
@@ -181,41 +190,5 @@ func TestRakuten(t *testing.T) {
    }
    if hex.EncodeToString(key.Key[:]) != rakuten.key {
       t.Fatal(".Key")
-   }
-}
-
-var SL2000 = struct{
-   dir string
-   g1  string
-   z1  string
-}{
-   dir: "ignore/",
-   g1:  "g1",
-   z1:  "z1",
-}
-func TestCbc(t *testing.T) {
-   data := []byte{2}
-   var (
-      key [16]byte
-      iv  [16]byte
-   )
-   //////////////////////////////////////////////////////
-   data1 := append(data, bytes.Repeat([]byte{15}, 15)...)
-   block, err := aes.NewCipher(key[:])
-   if err != nil {
-      t.Fatal(err)
-   }
-   cipher.NewCBCEncrypter(block, iv[:]).CryptBlocks(data1, data1)
-   //////////////////////////////////////////////////////////////
-   bin := crypto.FromBytes(data).
-      WithKey(key[:]).
-      WithIv(iv[:]).
-      Aes().CBC().PKCS7Padding().
-      Encrypt()
-   if err := bin.Error(); err != nil {
-      t.Fatal(err)
-   }
-   if !bytes.Equal(bin.ToBytes(), data1) {
-      t.Fatal("!bytes.Equal")
    }
 }
