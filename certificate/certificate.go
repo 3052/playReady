@@ -2,6 +2,11 @@ package certificate
 
 import "encoding/binary"
 
+type Feature struct {
+   Entries  uint32
+   Features []uint32
+}
+
 func (f *Feature) New(Type int) {
    f.Entries = 1
    f.Features = []uint32{uint32(Type)}
@@ -27,11 +32,6 @@ type Key struct {
    Flags     uint32
    PublicKey [64]byte
    Usage     Feature
-}
-
-type Feature struct {
-   Entries  uint32
-   Features []uint32
 }
 
 func (k *Key) Decode(data []byte) (int, error) {

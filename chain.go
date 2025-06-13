@@ -59,13 +59,13 @@ func (c *Chain) CreateLeaf(ModelKey, SigningKey, EncryptKey EcKey) error {
    NewDevice.New()
    KeyInfoFtlv.New(1, 6, BuiltKeyInfo.Encode())
    ManufacturerFtlv.New(0, 7, c.Certs[0].ManufacturerInfo.Encode())
-   // SCALABLE with SL2000 /////////////////////////////////////////////
-   feature := c.Certs[0].Features
-   feature.Entries++
-   feature.Features = append(feature.Features, 13)
-   c.Certs[0].Features = feature
-   ///////////////////////////////////////////////////////////////////////
-   FeatureFtlv.New(1, 5, c.Certs[0].Features.Encode())
+   feature := certificate.Feature{
+      Entries: 1,
+      // SCALABLE with SL2000
+      // SUPPORTS_PR3_FEATURES
+      Features: []uint32{ 0xD },
+   }
+   FeatureFtlv.New(1, 5, feature.Encode())
    DeviceFtlv.New(1, 4, NewDevice.Encode())
    leaf_data := CertificateFtlv.Encode()
    leaf_data = append(leaf_data, DeviceFtlv.Encode()...)

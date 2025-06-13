@@ -11,8 +11,6 @@ import (
    "testing"
 )
 
-// some SL2000 do not work with scalable
-//var tester = SL3000
 var tester = SL2000
 
 var rakuten = struct {

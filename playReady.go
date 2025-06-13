@@ -1,13 +1,153 @@
 package playReady
 
 import (
+   "41.neocities.org/playReady/certificate"
+   "bytes"
    "crypto/ecdsa"
    "crypto/elliptic"
+   "crypto/sha256"
    "encoding/binary"
    "encoding/hex"
+   "errors"
    "fmt"
    "github.com/deatil/go-cryptobin/cryptobin/crypto"
    "math/big"
+)
+
+func (c *Cert) NewNoSig(Value []byte) {
+   copy(c.Magic[:], "CERT")
+   c.Version = 1
+   c.Length = uint32(len(Value)) + 16 + 144
+   c.LengthToSignature = uint32(len(Value)) + 16
+   c.RawData = make([]byte, len(Value))
+   copy(c.RawData, Value)
+}
+
+type Cert struct {
+   Magic             [4]byte
+   Version           uint32
+   Length            uint32
+   LengthToSignature uint32
+   RawData           []byte
+   CertificateInfo   *CertInfo
+   Features          *certificate.Feature
+   KeyData           *certificate.KeyInfo
+   ManufacturerInfo  *Manufacturer
+   SignatureData     *certificate.Signature
+}
+
+func (c *Cert) Decode(data []byte) (int, error) {
+   n := copy(c.Magic[:], data)
+
+   if string(c.Magic[:]) != "CERT" {
+      return 0, errors.New("failed to find cert magic")
+   }
+
+   c.Version = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   c.Length = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   c.LengthToSignature = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   c.RawData = data[n:][:c.Length-16]
+   n += len(c.RawData)
+
+   var sum uint32
+   for sum < c.Length-16 {
+      var value FTLV
+      j, err := value.Decode(c.RawData[sum:])
+      if err != nil {
+         return 0, err
+      }
+      switch value.Type {
+      case OBJTYPE_BASIC:
+         c.CertificateInfo = &CertInfo{}
+         err := c.CertificateInfo.Decode(value.Value)
+         if err != nil {
+            return 0, err
+         }
+
+      case OBJTYPE_FEATURE:
+         c.Features = &certificate.Feature{}
+         _, err := c.Features.Decode(value.Value)
+         if err != nil {
+            return 0, err
+         }
+
+      case OBJTYPE_KEY:
+         c.KeyData = &certificate.KeyInfo{}
+         err := c.KeyData.Decode(value.Value)
+         if err != nil {
+            return 0, err
+         }
+
+      case OBJTYPE_MANUFACTURER:
+         c.ManufacturerInfo = &Manufacturer{}
+         err := c.ManufacturerInfo.Decode(value.Value)
+         if err != nil {
+            return 0, err
+         }
+
+      case OBJTYPE_SIGNATURE:
+         c.SignatureData = &certificate.Signature{}
+         err := c.SignatureData.Decode(value.Value)
+
+         if err != nil {
+            return 0, err
+         }
+
+      }
+
+      sum += j
+   }
+
+   return n, nil
+}
+
+func (c *Cert) Encode() []byte {
+   data := c.Magic[:]
+   data = binary.BigEndian.AppendUint32(data, c.Version)
+   data = binary.BigEndian.AppendUint32(data, c.Length)
+   data = binary.BigEndian.AppendUint32(data, c.LengthToSignature)
+   return append(data, c.RawData[:]...)
+}
+
+func (c *Cert) Verify(PubKey []byte) bool {
+   if !bytes.Equal(c.SignatureData.IssuerKey, PubKey) {
+      return false
+   }
+   data := c.Encode()
+   data = data[:c.LengthToSignature]
+   x := new(big.Int).SetBytes(PubKey[:32])
+   y := new(big.Int).SetBytes(PubKey[32:])
+   PublicKey := &ecdsa.PublicKey{
+      Curve: elliptic.P256(),
+      X:     x,
+      Y:     y,
+   }
+   Sig := c.SignatureData.SignatureData
+   SignatureDigest := sha256.Sum256(data)
+   r, s := new(big.Int).SetBytes(Sig[:32]), new(big.Int).SetBytes(Sig[32:])
+   return ecdsa.Verify(PublicKey, SignatureDigest[:], r, s)
+}
+const (
+   OBJTYPE_BASIC              = 0x0001
+   OBJTYPE_DOMAIN             = 0x0002
+   OBJTYPE_PC                 = 0x0003
+   OBJTYPE_DEVICE             = 0x0004
+   OBJTYPE_FEATURE            = 0x0005
+   OBJTYPE_KEY                = 0x0006
+   OBJTYPE_MANUFACTURER       = 0x0007
+   OBJTYPE_SIGNATURE          = 0x0008
+   OBJTYPE_SILVERLIGHT        = 0x0009
+   OBJTYPE_METERING           = 0x000A
+   OBJTYPE_EXTDATASIGNKEY     = 0x000B
+   OBJTYPE_EXTDATACONTAINER   = 0x000C
+   OBJTYPE_EXTDATASIGNATURE   = 0x000D
+   OBJTYPE_EXTDATA_HWID       = 0x000E
+   OBJTYPE_SERVER             = 0x000F
+   OBJTYPE_SECURITY_VERSION   = 0x0010
+   OBJTYPE_SECURITY_VERSION_2 = 0x0011
 )
 
 func (x *XmlKey) New() error {
@@ -446,28 +586,6 @@ func (m *ManufacturerInfo) Decode(data []byte) (uint32, error) {
    m.Value = string(data[n:][:padded_length])
    return n + padded_length, nil
 }
-
-type ObjType uint16
-
-const (
-   BASIC ObjType = iota + 1
-   DOMAIN
-   PC
-   DEVICE
-   FEATURE
-   KEY
-   MANUFACTURER
-   SIGNATURE
-   SILVERLIGHT
-   METERING
-   EXTDATASIGNKEY
-   EXTDATACONTAINER
-   EXTDATASIGNATURE
-   EXTDATA_HWIO
-   SERVER
-   SECURITY_VERSION
-   SECURITY_VERSION_2
-)
 
 type PlayReadyObject struct {
    Type   uint16
