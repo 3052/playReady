@@ -7,7 +7,7 @@ import (
 )
 
 func TestChain(t *testing.T) {
-   data, err := os.ReadFile(tester.dir + tester.g1)
+   data, err := os.ReadFile(SL2000.dir + SL2000.g1)
    if err != nil {
       t.Fatal(err)
    }
@@ -16,7 +16,7 @@ func TestChain(t *testing.T) {
    if err != nil {
       t.Fatal(err)
    }
-   data, err = os.ReadFile(tester.dir + tester.z1)
+   data, err = os.ReadFile(SL2000.dir + SL2000.z1)
    if err != nil {
       t.Fatal(err)
    }
@@ -37,15 +37,15 @@ func TestChain(t *testing.T) {
    if err != nil {
       t.Fatal(err)
    }
-   err = write_file(tester.dir+"chain.txt", chain1.Encode())
+   err = write_file(SL2000.dir+"chain.txt", chain1.Encode())
    if err != nil {
       t.Fatal(err)
    }
-   err = write_file(tester.dir+"signing_key.txt", signing_key.Private())
+   err = write_file(SL2000.dir+"signing_key.txt", signing_key.Private())
    if err != nil {
       t.Fatal(err)
    }
-   err = write_file(tester.dir+"encrypt_key.txt", encrypt_key.Private())
+   err = write_file(SL2000.dir+"encrypt_key.txt", encrypt_key.Private())
    if err != nil {
       t.Fatal(err)
    }

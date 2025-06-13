@@ -11,8 +11,6 @@ import (
    "testing"
 )
 
-var tester = SL2000
-
 var rakuten = struct {
    content string
    key     string
@@ -28,27 +26,9 @@ var rakuten = struct {
    kid_pr:  "zn6PMa9p48/pbeMb5rdycg==",
 }
 
-var SL2000 = device_tester{
-   dir: "ignore/SL2000/",
-   g1:  "g1",
-   z1:  "z1",
-}
-
-var SL3000 = device_tester{
-   dir: "ignore/SL3000/",
-   g1:  "bgroupcert.dat",
-   z1:  "zgpriv.dat",
-}
-
-type device_tester struct {
-   dir string
-   g1  string
-   z1  string
-}
-
 func TestScalable(t *testing.T) {
    var device LocalDevice
-   data, err := os.ReadFile(tester.dir + "chain.txt")
+   data, err := os.ReadFile(SL2000.dir + "chain.txt")
    if err != nil {
       t.Fatal(err)
    }
@@ -56,12 +36,12 @@ func TestScalable(t *testing.T) {
    if err != nil {
       t.Fatal(err)
    }
-   data, err = os.ReadFile(tester.dir + "signing_key.txt")
+   data, err = os.ReadFile(SL2000.dir + "signing_key.txt")
    if err != nil {
       t.Fatal(err)
    }
    device.SigningKey.LoadBytes(data)
-   data, err = os.ReadFile(tester.dir + "encrypt_key.txt")
+   data, err = os.ReadFile(SL2000.dir + "encrypt_key.txt")
    if err != nil {
       t.Fatal(err)
    }
@@ -104,7 +84,7 @@ func TestScalable(t *testing.T) {
 
 func TestRakuten(t *testing.T) {
    var device LocalDevice
-   data, err := os.ReadFile(tester.dir + "chain.txt")
+   data, err := os.ReadFile(SL2000.dir + "chain.txt")
    if err != nil {
       t.Fatal(err)
    }
@@ -112,12 +92,12 @@ func TestRakuten(t *testing.T) {
    if err != nil {
       t.Fatal(err)
    }
-   data, err = os.ReadFile(tester.dir + "signing_key.txt")
+   data, err = os.ReadFile(SL2000.dir + "signing_key.txt")
    if err != nil {
       t.Fatal(err)
    }
    device.SigningKey.LoadBytes(data)
-   data, err = os.ReadFile(tester.dir + "encrypt_key.txt")
+   data, err = os.ReadFile(SL2000.dir + "encrypt_key.txt")
    if err != nil {
       t.Fatal(err)
    }
@@ -149,4 +129,14 @@ func TestRakuten(t *testing.T) {
    if hex.EncodeToString(key.Key[:]) != rakuten.key {
       t.Fatal(".Key")
    }
+}
+
+var SL2000 = struct{
+   dir string
+   g1  string
+   z1  string
+}{
+   dir: "ignore/",
+   g1:  "g1",
+   z1:  "z1",
 }
