@@ -14,6 +14,20 @@ import (
    "math/big"
 )
 
+func (c *ContentKey) Decrypt(key *ecdsa.PrivateKey, aux_keys *AuxKeys) error {
+   switch c.CipherType {
+   case 3:
+      decrypted := elGamal.Decrypt(c.Value, key.D)
+      c.Integrity.Decode(decrypted)
+      decrypted = decrypted[16:]
+      copy(c.Key[:], decrypted)
+      return nil
+   case 6:
+      return c.Scalable(key, aux_keys)
+   }
+   return errors.New("cant decrypt key")
+}
+
 // pkg.go.dev/crypto/ecdsa#PublicKey
 func (e *EcKey) PublicBytes() []byte {
    return append(e[0].PublicKey.X.Bytes(), e[0].PublicKey.Y.Bytes()...)
@@ -366,26 +380,26 @@ func (l *LicenseResponse) Decode(data []byte) error {
       case KEY_MATERIAL_CONTAINER_ENTRY_TYPE: // 9
          var j uint32
          for j < value.Length-16 {
-            var ftlv2 FTLV
-            k, err := ftlv2.Decode(value.Value[j:])
+            var value1 FTLV
+            k, err := value1.Decode(value.Value[j:])
             if err != nil {
                return err
             }
-            switch XmrType(ftlv2.Type) {
+            switch XmrType(value1.Type) {
             case CONTENT_KEY_ENTRY_TYPE: // 10
                l.ContentKeyObject = &ContentKey{}
-               err = l.ContentKeyObject.Decode(ftlv2.Value)
+               err = l.ContentKeyObject.Decode(value1.Value)
                if err != nil {
                   return err
                }
             
             case DEVICE_KEY_ENTRY_TYPE: // 42
                l.ECCKeyObject = &ECCKey{}
-               l.ECCKeyObject.Decode(ftlv2.Value)
+               l.ECCKeyObject.Decode(value1.Value)
             
             case AUX_KEY_ENTRY_TYPE: // 81
                l.AuxKeyObject = &AuxKeys{}
-               l.AuxKeyObject.Decode(ftlv2.Value)
+               l.AuxKeyObject.Decode(value1.Value)
             
             default:
                return errors.New("FTLV.Type")
@@ -432,20 +446,6 @@ func AesCbcPaddingEncrypt(data, key, iv []byte) ([]byte, error) {
    bin := crypto.FromBytes(data).WithKey(key).WithIv(iv).
       Aes().CBC().PKCS7Padding().Encrypt()
    return bin.ToBytes(), bin.Error()
-}
-
-func (c *ContentKey) Decrypt(key *ecdsa.PrivateKey, aux_keys *AuxKeys) error {
-   switch c.CipherType {
-   case 3:
-      decrypted := elGamal.Decrypt(c.Value, key.D)
-      c.Integrity.Decode(decrypted)
-      decrypted = decrypted[16:]
-      copy(c.Key[:], decrypted)
-      return nil
-   case 6:
-      return c.Scalable(key, aux_keys)
-   }
-   return errors.New("cant decrypt key")
 }
 
 type EcKey [1]*ecdsa.PrivateKey

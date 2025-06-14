@@ -8,19 +8,14 @@ import (
    "slices"
 )
 
-// wikipedia.org/wiki/Windows_Media_DRM
-var wmrm_public_key = "C8B6AF16EE941AADAA5389B4AF2C10E356BE42AF175EF3FACE93254E7B0B3D9B982B27B5CB2341326E56AA857DBFD5C634CE2CF9EA74FCA8F2AF5957EFEEA562"
-
 // wikipedia.org/wiki/ElGamal_encryption#Key_generation
-func KeyGeneration() (*big.Int, *big.Int, error) {
-   data, err := hex.DecodeString(wmrm_public_key)
-   if err != nil {
-      return nil, nil, err
-   }
-   x := new(big.Int).SetBytes(data[:32])
-   y := new(big.Int).SetBytes(data[32:])
-   return x, y, nil
+func KeyGeneration() (*big.Int, *big.Int) {
+   data, _ := hex.DecodeString(wmrm_public_key)
+   return new(big.Int).SetBytes(data[:32]), new(big.Int).SetBytes(data[32:])
 }
+
+// wikipedia.org/wiki/Windows_Media_DRM
+const wmrm_public_key = "C8B6AF16EE941AADAA5389B4AF2C10E356BE42AF175EF3FACE93254E7B0B3D9B982B27B5CB2341326E56AA857DBFD5C634CE2CF9EA74FCA8F2AF5957EFEEA562"
 
 // wikipedia.org/wiki/ElGamal_encryption#Encryption
 func Encrypt(hX, hY *big.Int, m *ecdsa.PublicKey) []byte {

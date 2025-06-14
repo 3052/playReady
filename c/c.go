@@ -13,6 +13,164 @@ import (
    "slices"
 )
 
+func (c *Cert) Decode(data []byte) (int, error) {
+   n := copy(c.Magic[:], data)
+
+   if string(c.Magic[:]) != "CERT" {
+      return 0, errors.New("failed to find cert magic")
+   }
+
+   c.Version = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   c.Length = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   c.LengthToSignature = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   c.RawData = data[n:][:c.Length-16]
+   n += len(c.RawData)
+
+   var sum uint32
+   for sum < c.Length-16 {
+      var ftlv a.FTLV
+      j, err := ftlv.Decode(c.RawData[sum:])
+      if err != nil {
+         return 0, err
+      }
+      switch ftlv.Type {
+      case OBJTYPE_BASIC:
+         c.CertificateInfo = &CertInfo{}
+         err := c.CertificateInfo.Decode(ftlv.Value)
+         if err != nil {
+            return 0, err
+         }
+
+      case OBJTYPE_FEATURE:
+         c.Features = &Feature{}
+         c.Features.Decode(ftlv.Value)
+
+      case OBJTYPE_KEY:
+         c.KeyData = &KeyInfo{}
+         c.KeyData.Decode(ftlv.Value)
+
+      case OBJTYPE_MANUFACTURER:
+         c.ManufacturerInfo = &Manufacturer{}
+         err := c.ManufacturerInfo.Decode(ftlv.Value)
+         if err != nil {
+            return 0, err
+         }
+
+      case OBJTYPE_SIGNATURE:
+         c.SignatureData = &b.Signature{}
+         err := c.SignatureData.Decode(ftlv.Value)
+         if err != nil {
+            return 0, err
+         }
+
+      }
+
+      sum += j
+   }
+
+   return n, nil
+}
+
+type LocalDevice struct {
+   CertificateChain Chain
+   EncryptKey       a.EcKey
+   SigningKey       a.EcKey
+}
+
+type Chain struct {
+   Magic     [4]byte
+   Version   uint32
+   Length    uint32
+   Flags     uint32
+   CertCount uint32
+   Certs     []Cert
+}
+
+type Cert struct {
+   Magic             [4]byte
+   Version           uint32
+   Length            uint32
+   LengthToSignature uint32
+   RawData           []byte
+   CertificateInfo   *CertInfo
+   Features          *Feature
+   KeyData           *KeyInfo
+   ManufacturerInfo  *Manufacturer
+   SignatureData     *b.Signature
+}
+
+func (c *Cert) NewNoSig(Value []byte) {
+   copy(c.Magic[:], "CERT")
+   c.Version = 1
+   c.Length = uint32(len(Value)) + 16 + 144
+   c.LengthToSignature = uint32(len(Value)) + 16
+   c.RawData = make([]byte, len(Value))
+   copy(c.RawData, Value)
+}
+
+func (c *Chain) Encode() []byte {
+   data := c.Magic[:]
+   data = binary.BigEndian.AppendUint32(data, c.Version)
+   data = binary.BigEndian.AppendUint32(data, c.Length)
+   data = binary.BigEndian.AppendUint32(data, c.Flags)
+   data = binary.BigEndian.AppendUint32(data, c.CertCount)
+   for _, cert1 := range c.Certs {
+      data = append(data, cert1.Encode()...)
+   }
+   return data
+}
+
+func (c *Chain) Verify() bool {
+   ModelBase := c.Certs[len(c.Certs)-1].SignatureData.IssuerKey
+   for i := len(c.Certs) - 1; i >= 0; i-- {
+      valid := c.Certs[i].Verify(ModelBase[:])
+      if !valid {
+         return false
+      }
+      ModelBase = c.Certs[i].KeyData.Keys[0].PublicKey[:]
+   }
+   return true
+}
+
+func (c *Cert) Verify(PubKey []byte) bool {
+   if !bytes.Equal(c.SignatureData.IssuerKey, PubKey) {
+      return false
+   }
+   data := c.Encode()
+   data = data[:c.LengthToSignature]
+   x := new(big.Int).SetBytes(PubKey[:32])
+   y := new(big.Int).SetBytes(PubKey[32:])
+   PublicKey := &ecdsa.PublicKey{
+      Curve: elliptic.P256(),
+      X:     x,
+      Y:     y,
+   }
+   Sig := c.SignatureData.SignatureData
+   SignatureDigest := sha256.Sum256(data)
+   r, s := new(big.Int).SetBytes(Sig[:32]), new(big.Int).SetBytes(Sig[32:])
+   return ecdsa.Verify(PublicKey, SignatureDigest[:], r, s)
+}
+func (c *Cert) Encode() []byte {
+   data := c.Magic[:]
+   data = binary.BigEndian.AppendUint32(data, c.Version)
+   data = binary.BigEndian.AppendUint32(data, c.Length)
+   data = binary.BigEndian.AppendUint32(data, c.LengthToSignature)
+   return append(data, c.RawData[:]...)
+}
+
+func (f *Feature) Decode(data []byte) int {
+   f.Entries = binary.BigEndian.Uint32(data)
+   n := 4
+   for range f.Entries {
+      f.Features = append(f.Features, binary.BigEndian.Uint32(data[n:]))
+      n += 4
+   }
+   return n
+}
+
 type Device struct {
    MaxLicenseSize       uint32
    MaxHeaderSize        uint32
@@ -93,6 +251,7 @@ func (c *Chain) CreateLeaf(ModelKey, SigningKey, EncryptKey a.EcKey) error {
    c.Certs = slices.Insert(c.Certs, 0, UnsignedCert)
    return nil
 }
+
 func (c *Chain) Decode(data []byte) error {
    n := copy(c.Magic[:], data)
    if string(c.Magic[:]) != "CHAI" {
@@ -141,16 +300,6 @@ func (f *Feature) Encode() []byte {
    return data
 }
 
-func (f *Feature) Decode(data []byte) (int, error) {
-   f.Entries = binary.BigEndian.Uint32(data)
-   var n = 4
-   for range f.Entries {
-      f.Features = append(f.Features, binary.BigEndian.Uint32(data[n:]))
-      n += 4
-   }
-   return n, nil
-}
-
 func (k *Key) New(key []byte, Type int) {
    k.Type = 1
    k.Length = 512
@@ -166,7 +315,7 @@ type Key struct {
    Usage     Feature
 }
 
-func (k *Key) Decode(data []byte) (int, error) {
+func (k *Key) Decode(data []byte) int {
    k.Type = binary.BigEndian.Uint16(data)
    n := 2
    k.Length = binary.BigEndian.Uint16(data[n:])
@@ -174,25 +323,16 @@ func (k *Key) Decode(data []byte) (int, error) {
    k.Flags = binary.BigEndian.Uint32(data[n:])
    n += 4
    n += copy(k.PublicKey[:], data[n:])
-   n1, err := k.Usage.Decode(data[n:])
-   if err != nil {
-      return 0, err
-   }
-   n += n1
-   return n, nil
+   n += k.Usage.Decode(data[n:])
+   return n
 }
 
 func (k *Key) Encode() []byte {
-   var data []byte
-
-   data = binary.BigEndian.AppendUint16(data, k.Type)
+   data := binary.BigEndian.AppendUint16(nil, k.Type)
    data = binary.BigEndian.AppendUint16(data, k.Length)
    data = binary.BigEndian.AppendUint32(data, k.Flags)
-
    data = append(data, k.PublicKey[:]...)
-   data = append(data, k.Usage.Encode()...)
-
-   return data
+   return append(data, k.Usage.Encode()...)
 }
 
 func (k *KeyInfo) New(SigningKey, EncryptKey []byte) {
@@ -218,25 +358,15 @@ func (k *KeyInfo) Encode() []byte {
    return data
 }
 
-func (k *KeyInfo) Decode(data []byte) error {
+func (k *KeyInfo) Decode(data []byte) {
    k.Entries = binary.BigEndian.Uint32(data)
    data = data[4:]
-
    for range k.Entries {
-      var KeyData Key
-
-      i, err := KeyData.Decode(data)
-
-      if err != nil {
-         return err
-      }
-
-      k.Keys = append(k.Keys, KeyData)
-
-      data = data[i:]
+      var key_data Key
+      n := key_data.Decode(data)
+      k.Keys = append(k.Keys, key_data)
+      data = data[n:]
    }
-
-   return nil
 }
 
 type ManufacturerInfo struct {
@@ -359,158 +489,3 @@ const (
    OBJTYPE_SECURITY_VERSION   = 0x0010
    OBJTYPE_SECURITY_VERSION_2 = 0x0011
 )
-
-func (c *Cert) Decode(data []byte) (int, error) {
-   n := copy(c.Magic[:], data)
-
-   if string(c.Magic[:]) != "CERT" {
-      return 0, errors.New("failed to find cert magic")
-   }
-
-   c.Version = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   c.Length = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   c.LengthToSignature = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   c.RawData = data[n:][:c.Length-16]
-   n += len(c.RawData)
-
-   var sum uint32
-   for sum < c.Length-16 {
-      var ftlv a.FTLV
-      j, err := ftlv.Decode(c.RawData[sum:])
-      if err != nil {
-         return 0, err
-      }
-      switch ftlv.Type {
-      case OBJTYPE_BASIC:
-         c.CertificateInfo = &CertInfo{}
-         err := c.CertificateInfo.Decode(ftlv.Value)
-         if err != nil {
-            return 0, err
-         }
-
-      case OBJTYPE_FEATURE:
-         c.Features = &Feature{}
-         _, err := c.Features.Decode(ftlv.Value)
-         if err != nil {
-            return 0, err
-         }
-
-      case OBJTYPE_KEY:
-         c.KeyData = &KeyInfo{}
-         err := c.KeyData.Decode(ftlv.Value)
-         if err != nil {
-            return 0, err
-         }
-
-      case OBJTYPE_MANUFACTURER:
-         c.ManufacturerInfo = &Manufacturer{}
-         err := c.ManufacturerInfo.Decode(ftlv.Value)
-         if err != nil {
-            return 0, err
-         }
-
-      case OBJTYPE_SIGNATURE:
-         c.SignatureData = &b.Signature{}
-         err := c.SignatureData.Decode(ftlv.Value)
-         if err != nil {
-            return 0, err
-         }
-
-      }
-
-      sum += j
-   }
-
-   return n, nil
-}
-
-type LocalDevice struct {
-   CertificateChain Chain
-   EncryptKey       a.EcKey
-   SigningKey       a.EcKey
-}
-
-type Chain struct {
-   Magic     [4]byte
-   Version   uint32
-   Length    uint32
-   Flags     uint32
-   CertCount uint32
-   Certs     []Cert
-}
-
-type Cert struct {
-   Magic             [4]byte
-   Version           uint32
-   Length            uint32
-   LengthToSignature uint32
-   RawData           []byte
-   CertificateInfo   *CertInfo
-   Features          *Feature
-   KeyData           *KeyInfo
-   ManufacturerInfo  *Manufacturer
-   SignatureData     *b.Signature
-}
-
-func (c *Cert) NewNoSig(Value []byte) {
-   copy(c.Magic[:], "CERT")
-   c.Version = 1
-   c.Length = uint32(len(Value)) + 16 + 144
-   c.LengthToSignature = uint32(len(Value)) + 16
-   c.RawData = make([]byte, len(Value))
-   copy(c.RawData, Value)
-}
-
-func (c *Chain) Encode() []byte {
-   data := c.Magic[:]
-   data = binary.BigEndian.AppendUint32(data, c.Version)
-   data = binary.BigEndian.AppendUint32(data, c.Length)
-   data = binary.BigEndian.AppendUint32(data, c.Flags)
-   data = binary.BigEndian.AppendUint32(data, c.CertCount)
-   for _, cert1 := range c.Certs {
-      data = append(data, cert1.Encode()...)
-   }
-   return data
-}
-
-func (c *Chain) Verify() bool {
-   ModelBase := c.Certs[len(c.Certs)-1].SignatureData.IssuerKey
-   for i := len(c.Certs) - 1; i >= 0; i-- {
-      valid := c.Certs[i].Verify(ModelBase[:])
-      if !valid {
-         return false
-      }
-      ModelBase = c.Certs[i].KeyData.Keys[0].PublicKey[:]
-   }
-   return true
-}
-
-func (c *Cert) Verify(PubKey []byte) bool {
-   if !bytes.Equal(c.SignatureData.IssuerKey, PubKey) {
-      return false
-   }
-   data := c.Encode()
-   data = data[:c.LengthToSignature]
-   x := new(big.Int).SetBytes(PubKey[:32])
-   y := new(big.Int).SetBytes(PubKey[32:])
-   PublicKey := &ecdsa.PublicKey{
-      Curve: elliptic.P256(),
-      X:     x,
-      Y:     y,
-   }
-   Sig := c.SignatureData.SignatureData
-   SignatureDigest := sha256.Sum256(data)
-   r, s := new(big.Int).SetBytes(Sig[:32]), new(big.Int).SetBytes(Sig[32:])
-   return ecdsa.Verify(PublicKey, SignatureDigest[:], r, s)
-}
-func (c *Cert) Encode() []byte {
-   data := c.Magic[:]
-   data = binary.BigEndian.AppendUint32(data, c.Version)
-   data = binary.BigEndian.AppendUint32(data, c.Length)
-   data = binary.BigEndian.AppendUint32(data, c.LengthToSignature)
-   return append(data, c.RawData[:]...)
-}
-

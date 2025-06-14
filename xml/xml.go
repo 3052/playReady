@@ -4,7 +4,7 @@ import "encoding/xml"
 
 type InnerChallenge struct { // Renamed from Challenge
    XmlNs     string `xml:"xmlns,attr"`
-   La        *La
+   La        La
    Signature Signature
 }
 

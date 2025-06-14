@@ -73,12 +73,9 @@ func get_cipher_data(chain *c.Chain, key *a.XmlKey) ([]byte, error) {
    }
    return append(key.AesIv[:], data1...), nil
 }
-func new_la(key *a.XmlKey, cipher_data []byte, kid string) (*xml.La, error) {
-   x, y, err := elGamal.KeyGeneration()
-   if err != nil {
-      return nil, err
-   }
-   return &xml.La{
+func new_la(key *a.XmlKey, cipher_data []byte, kid string) xml.La {
+   x, y := elGamal.KeyGeneration()
+   return xml.La{
       XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/protocols",
       Id:      "SignedData",
       Version: "1",
@@ -123,9 +120,8 @@ func new_la(key *a.XmlKey, cipher_data []byte, kid string) (*xml.La, error) {
             CipherValue: base64.StdEncoding.EncodeToString(cipher_data),
          },
       },
-   }, nil
+   }
 }
-
 func new_envelope(device *c.LocalDevice, kid string) (*xml.Envelope, error) {
    var key a.XmlKey
    err := key.New()
@@ -136,10 +132,7 @@ func new_envelope(device *c.LocalDevice, kid string) (*xml.Envelope, error) {
    if err != nil {
       return nil, err
    }
-   la, err := new_la(&key, cipher_data, kid)
-   if err != nil {
-      return nil, err
-   }
+   la := new_la(&key, cipher_data, kid)
    la_data, err := la.Marshal()
    if err != nil {
       return nil, err
@@ -181,4 +174,3 @@ func new_envelope(device *c.LocalDevice, kid string) (*xml.Envelope, error) {
       },
    }, nil
 }
-
