@@ -21,7 +21,7 @@ var rakuten = struct {
    kid_wv  string
    kid_pr  string
 }{
-   url:     "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=d41801ef-92a6-476b-a0f2-c88461316e80",
+   url:     "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=2b37fb51-8e1d-4ee5-ac2b-de265c3851ca",
    content: "rakuten.tv/cz?content_type=movies&content_id=transvulcania-the-people-s-run",
    key:     "ab82952e8b567a2359393201e4dde4b4",
    kid_wv:  "318f7ece69afcfe3e96de31be6b77272",
