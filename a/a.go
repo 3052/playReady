@@ -14,6 +14,26 @@ import (
    "math/big"
 )
 
+// pkg.go.dev/crypto/ecdsa#PublicKey
+func (x *XmlKey) New() error {
+   key, err := ecdsa.GenerateKey(elliptic.P256(), Fill('A'))
+   if err != nil {
+      return err
+   }
+   data := key.PublicKey.X.Bytes()
+   n := copy(x.AesIv[:], data)
+   data = data[n:]
+   copy(x.AesKey[:], data)
+   x.PublicKey = key.PublicKey
+   return nil
+}
+
+type XmlKey struct {
+   AesIv     [16]byte
+   AesKey    [16]byte
+   PublicKey ecdsa.PublicKey
+}
+
 func (c *ContentKey) Decrypt(key *ecdsa.PrivateKey, aux_keys *AuxKeys) error {
    switch c.CipherType {
    case 3:
@@ -33,26 +53,6 @@ func (e *EcKey) PublicBytes() []byte {
    return append(e[0].PublicKey.X.Bytes(), e[0].PublicKey.Y.Bytes()...)
 }
 
-// pkg.go.dev/crypto/ecdsa#PublicKey
-func (x *XmlKey) New() error {
-   key, err := ecdsa.GenerateKey(elliptic.P256(), Fill)
-   if err != nil {
-      return err
-   }
-   data := key.PublicKey.X.Bytes()
-   n := copy(x.AesIv[:], data)
-   data = data[n:]
-   copy(x.AesKey[:], data)
-   x.PublicKey = key.PublicKey
-   return nil
-}
-
-type XmlKey struct {
-   AesIv     [16]byte
-   AesKey    [16]byte
-   PublicKey ecdsa.PublicKey
-}
-
 func (e *EcKey) LoadBytes(data []byte) {
    var public ecdsa.PublicKey
    public.Curve = elliptic.P256()
@@ -65,7 +65,7 @@ func (e *EcKey) LoadBytes(data []byte) {
 
 func (e *EcKey) New() error {
    var err error
-   e[0], err = ecdsa.GenerateKey(elliptic.P256(), Fill)
+   e[0], err = ecdsa.GenerateKey(elliptic.P256(), Fill('B'))
    if err != nil {
       return err
    }
@@ -78,17 +78,15 @@ func (e EcKey) Private() []byte {
    return data[:]
 }
 
-type Filler byte
+type Fill byte
 
 // github.com/golang/go/issues/58454
-func (f Filler) Read(data []byte) (int, error) {
+func (f Fill) Read(data []byte) (int, error) {
    for index := range data {
       data[index] = byte(f)
    }
    return len(data), nil
 }
-
-var Fill Filler = '!'
 
 type Guid struct {
    Data1 uint32 // little endian
