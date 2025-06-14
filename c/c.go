@@ -33,7 +33,9 @@ func (d *Device) Encode() []byte {
 }
 
 func (c *Chain) CreateLeaf(ModelKey, SigningKey, EncryptKey a.EcKey) error {
-   if !bytes.Equal(c.Certs[0].KeyData.Keys[0].PublicKey[:], ModelKey.PublicBytes()) {
+   if !bytes.Equal(
+      c.Certs[0].KeyData.Keys[0].PublicKey[:], ModelKey.PublicBytes(),
+   ) {
       return errors.New("zgpriv not for cert")
    }
    if !c.Verify() {
@@ -76,7 +78,7 @@ func (c *Chain) CreateLeaf(ModelKey, SigningKey, EncryptKey a.EcKey) error {
    var UnsignedCert Cert
    UnsignedCert.NewNoSig(leaf_data)
    SignatureDigest := sha256.Sum256(UnsignedCert.Encode())
-   r, s, err := ecdsa.Sign(a.Fill, ModelKey.Key, SignatureDigest[:])
+   r, s, err := ecdsa.Sign(a.Fill, ModelKey[0], SignatureDigest[:])
    if err != nil {
       return err
    }
@@ -149,10 +151,10 @@ func (f *Feature) Decode(data []byte) (int, error) {
    return n, nil
 }
 
-func (k *Key) New(Key []byte, Type int) {
+func (k *Key) New(key []byte, Type int) {
    k.Type = 1
    k.Length = 512
-   copy(k.PublicKey[:], Key)
+   copy(k.PublicKey[:], key)
    k.Usage.New(Type)
 }
 

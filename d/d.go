@@ -12,6 +12,67 @@ import (
    "errors"
 )
 
+func ParseLicense(device *c.LocalDevice, data []byte) (*a.ContentKey, error) {
+   var response xml.EnvelopeResponse
+   err := response.Unmarshal(data)
+   if err != nil {
+      return nil, err
+   }
+   if fault := response.Body.Fault; fault != nil {
+      return nil, errors.New(fault.Fault)
+   }
+   decoded, err := base64.StdEncoding.DecodeString(response.
+      Body.
+      AcquireLicenseResponse.
+      AcquireLicenseResult.
+      Response.
+      LicenseResponse.
+      Licenses.
+      License,
+   )
+   if err != nil {
+      return nil, err
+   }
+   var license a.LicenseResponse
+   err = license.Decode(decoded)
+   if err != nil {
+      return nil, err
+   }
+   if !bytes.Equal(license.ECCKeyObject.Value, device.EncryptKey.PublicBytes()) {
+      return nil, errors.New("license response is not for this device")
+   }
+   err = license.ContentKeyObject.Decrypt(
+      device.EncryptKey[0], license.AuxKeyObject,
+   )
+   if err != nil {
+      return nil, err
+   }
+   err = license.Verify(license.ContentKeyObject.Integrity.Guid())
+   if err != nil {
+      return nil, err
+   }
+   return license.ContentKeyObject, nil
+}
+
+func get_cipher_data(chain *c.Chain, key *a.XmlKey) ([]byte, error) {
+   value := xml.Data{
+      CertificateChains: xml.CertificateChains{
+         CertificateChain: base64.StdEncoding.EncodeToString(chain.Encode()),
+      },
+      Features: xml.Features{
+         Feature: xml.Feature{"AESCBC"}, // SCALABLE
+      },
+   }
+   data1, err := value.Marshal()
+   if err != nil {
+      return nil, err
+   }
+   data1, err = a.AesCbcPaddingEncrypt(data1, key.AesKey[:], key.AesIv[:])
+   if err != nil {
+      return nil, err
+   }
+   return append(key.AesIv[:], data1...), nil
+}
 func new_la(key *a.XmlKey, cipher_data []byte, kid string) (*xml.La, error) {
    x, y, err := elGamal.KeyGeneration()
    if err != nil {
@@ -96,7 +157,7 @@ func new_envelope(device *c.LocalDevice, kid string) (*xml.Envelope, error) {
       return nil, err
    }
    signed_digest := sha256.Sum256(signed_data)
-   r, s, err := ecdsa.Sign(a.Fill, device.SigningKey.Key, signed_digest[:])
+   r, s, err := ecdsa.Sign(a.Fill, device.SigningKey[0], signed_digest[:])
    if err != nil {
       return nil, err
    }
@@ -121,62 +182,3 @@ func new_envelope(device *c.LocalDevice, kid string) (*xml.Envelope, error) {
    }, nil
 }
 
-func ParseLicense(device *c.LocalDevice, data []byte) (*a.ContentKey, error) {
-   var response xml.EnvelopeResponse
-   err := response.Unmarshal(data)
-   if err != nil {
-      return nil, err
-   }
-   if fault := response.Body.Fault; fault != nil {
-      return nil, errors.New(fault.Fault)
-   }
-   decoded, err := base64.StdEncoding.DecodeString(response.
-      Body.
-      AcquireLicenseResponse.
-      AcquireLicenseResult.
-      Response.
-      LicenseResponse.
-      Licenses.
-      License,
-   )
-   if err != nil {
-      return nil, err
-   }
-   var license a.LicenseResponse
-   err = license.Decode(decoded)
-   if err != nil {
-      return nil, err
-   }
-   if !bytes.Equal(license.ECCKeyObject.Value, device.EncryptKey.PublicBytes()) {
-      return nil, errors.New("license response is not for this device")
-   }
-   err = license.ContentKeyObject.Decrypt(device.EncryptKey, license.AuxKeyObject)
-   if err != nil {
-      return nil, err
-   }
-   err = license.Verify(license.ContentKeyObject.Integrity.Guid())
-   if err != nil {
-      return nil, err
-   }
-   return license.ContentKeyObject, nil
-}
-
-func get_cipher_data(chain *c.Chain, key *a.XmlKey) ([]byte, error) {
-   value := xml.Data{
-      CertificateChains: xml.CertificateChains{
-         CertificateChain: base64.StdEncoding.EncodeToString(chain.Encode()),
-      },
-      Features: xml.Features{
-         Feature: xml.Feature{"AESCBC"}, // SCALABLE
-      },
-   }
-   data1, err := value.Marshal()
-   if err != nil {
-      return nil, err
-   }
-   data1, err = a.AesCbcPaddingEncrypt(data1, key.AesKey[:], key.AesIv[:])
-   if err != nil {
-      return nil, err
-   }
-   return append(key.AesIv[:], data1...), nil
-}

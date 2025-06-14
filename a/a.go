@@ -14,71 +14,9 @@ import (
    "math/big"
 )
 
-func (c *ContentKey) Decrypt(key EcKey, aux_keys *AuxKeys) error {
-   switch c.CipherType {
-   case 3:
-      decrypted := elGamal.Decrypt(c.Value, key.Key.D)
-      c.Integrity.Decode(decrypted)
-      decrypted = decrypted[16:]
-      copy(c.Key[:], decrypted)
-      return nil
-   case 6:
-      return c.Scalable(key, aux_keys)
-   }
-   return errors.New("cant decrypt key")
-}
-
-func (c *ContentKey) Scalable(key EcKey, aux_keys *AuxKeys) error {
-   rootKeyInfo := c.Value[:144]
-   root_key := rootKeyInfo[128:]
-   leaf_keys := c.Value[144:]
-   decrypted := elGamal.Decrypt(rootKeyInfo[:128], key.Key.D)
-   var (
-      CI [16]byte
-      CK [16]byte
-   )
-   for i := range 16 {
-      CI[i] = decrypted[i*2]
-      CK[i] = decrypted[i*2+1]
-   }
-   magic_constant_zero, err := c.magic_constant_zero()
-   if err != nil {
-      return err
-   }
-   rgb_uplink_xkey := XorKey(CK[:], magic_constant_zero)
-   content_key_prime, err := aes_ecb_encrypt(rgb_uplink_xkey, CK[:])
-   if err != nil {
-      return err
-   }
-   aux_key_calc, err := aes_ecb_encrypt(
-      aux_keys.Keys[0].Key[:], content_key_prime,
-   )
-   if err != nil {
-      return err
-   }
-   var zero [16]byte
-   up_link_xkey := XorKey(aux_key_calc, zero[:])
-   o_secondary_key, err := aes_ecb_encrypt(root_key, CK[:])
-   if err != nil {
-      return err
-   }
-   rgb_key, err := aes_ecb_encrypt(leaf_keys, up_link_xkey)
-   if err != nil {
-      return err
-   }
-   rgb_key, err = aes_ecb_encrypt(rgb_key, o_secondary_key)
-   if err != nil {
-      return err
-   }
-   c.Integrity.Decode(rgb_key[:])
-   rgb_key = rgb_key[16:]
-   copy(c.Key[:], rgb_key)
-   return nil
-}
-
 // pkg.go.dev/crypto/ecdsa#PublicKey
 func (e *EcKey) PublicBytes() []byte {
-   return append(e.Key.PublicKey.X.Bytes(), e.Key.PublicKey.Y.Bytes()...)
+   return append(e[0].PublicKey.X.Bytes(), e[0].PublicKey.Y.Bytes()...)
 }
 
 // pkg.go.dev/crypto/ecdsa#PublicKey
@@ -101,10 +39,6 @@ type XmlKey struct {
    PublicKey ecdsa.PublicKey
 }
 
-type EcKey struct {
-   Key *ecdsa.PrivateKey
-}
-
 func (e *EcKey) LoadBytes(data []byte) {
    var public ecdsa.PublicKey
    public.Curve = elliptic.P256()
@@ -112,12 +46,12 @@ func (e *EcKey) LoadBytes(data []byte) {
    var private ecdsa.PrivateKey
    private.D = new(big.Int).SetBytes(data)
    private.PublicKey = public
-   e.Key = &private
+   e[0] = &private
 }
 
 func (e *EcKey) New() error {
    var err error
-   e.Key, err = ecdsa.GenerateKey(elliptic.P256(), Fill)
+   e[0], err = ecdsa.GenerateKey(elliptic.P256(), Fill)
    if err != nil {
       return err
    }
@@ -126,7 +60,7 @@ func (e *EcKey) New() error {
 
 func (e EcKey) Private() []byte {
    var data [32]byte
-   e.Key.D.FillBytes(data[:])
+   e[0].D.FillBytes(data[:])
    return data[:]
 }
 
@@ -237,9 +171,9 @@ func (a *AuxKeys) Decode(data []byte) {
    a.Count = binary.BigEndian.Uint16(data)
    data = data[2:]
    for range a.Count {
-      var Key AuxKey
-      n := Key.Decode(data)
-      a.Keys = append(a.Keys, Key)
+      var key AuxKey
+      n := key.Decode(data)
+      a.Keys = append(a.Keys, key)
       data = data[n:]
    }
 }
@@ -498,4 +432,68 @@ func AesCbcPaddingEncrypt(data, key, iv []byte) ([]byte, error) {
    bin := crypto.FromBytes(data).WithKey(key).WithIv(iv).
       Aes().CBC().PKCS7Padding().Encrypt()
    return bin.ToBytes(), bin.Error()
+}
+
+func (c *ContentKey) Decrypt(key *ecdsa.PrivateKey, aux_keys *AuxKeys) error {
+   switch c.CipherType {
+   case 3:
+      decrypted := elGamal.Decrypt(c.Value, key.D)
+      c.Integrity.Decode(decrypted)
+      decrypted = decrypted[16:]
+      copy(c.Key[:], decrypted)
+      return nil
+   case 6:
+      return c.Scalable(key, aux_keys)
+   }
+   return errors.New("cant decrypt key")
+}
+
+type EcKey [1]*ecdsa.PrivateKey
+
+func (c *ContentKey) Scalable(key *ecdsa.PrivateKey, aux_keys *AuxKeys) error {
+   rootKeyInfo := c.Value[:144]
+   root_key := rootKeyInfo[128:]
+   leaf_keys := c.Value[144:]
+   decrypted := elGamal.Decrypt(rootKeyInfo[:128], key.D)
+   var (
+      CI [16]byte
+      CK [16]byte
+   )
+   for i := range 16 {
+      CI[i] = decrypted[i*2]
+      CK[i] = decrypted[i*2+1]
+   }
+   magic_constant_zero, err := c.magic_constant_zero()
+   if err != nil {
+      return err
+   }
+   rgb_uplink_xkey := XorKey(CK[:], magic_constant_zero)
+   content_key_prime, err := aes_ecb_encrypt(rgb_uplink_xkey, CK[:])
+   if err != nil {
+      return err
+   }
+   aux_key_calc, err := aes_ecb_encrypt(
+      aux_keys.Keys[0].Key[:], content_key_prime,
+   )
+   if err != nil {
+      return err
+   }
+   var zero [16]byte
+   up_link_xkey := XorKey(aux_key_calc, zero[:])
+   o_secondary_key, err := aes_ecb_encrypt(root_key, CK[:])
+   if err != nil {
+      return err
+   }
+   rgb_key, err := aes_ecb_encrypt(leaf_keys, up_link_xkey)
+   if err != nil {
+      return err
+   }
+   rgb_key, err = aes_ecb_encrypt(rgb_key, o_secondary_key)
+   if err != nil {
+      return err
+   }
+   c.Integrity.Decode(rgb_key[:])
+   rgb_key = rgb_key[16:]
+   copy(c.Key[:], rgb_key)
+   return nil
 }
