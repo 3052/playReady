@@ -14,6 +14,54 @@ import (
    "testing"
 )
 
+func TestRakuten(t *testing.T) {
+   var device c.LocalDevice
+   data, err := os.ReadFile(SL2000.dir + "chain.txt")
+   if err != nil {
+      t.Fatal(err)
+   }
+   err = device.CertificateChain.Decode(data)
+   if err != nil {
+      t.Fatal(err)
+   }
+   data, err = os.ReadFile(SL2000.dir + "signing_key.txt")
+   if err != nil {
+      t.Fatal(err)
+   }
+   device.SigningKey.LoadBytes(data)
+   data, err = os.ReadFile(SL2000.dir + "encrypt_key.txt")
+   if err != nil {
+      t.Fatal(err)
+   }
+   device.EncryptKey.LoadBytes(data)
+   envelope1, err := new_envelope(&device, rakuten.kid_pr)
+   if err != nil {
+      t.Fatal(err)
+   }
+   data, err = xml.Marshal(envelope1)
+   if err != nil {
+      t.Fatal(err)
+   }
+   resp, err := http.Post(rakuten.url, "", bytes.NewReader(data))
+   if err != nil {
+      t.Fatal(err)
+   }
+   defer resp.Body.Close()
+   data, err = io.ReadAll(resp.Body)
+   if err != nil {
+      t.Fatal(err)
+   }
+   key, err := ParseLicense(&device, data)
+   if err != nil {
+      t.Fatal(err)
+   }
+   if hex.EncodeToString(key.KeyId.Uuid()) != rakuten.kid_wv {
+      t.Fatal(".KeyId")
+   }
+   if hex.EncodeToString(key.Key[:]) != rakuten.key {
+      t.Fatal(".Key")
+   }
+}
 var rakuten = struct {
    content string
    key     string
@@ -140,55 +188,6 @@ func TestScalable(t *testing.T) {
    }
    var zero [16]byte
    if !bytes.Equal(key.Key[:], zero[:]) {
-      t.Fatal(".Key")
-   }
-}
-
-func TestRakuten(t *testing.T) {
-   var device c.LocalDevice
-   data, err := os.ReadFile(SL2000.dir + "chain.txt")
-   if err != nil {
-      t.Fatal(err)
-   }
-   err = device.CertificateChain.Decode(data)
-   if err != nil {
-      t.Fatal(err)
-   }
-   data, err = os.ReadFile(SL2000.dir + "signing_key.txt")
-   if err != nil {
-      t.Fatal(err)
-   }
-   device.SigningKey.LoadBytes(data)
-   data, err = os.ReadFile(SL2000.dir + "encrypt_key.txt")
-   if err != nil {
-      t.Fatal(err)
-   }
-   device.EncryptKey.LoadBytes(data)
-   envelope1, err := new_envelope(&device, rakuten.kid_pr)
-   if err != nil {
-      t.Fatal(err)
-   }
-   data, err = xml.Marshal(envelope1)
-   if err != nil {
-      t.Fatal(err)
-   }
-   resp, err := http.Post(rakuten.url, "", bytes.NewReader(data))
-   if err != nil {
-      t.Fatal(err)
-   }
-   defer resp.Body.Close()
-   data, err = io.ReadAll(resp.Body)
-   if err != nil {
-      t.Fatal(err)
-   }
-   key, err := ParseLicense(&device, data)
-   if err != nil {
-      t.Fatal(err)
-   }
-   if hex.EncodeToString(key.KeyId.Uuid()) != rakuten.kid_wv {
-      t.Fatal(".KeyId")
-   }
-   if hex.EncodeToString(key.Key[:]) != rakuten.key {
       t.Fatal(".Key")
    }
 }

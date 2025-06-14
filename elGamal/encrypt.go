@@ -21,7 +21,7 @@ func KeyGeneration() (*big.Int, *big.Int) {
 
 // wikipedia.org/wiki/ElGamal_encryption#Encryption
 // A second party, Bob, encrypts a message M to Microsoft under their public key
-func Encrypt(hX, hY *big.Int, m *ecdsa.PublicKey) []byte {
+func Encrypt(m *ecdsa.PublicKey, hX, hY *big.Int) []byte {
    // generator
    g := elliptic.P256()
    // choose an integer y randomly
