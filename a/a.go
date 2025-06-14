@@ -14,6 +14,35 @@ import (
    "slices"
 )
 
+func (e *EcKey) LoadBytes(data []byte) {
+   var public ecdsa.PublicKey
+   public.Curve = elliptic.P256()
+   public.X, public.Y = public.Curve.ScalarBaseMult(data)
+   var private ecdsa.PrivateKey
+   private.D = new(big.Int).SetBytes(data)
+   private.PublicKey = public
+   e.Key = &private
+}
+
+type EcKey struct {
+   Key *ecdsa.PrivateKey
+}
+
+var wmrm_public_key = "C8B6AF16EE941AADAA5389B4AF2C10E356BE42AF175EF3FACE93254E7B0B3D9B982B27B5CB2341326E56AA857DBFD5C634CE2CF9EA74FCA8F2AF5957EFEEA562"
+
+func (WMRM) Points() (*big.Int, *big.Int, error) {
+   bytes, err := hex.DecodeString(wmrm_public_key)
+   if err != nil {
+      return nil, nil, err
+   }
+   x := new(big.Int).SetBytes(bytes[:32])
+   y := new(big.Int).SetBytes(bytes[32:])
+   return x, y, nil
+}
+
+// wikipedia.org/wiki/Windows_Media_DRM
+type WMRM struct{}
+
 func (e *EcKey) New() error {
    var err error
    e.Key, err = ecdsa.GenerateKey(elliptic.P256(), Fill)
@@ -34,16 +63,6 @@ func (e EcKey) Private() []byte {
    var data [32]byte
    e.Key.D.FillBytes(data[:])
    return data[:]
-}
-
-type EcKey struct {
-   Key *ecdsa.PrivateKey
-}
-
-type XmlKey struct {
-   AesIv     [16]byte
-   AesKey    [16]byte
-   PublicKey ecdsa.PublicKey
 }
 
 type Filler byte
@@ -463,19 +482,6 @@ func (l *LicenseResponse) Verify(content_integrity []byte) error {
 
 type ElGamal struct{}
 
-func (ElGamal) Decrypt(ciphertext []byte, PrivateKey *big.Int) []byte {
-   curve_data := elliptic.P256()
-   x1 := new(big.Int).SetBytes(ciphertext[:32])
-   y1 := new(big.Int).SetBytes(ciphertext[32:64])
-   x2 := new(big.Int).SetBytes(ciphertext[64:96])
-   y2 := new(big.Int).SetBytes(ciphertext[96:128])
-   SX, SY := curve_data.ScalarMult(x1, y1, PrivateKey.Bytes())
-   NegSY := new(big.Int).Sub(curve_data.Params().P, SY)
-   NegSY.Mod(NegSY, curve_data.Params().P)
-   PX, PY := curve_data.Add(x2, y2, SX, NegSY)
-   return append(PX.Bytes(), PY.Bytes()...)
-}
-
 func (c *ContentKey) Decrypt(key EcKey, aux_keys *AuxKeys) error {
    switch c.CipherType {
    case 3:
@@ -502,40 +508,35 @@ func AesCbcPaddingEncrypt(data, key, iv []byte) ([]byte, error) {
    return bin.ToBytes(), bin.Error()
 }
 
-func (ElGamal) Encrypt(PubX, PubY *big.Int, plaintext *XmlKey) []byte {
-   curve_data := elliptic.P256()
-   curve_int := big.NewInt(1)
-   C1X, C1Y := curve_data.ScalarMult(
-      curve_data.Params().Gx, curve_data.Params().Gy, curve_int.Bytes(),
-   )
-   C2XMulti, C2YMulti := curve_data.ScalarMult(PubX, PubY, curve_int.Bytes())
-   C2X, C2Y := curve_data.Add(
-      plaintext.PublicKey.X, plaintext.PublicKey.Y, C2XMulti, C2YMulti,
-   )
-   return slices.Concat(C1X.Bytes(), C1Y.Bytes(), C2X.Bytes(), C2Y.Bytes())
+type XmlKey struct {
+   AesIv     [16]byte
+   AesKey    [16]byte
+   PublicKey ecdsa.PublicKey
 }
 
-var wmrm_public_key = "C8B6AF16EE941AADAA5389B4AF2C10E356BE42AF175EF3FACE93254E7B0B3D9B982B27B5CB2341326E56AA857DBFD5C634CE2CF9EA74FCA8F2AF5957EFEEA562"
-
-func (WMRM) Points() (*big.Int, *big.Int, error) {
-   bytes, err := hex.DecodeString(wmrm_public_key)
-   if err != nil {
-      return nil, nil, err
-   }
-   x := new(big.Int).SetBytes(bytes[:32])
-   y := new(big.Int).SetBytes(bytes[32:])
-   return x, y, nil
+func (ElGamal) Encrypt(
+   publicKeyX, publicKeyY *big.Int, msg *ecdsa.PublicKey,
+) []byte {
+   curve := elliptic.P256()
+   r := big.NewInt(1)
+   // Calculate first component C1 = g^r
+   c1X, c1Y := curve.ScalarBaseMult(r.Bytes())
+   // Calculate shared secret s = (h^r)
+   sX, sY := curve.ScalarMult(publicKeyX, publicKeyY, r.Bytes())
+   // Second component C2 = M + s (point addition for elliptic curves)
+   c2X, c2Y := curve.Add(msg.X, msg.Y, sX, sY)
+   return slices.Concat(c1X.Bytes(), c1Y.Bytes(), c2X.Bytes(), c2Y.Bytes())
 }
 
-// wikipedia.org/wiki/Windows_Media_DRM
-type WMRM struct{}
-
-func (e *EcKey) LoadBytes(data []byte) {
-   var public ecdsa.PublicKey
-   public.Curve = elliptic.P256()
-   public.X, public.Y = public.Curve.ScalarBaseMult(data)
-   var private ecdsa.PrivateKey
-   private.D = new(big.Int).SetBytes(data)
-   private.PublicKey = public
-   e.Key = &private
+func (ElGamal) Decrypt(ciphertext []byte, PrivateKey *big.Int) []byte {
+   curve := elliptic.P256()
+   x1 := new(big.Int).SetBytes(ciphertext[:32])
+   y1 := new(big.Int).SetBytes(ciphertext[32:64])
+   x2 := new(big.Int).SetBytes(ciphertext[64:96])
+   y2 := new(big.Int).SetBytes(ciphertext[96:128])
+   sX, sY := curve.ScalarMult(x1, y1, PrivateKey.Bytes())
+   NegSY := new(big.Int).Sub(curve.Params().P, sY)
+   NegSY.Mod(NegSY, curve.Params().P)
+   PX, PY := curve.Add(x2, y2, sX, NegSY)
+   return append(PX.Bytes(), PY.Bytes()...)
 }

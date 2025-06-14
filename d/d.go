@@ -11,6 +11,60 @@ import (
    "errors"
 )
 
+func new_la(key *a.XmlKey, cipher_data []byte, kid string) (*xml.La, error) {
+   var ecc_pub_key a.WMRM
+   x, y, err := ecc_pub_key.Points()
+   if err != nil {
+      return nil, err
+   }
+   return &xml.La{
+      XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/protocols",
+      Id:      "SignedData",
+      Version: "1",
+      ContentHeader: xml.ContentHeader{
+         WrmHeader: xml.WrmHeader{
+            XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/PlayReadyHeader",
+            Version: "4.0.0.0",
+            Data: xml.WrmHeaderData{
+               ProtectInfo: xml.ProtectInfo{
+                  KeyLen: "16",
+                  AlgId:  "AESCTR",
+               },
+               Kid: kid,
+            },
+         },
+      },
+      EncryptedData: xml.EncryptedData{
+         XmlNs: "http://www.w3.org/2001/04/xmlenc#",
+         Type:  "http://www.w3.org/2001/04/xmlenc#Element",
+         EncryptionMethod: xml.Algorithm{
+            Algorithm: "http://www.w3.org/2001/04/xmlenc#aes128-cbc",
+         },
+         KeyInfo: xml.KeyInfo{
+            XmlNs: "http://www.w3.org/2000/09/xmldsig#",
+            EncryptedKey: xml.EncryptedKey{
+               XmlNs: "http://www.w3.org/2001/04/xmlenc#",
+               EncryptionMethod: xml.Algorithm{
+                  Algorithm: "http://schemas.microsoft.com/DRM/2007/03/protocols#ecc256",
+               },
+               KeyInfo: xml.EncryptedKeyInfo{
+                  XmlNs:   "http://www.w3.org/2000/09/xmldsig#",
+                  KeyName: "WMRMServer",
+               },
+               CipherData: xml.CipherData{
+                  CipherValue: base64.StdEncoding.EncodeToString(
+                     a.ElGamal{}.Encrypt(x, y, &key.PublicKey),
+                  ),
+               },
+            },
+         },
+         CipherData: xml.CipherData{
+            CipherValue: base64.StdEncoding.EncodeToString(cipher_data),
+         },
+      },
+   }, nil
+}
+
 func new_envelope(device *c.LocalDevice, kid string) (*xml.Envelope, error) {
    var key a.XmlKey
    err := key.New()
@@ -125,58 +179,4 @@ func get_cipher_data(chain *c.Chain, key *a.XmlKey) ([]byte, error) {
       return nil, err
    }
    return append(key.AesIv[:], data1...), nil
-}
-
-func new_la(key *a.XmlKey, cipher_data []byte, kid string) (*xml.La, error) {
-   var ecc_pub_key a.WMRM
-   x, y, err := ecc_pub_key.Points()
-   if err != nil {
-      return nil, err
-   }
-   return &xml.La{
-      XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/protocols",
-      Id:      "SignedData",
-      Version: "1",
-      ContentHeader: xml.ContentHeader{
-         WrmHeader: xml.WrmHeader{
-            XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/PlayReadyHeader",
-            Version: "4.0.0.0",
-            Data: xml.WrmHeaderData{
-               ProtectInfo: xml.ProtectInfo{
-                  KeyLen: "16",
-                  AlgId:  "AESCTR",
-               },
-               Kid: kid,
-            },
-         },
-      },
-      EncryptedData: xml.EncryptedData{
-         XmlNs: "http://www.w3.org/2001/04/xmlenc#",
-         Type:  "http://www.w3.org/2001/04/xmlenc#Element",
-         EncryptionMethod: xml.Algorithm{
-            Algorithm: "http://www.w3.org/2001/04/xmlenc#aes128-cbc",
-         },
-         KeyInfo: xml.KeyInfo{
-            XmlNs: "http://www.w3.org/2000/09/xmldsig#",
-            EncryptedKey: xml.EncryptedKey{
-               XmlNs: "http://www.w3.org/2001/04/xmlenc#",
-               EncryptionMethod: xml.Algorithm{
-                  Algorithm: "http://schemas.microsoft.com/DRM/2007/03/protocols#ecc256",
-               },
-               KeyInfo: xml.EncryptedKeyInfo{
-                  XmlNs:   "http://www.w3.org/2000/09/xmldsig#",
-                  KeyName: "WMRMServer",
-               },
-               CipherData: xml.CipherData{
-                  CipherValue: base64.StdEncoding.EncodeToString(
-                     a.ElGamal{}.Encrypt(x, y, key),
-                  ),
-               },
-            },
-         },
-         CipherData: xml.CipherData{
-            CipherValue: base64.StdEncoding.EncodeToString(cipher_data),
-         },
-      },
-   }, nil
 }
