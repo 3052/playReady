@@ -126,14 +126,10 @@ func get_cipher_data(chain *c.Chain, key *a.XmlKey) ([]byte, error) {
    }
    return append(key.AesIv[:], data1...), nil
 }
+
 func new_la(key *a.XmlKey, cipher_data []byte, kid string) (*xml.La, error) {
    var ecc_pub_key a.WMRM
    x, y, err := ecc_pub_key.Points()
-   if err != nil {
-      return nil, err
-   }
-   var el_gamal a.ElGamal
-   encrypted, err := el_gamal.Encrypt(x, y, key)
    if err != nil {
       return nil, err
    }
@@ -172,7 +168,9 @@ func new_la(key *a.XmlKey, cipher_data []byte, kid string) (*xml.La, error) {
                   KeyName: "WMRMServer",
                },
                CipherData: xml.CipherData{
-                  CipherValue: base64.StdEncoding.EncodeToString(encrypted),
+                  CipherValue: base64.StdEncoding.EncodeToString(
+                     a.ElGamal{}.Encrypt(x, y, key),
+                  ),
                },
             },
          },
