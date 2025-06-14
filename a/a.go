@@ -45,19 +45,23 @@ type Guid struct {
 }
 
 func (k *Guid) Uuid() []byte {
-   var data []byte
-   data = binary.BigEndian.AppendUint32(data, k.Data1)
+   data := binary.BigEndian.AppendUint32(nil, k.Data1)
    data = binary.BigEndian.AppendUint16(data, k.Data2)
    data = binary.BigEndian.AppendUint16(data, k.Data3)
    return binary.BigEndian.AppendUint64(data, k.Data4)
 }
 
 func (k *Guid) Guid() []byte {
-   var data []byte
-   data = binary.LittleEndian.AppendUint32(data, k.Data1)
+   data := binary.LittleEndian.AppendUint32(nil, k.Data1)
    data = binary.LittleEndian.AppendUint16(data, k.Data2)
    data = binary.LittleEndian.AppendUint16(data, k.Data3)
    return binary.BigEndian.AppendUint64(data, k.Data4)
+}
+
+type Signature struct {
+   Type   uint16
+   Length uint16
+   Data   []byte
 }
 
 func (k *Guid) Decode(data []byte) {
@@ -68,105 +72,6 @@ func (k *Guid) Decode(data []byte) {
    k.Data3 = binary.LittleEndian.Uint16(data)
    data = data[2:]
    k.Data4 = binary.BigEndian.Uint64(data)
-}
-
-type Signature struct {
-   Type   uint16
-   Length uint16
-   Data   []byte
-}
-
-func (l *LicenseResponse) Decode(data []byte) error {
-   l.RawData = make([]byte, len(data))
-   copy(l.RawData, data)
-
-   n := copy(l.Magic[:], data)
-   l.Offset = binary.BigEndian.Uint16(data[n:])
-   n += 2
-   l.Version = binary.BigEndian.Uint16(data[n:])
-   n += 2
-   n += copy(l.RightsId[:], data[n:])
-
-   j, err := l.OuterContainer.Decode(data[n:])
-
-   if err != nil {
-      return err
-   }
-   n += int(j)
-
-   var size uint32
-
-   for size < l.OuterContainer.Length-16 {
-      var value FTLV
-      i, err := value.Decode(l.OuterContainer.Value[int(size):])
-      if err != nil {
-         return err
-      }
-      switch XmrType(value.Type) {
-      case GLOBAL_POLICY_CONTAINER_ENTRY_TYPE: // 2
-         // Rakuten
-      case PLAYBACK_POLICY_CONTAINER_ENTRY_TYPE: // 4
-         // Rakuten
-      case KEY_MATERIAL_CONTAINER_ENTRY_TYPE: // 9
-         var j uint32
-         for j < value.Length-16 {
-            var ftlv2 FTLV
-            k, err := ftlv2.Decode(value.Value[j:])
-            if err != nil {
-               return err
-            }
-            switch XmrType(ftlv2.Type) {
-            case CONTENT_KEY_ENTRY_TYPE: // 10
-               l.ContentKeyObject = &ContentKey{}
-               err = l.ContentKeyObject.Decode(ftlv2.Value)
-               if err != nil {
-                  return err
-               }
-            case DEVICE_KEY_ENTRY_TYPE: // 42
-               l.ECCKeyObject = &ECCKey{}
-               err = l.ECCKeyObject.Decode(ftlv2.Value)
-               if err != nil {
-                  return err
-               }
-            case AUX_KEY_ENTRY_TYPE: // 81
-               l.AuxKeyObject = &AuxKeys{}
-               err = l.AuxKeyObject.Decode(ftlv2.Value)
-               if err != nil {
-                  return err
-               }
-            default:
-               return errors.New("ftlv2.Type")
-            }
-            j += k
-         }
-      case SIGNATURE_ENTRY_TYPE: // 11
-         l.SignatureObject = &Signature{}
-         err := l.SignatureObject.Decode(value.Value)
-         l.SignatureObject.Length = uint16(value.Length)
-         if err != nil {
-            return err
-         }
-      default:
-         return errors.New("FTLV.Type")
-      }
-      size += i
-   }
-
-   return nil
-}
-
-func (l *LicenseResponse) Verify(content_integrity []byte) error {
-   data := l.Encode()
-   data = data[:len(l.RawData)-int(l.SignatureObject.Length)]
-   block, err := aes.NewCipher(content_integrity)
-   if err != nil {
-      return err
-   }
-   data = mac.NewCMAC(block, aes.BlockSize).MAC(data)
-   if !bytes.Equal(data, l.SignatureObject.Data) {
-      return errors.New("failed to decrypt the keys")
-   }
-   return nil
 }
 
 func (l *LicenseResponse) Encode() []byte {
@@ -205,6 +110,24 @@ type AuxKeys struct {
    Keys  []AuxKey
 }
 
+type AuxKey struct {
+   Location uint32
+   Key      [16]byte
+}
+
+type ECCKey struct {
+   Curve  uint16
+   Length uint16
+   Value  []byte
+}
+
+type FTLV struct {
+   Flags  uint16
+   Type   uint16
+   Length uint32
+   Value  []byte
+}
+
 func (a *AuxKeys) Decode(data []byte) error {
    a.Count = binary.BigEndian.Uint16(data)
    data = data[2:]
@@ -225,11 +148,6 @@ func (a *AuxKeys) Decode(data []byte) error {
    return nil
 }
 
-type AuxKey struct {
-   Location uint32
-   Key      [16]byte
-}
-
 func (a *AuxKey) Decode(data []byte) (int, error) {
    a.Location = binary.BigEndian.Uint32(data)
    data = data[4:]
@@ -237,12 +155,6 @@ func (a *AuxKey) Decode(data []byte) (int, error) {
    n := copy(a.Key[:], data)
 
    return n + 4, nil
-}
-
-type ECCKey struct {
-   Curve  uint16
-   Length uint16
-   Value  []byte
 }
 
 func (e *ECCKey) Decode(data []byte) error {
@@ -256,13 +168,6 @@ func (e *ECCKey) Decode(data []byte) error {
    copy(e.Value, data)
 
    return nil
-}
-
-type FTLV struct {
-   Flags  uint16
-   Type   uint16
-   Length uint32
-   Value  []byte
 }
 
 func (f *FTLV) Encode() []byte {
@@ -573,3 +478,96 @@ func (x *XmlKey) New() error {
    copy(x.AesKey[:], Aes)
    return nil
 }
+func (l *LicenseResponse) Decode(data []byte) error {
+   l.RawData = make([]byte, len(data))
+   copy(l.RawData, data)
+
+   n := copy(l.Magic[:], data)
+   l.Offset = binary.BigEndian.Uint16(data[n:])
+   n += 2
+   l.Version = binary.BigEndian.Uint16(data[n:])
+   n += 2
+   n += copy(l.RightsId[:], data[n:])
+
+   j, err := l.OuterContainer.Decode(data[n:])
+
+   if err != nil {
+      return err
+   }
+   n += int(j)
+
+   var size uint32
+
+   for size < l.OuterContainer.Length-16 {
+      var value FTLV
+      i, err := value.Decode(l.OuterContainer.Value[int(size):])
+      if err != nil {
+         return err
+      }
+      switch XmrType(value.Type) {
+      case GLOBAL_POLICY_CONTAINER_ENTRY_TYPE: // 2
+         // Rakuten
+      case PLAYBACK_POLICY_CONTAINER_ENTRY_TYPE: // 4
+         // Rakuten
+      case KEY_MATERIAL_CONTAINER_ENTRY_TYPE: // 9
+         var j uint32
+         for j < value.Length-16 {
+            var ftlv2 FTLV
+            k, err := ftlv2.Decode(value.Value[j:])
+            if err != nil {
+               return err
+            }
+            switch XmrType(ftlv2.Type) {
+            case CONTENT_KEY_ENTRY_TYPE: // 10
+               l.ContentKeyObject = &ContentKey{}
+               err = l.ContentKeyObject.Decode(ftlv2.Value)
+               if err != nil {
+                  return err
+               }
+            case DEVICE_KEY_ENTRY_TYPE: // 42
+               l.ECCKeyObject = &ECCKey{}
+               err = l.ECCKeyObject.Decode(ftlv2.Value)
+               if err != nil {
+                  return err
+               }
+            case AUX_KEY_ENTRY_TYPE: // 81
+               l.AuxKeyObject = &AuxKeys{}
+               err = l.AuxKeyObject.Decode(ftlv2.Value)
+               if err != nil {
+                  return err
+               }
+            default:
+               return errors.New("ftlv2.Type")
+            }
+            j += k
+         }
+      case SIGNATURE_ENTRY_TYPE: // 11
+         l.SignatureObject = &Signature{}
+         err := l.SignatureObject.Decode(value.Value)
+         l.SignatureObject.Length = uint16(value.Length)
+         if err != nil {
+            return err
+         }
+      default:
+         return errors.New("FTLV.Type")
+      }
+      size += i
+   }
+
+   return nil
+}
+
+func (l *LicenseResponse) Verify(content_integrity []byte) error {
+   data := l.Encode()
+   data = data[:len(l.RawData)-int(l.SignatureObject.Length)]
+   block, err := aes.NewCipher(content_integrity)
+   if err != nil {
+      return err
+   }
+   data = mac.NewCMAC(block, aes.BlockSize).MAC(data)
+   if !bytes.Equal(data, l.SignatureObject.Data) {
+      return errors.New("failed to decrypt the keys")
+   }
+   return nil
+}
+
