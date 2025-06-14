@@ -13,11 +13,41 @@ import (
    "math/big"
 )
 
+func (e *EcKey) New() error {
+   var err error
+   e.Key, err = ecdsa.GenerateKey(elliptic.P256(), Fill)
+   if err != nil {
+      return err
+   }
+   return nil
+}
+
+func (e *EcKey) LoadBytes(data []byte) {
+   var public ecdsa.PublicKey
+   public.Curve = elliptic.P256()
+   public.X, public.Y = public.Curve.ScalarBaseMult(data)
+   var private ecdsa.PrivateKey
+   private.D = new(big.Int).SetBytes(data)
+   private.PublicKey = public
+   e.Key = &private
+}
+
+func (e *EcKey) PublicBytes() []byte {
+   SigningX, SigningY := e.Key.PublicKey.X.Bytes(), e.Key.PublicKey.Y.Bytes()
+   SigningPublicKey := SigningX
+   SigningPublicKey = append(SigningPublicKey, SigningY...)
+   return SigningPublicKey
+}
+
+func (e EcKey) Private() []byte {
+   var data [32]byte
+   e.Key.D.FillBytes(data[:])
+   return data[:]
+}
+
 type EcKey struct {
    Key *ecdsa.PrivateKey
 }
-
-type ElGamal struct{}
 
 type XmlKey struct {
    AesIv     [16]byte
@@ -128,36 +158,24 @@ type FTLV struct {
    Value  []byte
 }
 
-func (a *AuxKeys) Decode(data []byte) error {
+func (a *AuxKeys) Decode(data []byte) {
    a.Count = binary.BigEndian.Uint16(data)
    data = data[2:]
-
    for range a.Count {
       var Key AuxKey
-
-      i, err := Key.Decode(data)
-
-      if err != nil {
-         return err
-      }
-
+      n := Key.Decode(data)
       a.Keys = append(a.Keys, Key)
-
-      data = data[i:]
+      data = data[n:]
    }
-   return nil
 }
 
-func (a *AuxKey) Decode(data []byte) (int, error) {
+func (a *AuxKey) Decode(data []byte) int {
    a.Location = binary.BigEndian.Uint32(data)
    data = data[4:]
-
-   n := copy(a.Key[:], data)
-
-   return n + 4, nil
+   return copy(a.Key[:], data) + 4
 }
 
-func (e *ECCKey) Decode(data []byte) error {
+func (e *ECCKey) Decode(data []byte) {
    e.Curve = binary.BigEndian.Uint16(data)
    data = data[2:]
 
@@ -166,8 +184,6 @@ func (e *ECCKey) Decode(data []byte) error {
 
    e.Value = make([]byte, e.Length)
    copy(e.Value, data)
-
-   return nil
 }
 
 func (f *FTLV) Encode() []byte {
@@ -208,11 +224,6 @@ type ContentKey struct {
    Key        [16]byte
 }
 
-func (c *ContentKey) ECC256(key EcKey) []byte {
-   var el_gamal ElGamal
-   return el_gamal.Decrypt(c.Value, key.Key.D)
-}
-
 func (c *ContentKey) Decode(data []byte) error {
    c.KeyId.Decode(data[:])
    data = data[16:]
@@ -244,55 +255,6 @@ func (c *ContentKey) Decrypt(key EcKey, aux_keys *AuxKeys) error {
       return c.Scalable(key, aux_keys)
    }
    return errors.New("cant decrypt key")
-}
-
-func (c *ContentKey) Scalable(key EcKey, aux_keys *AuxKeys) error {
-   rootKeyInfo := c.Value[:144]
-   root_key := rootKeyInfo[128:]
-   leaf_keys := c.Value[144:]
-   var el_gamal ElGamal
-   decrypted := el_gamal.Decrypt(rootKeyInfo[:128], key.Key.D)
-   var (
-      CI [16]byte
-      CK [16]byte
-   )
-   for i := range 16 {
-      CI[i] = decrypted[i*2]
-      CK[i] = decrypted[i*2+1]
-   }
-   magic_constant_zero, err := hex.DecodeString("7ee9ed4af773224f00b8ea7efb027cbb")
-   if err != nil {
-      return err
-   }
-   rgb_uplink_xkey := XorKey(CK[:], magic_constant_zero)
-   content_key_prime, err := aes_ecb_encrypt(rgb_uplink_xkey, CK[:])
-   if err != nil {
-      return err
-   }
-   aux_key_calc, err := aes_ecb_encrypt(
-      aux_keys.Keys[0].Key[:], content_key_prime,
-   )
-   if err != nil {
-      return err
-   }
-   var zero [16]byte
-   up_link_xkey := XorKey(aux_key_calc, zero[:])
-   o_secondary_key, err := aes_ecb_encrypt(root_key, CK[:])
-   if err != nil {
-      return err
-   }
-   rgb_key, err := aes_ecb_encrypt(leaf_keys, up_link_xkey)
-   if err != nil {
-      return err
-   }
-   rgb_key, err = aes_ecb_encrypt(rgb_key, o_secondary_key)
-   if err != nil {
-      return err
-   }
-   c.Integrity.Decode(rgb_key[:])
-   rgb_key = rgb_key[16:]
-   copy(c.Key[:], rgb_key)
-   return nil
 }
 
 type XmrType uint16
@@ -397,73 +359,58 @@ func XorKey(root, second []byte) []byte {
    return data
 }
 
-func (e *EcKey) New() error {
-   var err error
-   e.Key, err = ecdsa.GenerateKey(elliptic.P256(), Fill)
+func (c *ContentKey) ECC256(key EcKey) []byte {
+   var el_gamal ElGamal
+   return el_gamal.Decrypt(c.Value, key.Key.D)
+}
+
+func (c *ContentKey) Scalable(key EcKey, aux_keys *AuxKeys) error {
+   rootKeyInfo := c.Value[:144]
+   root_key := rootKeyInfo[128:]
+   leaf_keys := c.Value[144:]
+   var el_gamal ElGamal
+   decrypted := el_gamal.Decrypt(rootKeyInfo[:128], key.Key.D)
+   var (
+      CI [16]byte
+      CK [16]byte
+   )
+   for i := range 16 {
+      CI[i] = decrypted[i*2]
+      CK[i] = decrypted[i*2+1]
+   }
+   magic_constant_zero, err := hex.DecodeString("7ee9ed4af773224f00b8ea7efb027cbb")
    if err != nil {
       return err
    }
+   rgb_uplink_xkey := XorKey(CK[:], magic_constant_zero)
+   content_key_prime, err := aes_ecb_encrypt(rgb_uplink_xkey, CK[:])
+   if err != nil {
+      return err
+   }
+   aux_key_calc, err := aes_ecb_encrypt(
+      aux_keys.Keys[0].Key[:], content_key_prime,
+   )
+   if err != nil {
+      return err
+   }
+   var zero [16]byte
+   up_link_xkey := XorKey(aux_key_calc, zero[:])
+   o_secondary_key, err := aes_ecb_encrypt(root_key, CK[:])
+   if err != nil {
+      return err
+   }
+   rgb_key, err := aes_ecb_encrypt(leaf_keys, up_link_xkey)
+   if err != nil {
+      return err
+   }
+   rgb_key, err = aes_ecb_encrypt(rgb_key, o_secondary_key)
+   if err != nil {
+      return err
+   }
+   c.Integrity.Decode(rgb_key[:])
+   rgb_key = rgb_key[16:]
+   copy(c.Key[:], rgb_key)
    return nil
-}
-
-func (e *EcKey) LoadBytes(data []byte) {
-   var public ecdsa.PublicKey
-   public.Curve = elliptic.P256()
-   public.X, public.Y = public.Curve.ScalarBaseMult(data)
-   var private ecdsa.PrivateKey
-   private.D = new(big.Int).SetBytes(data)
-   private.PublicKey = public
-   e.Key = &private
-}
-
-func (e *EcKey) PublicBytes() []byte {
-   SigningX, SigningY := e.Key.PublicKey.X.Bytes(), e.Key.PublicKey.Y.Bytes()
-   SigningPublicKey := SigningX
-   SigningPublicKey = append(SigningPublicKey, SigningY...)
-   return SigningPublicKey
-}
-
-func (e EcKey) Private() []byte {
-   var data [32]byte
-   e.Key.D.FillBytes(data[:])
-   return data[:]
-}
-
-func (ElGamal) Decrypt(ciphertext []byte, PrivateKey *big.Int) []byte {
-   curveData := elliptic.P256()
-
-   x1, y1 := new(big.Int).SetBytes(ciphertext[:32]), new(big.Int).SetBytes(ciphertext[32:64])
-   x2, y2 := new(big.Int).SetBytes(ciphertext[64:96]), new(big.Int).SetBytes(ciphertext[96:128])
-
-   SX, SY := curveData.ScalarMult(x1, y1, PrivateKey.Bytes())
-
-   NegSY := new(big.Int).Sub(curveData.Params().P, SY)
-
-   NegSY.Mod(NegSY, curveData.Params().P)
-
-   PX, PY := curveData.Add(x2, y2, SX, NegSY)
-
-   Decrypted := PX.Bytes()
-
-   return append(Decrypted, PY.Bytes()...)
-}
-
-func (ElGamal) Encrypt(
-   PubX *big.Int, PubY *big.Int, plaintext *XmlKey,
-) ([]byte, error) {
-   curveData := elliptic.P256()
-   curve_int := big.NewInt(1)
-   C1X, C1Y := curveData.ScalarMult(
-      curveData.Params().Gx, curveData.Params().Gy, curve_int.Bytes(),
-   )
-   C2XMulti, C2YMulti := curveData.ScalarMult(PubX, PubY, curve_int.Bytes())
-   C2X, C2Y := curveData.Add(
-      plaintext.PublicKey.X, plaintext.PublicKey.Y, C2XMulti, C2YMulti,
-   )
-   Encrypted := C1X.Bytes()
-   Encrypted = append(Encrypted, C1Y.Bytes()...)
-   Encrypted = append(Encrypted, C2X.Bytes()...)
-   return append(Encrypted, C2Y.Bytes()...), nil
 }
 
 func (x *XmlKey) New() error {
@@ -478,6 +425,7 @@ func (x *XmlKey) New() error {
    copy(x.AesKey[:], Aes)
    return nil
 }
+
 func (l *LicenseResponse) Decode(data []byte) error {
    l.RawData = make([]byte, len(data))
    copy(l.RawData, data)
@@ -524,20 +472,17 @@ func (l *LicenseResponse) Decode(data []byte) error {
                if err != nil {
                   return err
                }
+            
             case DEVICE_KEY_ENTRY_TYPE: // 42
                l.ECCKeyObject = &ECCKey{}
-               err = l.ECCKeyObject.Decode(ftlv2.Value)
-               if err != nil {
-                  return err
-               }
+               l.ECCKeyObject.Decode(ftlv2.Value)
+            
             case AUX_KEY_ENTRY_TYPE: // 81
                l.AuxKeyObject = &AuxKeys{}
-               err = l.AuxKeyObject.Decode(ftlv2.Value)
-               if err != nil {
-                  return err
-               }
+               l.AuxKeyObject.Decode(ftlv2.Value)
+            
             default:
-               return errors.New("ftlv2.Type")
+               return errors.New("FTLV.Type")
             }
             j += k
          }
@@ -571,3 +516,39 @@ func (l *LicenseResponse) Verify(content_integrity []byte) error {
    return nil
 }
 
+type ElGamal struct{}
+
+func (ElGamal) Decrypt(ciphertext []byte, PrivateKey *big.Int) []byte {
+   curveData := elliptic.P256()
+
+   x1, y1 := new(big.Int).SetBytes(ciphertext[:32]), new(big.Int).SetBytes(ciphertext[32:64])
+   x2, y2 := new(big.Int).SetBytes(ciphertext[64:96]), new(big.Int).SetBytes(ciphertext[96:128])
+
+   SX, SY := curveData.ScalarMult(x1, y1, PrivateKey.Bytes())
+
+   NegSY := new(big.Int).Sub(curveData.Params().P, SY)
+
+   NegSY.Mod(NegSY, curveData.Params().P)
+
+   PX, PY := curveData.Add(x2, y2, SX, NegSY)
+
+   Decrypted := PX.Bytes()
+
+   return append(Decrypted, PY.Bytes()...)
+}
+
+func (ElGamal) Encrypt(PubX, PubY *big.Int, plaintext *XmlKey) ([]byte, error) {
+   curveData := elliptic.P256()
+   curve_int := big.NewInt(1)
+   C1X, C1Y := curveData.ScalarMult(
+      curveData.Params().Gx, curveData.Params().Gy, curve_int.Bytes(),
+   )
+   C2XMulti, C2YMulti := curveData.ScalarMult(PubX, PubY, curve_int.Bytes())
+   C2X, C2Y := curveData.Add(
+      plaintext.PublicKey.X, plaintext.PublicKey.Y, C2XMulti, C2YMulti,
+   )
+   Encrypted := C1X.Bytes()
+   Encrypted = append(Encrypted, C1Y.Bytes()...)
+   Encrypted = append(Encrypted, C2X.Bytes()...)
+   return append(Encrypted, C2Y.Bytes()...), nil
+}
