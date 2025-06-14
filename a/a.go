@@ -13,6 +13,69 @@ import (
    "math/big"
 )
 
+type EcKey struct {
+   Key *ecdsa.PrivateKey
+}
+
+type ElGamal struct{}
+
+type XmlKey struct {
+   AesIv     [16]byte
+   AesKey    [16]byte
+   PublicKey ecdsa.PublicKey
+}
+
+type Filler byte
+
+// github.com/golang/go/issues/58454
+func (f Filler) Read(data []byte) (int, error) {
+   for index := range data {
+      data[index] = byte(f)
+   }
+   return len(data), nil
+}
+
+var Fill Filler = '!'
+
+type Guid struct {
+   Data1 uint32 // little endian
+   Data2 uint16 // little endian
+   Data3 uint16 // little endian
+   Data4 uint64 // big endian
+}
+
+func (k *Guid) Uuid() []byte {
+   var data []byte
+   data = binary.BigEndian.AppendUint32(data, k.Data1)
+   data = binary.BigEndian.AppendUint16(data, k.Data2)
+   data = binary.BigEndian.AppendUint16(data, k.Data3)
+   return binary.BigEndian.AppendUint64(data, k.Data4)
+}
+
+func (k *Guid) Guid() []byte {
+   var data []byte
+   data = binary.LittleEndian.AppendUint32(data, k.Data1)
+   data = binary.LittleEndian.AppendUint16(data, k.Data2)
+   data = binary.LittleEndian.AppendUint16(data, k.Data3)
+   return binary.BigEndian.AppendUint64(data, k.Data4)
+}
+
+func (k *Guid) Decode(data []byte) {
+   k.Data1 = binary.LittleEndian.Uint32(data)
+   data = data[4:]
+   k.Data2 = binary.LittleEndian.Uint16(data)
+   data = data[2:]
+   k.Data3 = binary.LittleEndian.Uint16(data)
+   data = data[2:]
+   k.Data4 = binary.BigEndian.Uint64(data)
+}
+
+type Signature struct {
+   Type   uint16
+   Length uint16
+   Data   []byte
+}
+
 func (l *LicenseResponse) Decode(data []byte) error {
    l.RawData = make([]byte, len(data))
    copy(l.RawData, data)
@@ -105,18 +168,13 @@ func (l *LicenseResponse) Verify(content_integrity []byte) error {
    }
    return nil
 }
+
 func (l *LicenseResponse) Encode() []byte {
    data := l.Magic[:]
    data = binary.BigEndian.AppendUint16(data, l.Offset)
    data = binary.BigEndian.AppendUint16(data, l.Version)
    data = append(data, l.RightsId[:]...)
    return append(data, l.OuterContainer.Encode()...)
-}
-
-type Signature struct {
-   Type   uint16
-   Length uint16
-   Data   []byte
 }
 
 func (s *Signature) Decode(data []byte) error {
@@ -466,12 +524,6 @@ func (e EcKey) Private() []byte {
    return data[:]
 }
 
-type EcKey struct {
-   Key *ecdsa.PrivateKey
-}
-
-type ElGamal struct{}
-
 func (ElGamal) Decrypt(ciphertext []byte, PrivateKey *big.Int) []byte {
    curveData := elliptic.P256()
 
@@ -521,55 +573,3 @@ func (x *XmlKey) New() error {
    copy(x.AesKey[:], Aes)
    return nil
 }
-
-type XmlKey struct {
-   AesIv     [16]byte
-   AesKey    [16]byte
-   PublicKey ecdsa.PublicKey
-}
-
-type Filler byte
-
-// github.com/golang/go/issues/58454
-func (f Filler) Read(data []byte) (int, error) {
-   for index := range data {
-      data[index] = byte(f)
-   }
-   return len(data), nil
-}
-
-var Fill Filler = '!'
-
-type Guid struct {
-   Data1 uint32 // little endian
-   Data2 uint16 // little endian
-   Data3 uint16 // little endian
-   Data4 uint64 // big endian
-}
-
-func (k *Guid) Uuid() []byte {
-   var data []byte
-   data = binary.BigEndian.AppendUint32(data, k.Data1)
-   data = binary.BigEndian.AppendUint16(data, k.Data2)
-   data = binary.BigEndian.AppendUint16(data, k.Data3)
-   return binary.BigEndian.AppendUint64(data, k.Data4)
-}
-
-func (k *Guid) Guid() []byte {
-   var data []byte
-   data = binary.LittleEndian.AppendUint32(data, k.Data1)
-   data = binary.LittleEndian.AppendUint16(data, k.Data2)
-   data = binary.LittleEndian.AppendUint16(data, k.Data3)
-   return binary.BigEndian.AppendUint64(data, k.Data4)
-}
-
-func (k *Guid) Decode(data []byte) {
-   k.Data1 = binary.LittleEndian.Uint32(data)
-   data = data[4:]
-   k.Data2 = binary.LittleEndian.Uint16(data)
-   data = data[2:]
-   k.Data3 = binary.LittleEndian.Uint16(data)
-   data = data[2:]
-   k.Data4 = binary.BigEndian.Uint64(data)
-}
-
