@@ -4,6 +4,7 @@ import (
    "41.neocities.org/playReady/a"
    "41.neocities.org/playReady/c"
    "41.neocities.org/playReady/xml"
+   "41.neocities.org/playReady/elGamal"
    "bytes"
    "crypto/ecdsa"
    "crypto/sha256"
@@ -12,8 +13,7 @@ import (
 )
 
 func new_la(key *a.XmlKey, cipher_data []byte, kid string) (*xml.La, error) {
-   var el_gamal a.ElGamal
-   x, y, err := el_gamal.KeyGeneration()
+   x, y, err := elGamal.KeyGeneration()
    if err != nil {
       return nil, err
    }
@@ -53,7 +53,7 @@ func new_la(key *a.XmlKey, cipher_data []byte, kid string) (*xml.La, error) {
                },
                CipherData: xml.CipherData{
                   CipherValue: base64.StdEncoding.EncodeToString(
-                     a.ElGamal{}.Encrypt(x, y, &key.PublicKey),
+                     elGamal.Encrypt(x, y, &key.PublicKey),
                   ),
                },
             },
