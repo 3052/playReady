@@ -136,16 +136,6 @@ type licenseResponse struct {
    auxKeyObject     *auxKeys
 }
 
-// Chain represents a chain of certificates.
-type Chain struct {
-   magic     [4]byte
-   version   uint32
-   length    uint32
-   flags     uint32
-   certCount uint32
-   certs     []certificate
-}
-
 // Encode encodes the Chain into a byte slice.
 func (c *Chain) Encode() []byte {
    data := c.magic[:]
@@ -153,8 +143,8 @@ func (c *Chain) Encode() []byte {
    data = binary.BigEndian.AppendUint32(data, c.length)
    data = binary.BigEndian.AppendUint32(data, c.flags)
    data = binary.BigEndian.AppendUint32(data, c.certCount)
-   for _, cert1 := range c.certs {
-      data = append(data, cert1.encode()...)
+   for _, cert := range c.certs {
+      data = append(data, cert.encode()...)
    }
    return data
 }
@@ -169,13 +159,22 @@ func (c *Chain) verify() bool {
       if !valid {
          return false
       }
-      // The public key of the current certificate becomes the issuer key for the next in the chain.
+      // The public key of the current certificate becomes the issuer key for
+      // the next in the chain.
       modelBase = c.certs[i].keyData.keys[0].publicKey[:]
    }
    return true
 }
 
-///
+// Chain represents a chain of certificates.
+type Chain struct {
+   magic     [4]byte
+   version   uint32
+   length    uint32
+   flags     uint32
+   certCount uint32
+   certs     []certificate
+}
 
 // Decode decodes a byte slice into the Chain structure.
 func (c *Chain) Decode(data []byte) error {
@@ -192,15 +191,141 @@ func (c *Chain) Decode(data []byte) error {
    data = data[4:]
    c.certCount = binary.BigEndian.Uint32(data)
    data = data[4:]
-   for range c.certCount {
-      var cert1 certificate
-      i, err := cert1.decode(data)
+   c.certs = make([]certificate, c.certCount)
+   for i := range c.certCount {
+      var cert certificate
+      n, err := cert.decode(data)
       if err != nil {
          return err
       }
-      data = data[i:]
-      c.certs = append(c.certs, cert1)
+      c.certs[i] = cert
+      data = data[n:]
    }
+   return nil
+}
+
+// decode decodes a byte slice into the Cert structure.
+func (c *certificate) decode(data []byte) (int, error) {
+   n := copy(c.magic[:], data)
+   if string(c.magic[:]) != "CERT" {
+      return 0, errors.New("failed to find cert magic")
+   }
+   c.version = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   c.length = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   c.lengthToSignature = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   c.rawData = data[n:][:c.length-16]
+   n += len(c.rawData)
+   var n1 int
+   for n1 < len(c.rawData) {
+      var value ftlv
+      n1 += value.decode(c.rawData[n1:])
+      switch value.Type {
+      case objTypeBasic:
+         c.certificateInfo = &certInfo{}
+         c.certificateInfo.decode(value.Value)
+      case objTypeFeature:
+         c.features = &feature{}
+         c.features.decode(value.Value)
+      case objTypeKey:
+         c.keyData = &keyInfo{}
+         c.keyData.decode(value.Value)
+      case objTypeManufacturer:
+         c.manufacturerInfo = &manufacturer{}
+         c.manufacturerInfo.decode(value.Value)
+      case objTypeSignature:
+         c.signatureData = &ecdsaSignature{}
+         c.signatureData.decode(value.Value)
+      }
+   }
+   return n, nil
+}
+
+// verify verifies the signature of the certificate using the provided public
+// key.
+func (c *certificate) verify(pubKey []byte) bool {
+   // Check if the issuer key in the signature matches the provided public key.
+   if !bytes.Equal(c.signatureData.IssuerKey, pubKey) {
+      return false
+   }
+   // Reconstruct the ECDSA public key from the byte slice.
+   publicKey := ecdsa.PublicKey{
+      Curve: elliptic.P256(), // Assuming P256 curve
+      X: new(big.Int).SetBytes(pubKey[:32]),
+      Y: new(big.Int).SetBytes(pubKey[32:]),
+   }
+   // Get the data that was signed (up to lengthToSignature).
+   data := c.encode()
+   data = data[:c.lengthToSignature]
+   signatureDigest := sha256.Sum256(data)
+   // Extract R and S components from the signature data.
+   sign := c.signatureData.SignatureData
+   r := new(big.Int).SetBytes(sign[:32])
+   s := new(big.Int).SetBytes(sign[32:])
+   // Verify the signature.
+   return ecdsa.Verify(&publicKey, signatureDigest[:], r, s)
+}
+
+///
+
+// Decode decodes a byte slice into a LicenseResponse structure.
+func (l *licenseResponse) decode(data []byte) error {
+   l.RawData = data
+   n := copy(l.Magic[:], data)
+   l.Offset = binary.BigEndian.Uint16(data[n:])
+   n += 2
+   l.Version = binary.BigEndian.Uint16(data[n:])
+   n += 2
+   n += copy(l.RightsID[:], data[n:])
+   n += l.OuterContainer.decode(data[n:])
+
+   var size int
+
+   for size < int(l.OuterContainer.Length)-16 {
+      var value ftlv
+      i := value.decode(l.OuterContainer.Value[size:])
+      switch xmrType(value.Type) {
+      case globalPolicyContainerEntryType: // 2
+         // Rakuten
+      case playbackPolicyContainerEntryType: // 4
+         // Rakuten
+      case keyMaterialContainerEntryType: // 9
+         var j int
+         for j < int(value.Length)-16 {
+            var value1 ftlv
+            k := value1.decode(value.Value[j:])
+
+            switch xmrType(value1.Type) {
+            case contentKeyEntryType: // 10
+               l.contentKeyObject = &ContentKey{}
+               l.contentKeyObject.decode(value1.Value)
+
+            case deviceKeyEntryType: // 42
+               l.eccKeyObject = &eccKey{}
+               l.eccKeyObject.decode(value1.Value)
+
+            case auxKeyEntryType: // 81
+               l.auxKeyObject = &auxKeys{}
+               l.auxKeyObject.decode(value1.Value)
+
+            default:
+               return errors.New("FTLV.type")
+            }
+            j += k
+         }
+      case signatureEntryType: // 11
+         l.signatureObject = &signature{}
+         l.signatureObject.decode(value.Value)
+         l.signatureObject.Length = uint16(value.Length)
+
+      default:
+         return errors.New("FTLV.type")
+      }
+      size += i
+   }
+
    return nil
 }
 
@@ -361,142 +486,4 @@ func ParseLicense(device *LocalDevice, data []byte) (*ContentKey, error) {
       return nil, err
    }
    return license.contentKeyObject, nil
-}
-
-// decode decodes a byte slice into the Cert structure.
-func (c *certificate) decode(data []byte) (int, error) {
-   n := copy(c.magic[:], data)
-
-   if string(c.magic[:]) != "CERT" {
-      return 0, errors.New("failed to find cert magic")
-   }
-
-   c.version = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   c.length = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   c.lengthToSignature = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   c.rawData = data[n:][:c.length-16]
-   n += len(c.rawData)
-
-   var sum int
-   for sum < int(c.length)-16 {
-      var ftlv ftlv
-      j := ftlv.decode(c.rawData[sum:])
-
-      switch ftlv.Type {
-      case objTypeBasic:
-         c.certificateInfo = &certInfo{}
-         c.certificateInfo.decode(ftlv.Value)
-
-      case objTypeFeature:
-         c.features = &feature{}
-         c.features.decode(ftlv.Value)
-
-      case objTypeKey:
-         c.keyData = &keyInfo{}
-         c.keyData.decode(ftlv.Value)
-
-      case objTypeManufacturer:
-         c.manufacturerInfo = &manufacturer{}
-         c.manufacturerInfo.decode(ftlv.Value)
-
-      case objTypeSignature:
-         c.signatureData = &ecdsaSignature{}
-         c.signatureData.decode(ftlv.Value)
-
-      }
-
-      sum += j
-   }
-
-   return n, nil
-}
-
-// verify verifies the signature of the certificate using the provided public key.
-func (c *certificate) verify(pubKey []byte) bool {
-   // Check if the issuer key in the signature matches the provided public key.
-   if !bytes.Equal(c.signatureData.IssuerKey, pubKey) {
-      return false
-   }
-   // Get the data that was signed (up to lengthToSignature).
-   data := c.encode()
-   data = data[:c.lengthToSignature]
-
-   // Reconstruct the ECDSA public key from the byte slice.
-   x := new(big.Int).SetBytes(pubKey[:32])
-   y := new(big.Int).SetBytes(pubKey[32:])
-   publicKey := &ecdsa.PublicKey{
-      Curve: elliptic.P256(), // Assuming P256 curve
-      X:     x,
-      Y:     y,
-   }
-
-   // Extract R and S components from the signature data.
-   sig := c.signatureData.SignatureData
-   signatureDigest := sha256.Sum256(data)
-   r, s := new(big.Int).SetBytes(sig[:32]), new(big.Int).SetBytes(sig[32:])
-
-   // Verify the signature.
-   return ecdsa.Verify(publicKey, signatureDigest[:], r, s)
-}
-
-// Decode decodes a byte slice into a LicenseResponse structure.
-func (l *licenseResponse) decode(data []byte) error {
-   l.RawData = data
-   n := copy(l.Magic[:], data)
-   l.Offset = binary.BigEndian.Uint16(data[n:])
-   n += 2
-   l.Version = binary.BigEndian.Uint16(data[n:])
-   n += 2
-   n += copy(l.RightsID[:], data[n:])
-   n += l.OuterContainer.decode(data[n:])
-
-   var size int
-
-   for size < int(l.OuterContainer.Length)-16 {
-      var value ftlv
-      i := value.decode(l.OuterContainer.Value[size:])
-      switch xmrType(value.Type) {
-      case globalPolicyContainerEntryType: // 2
-         // Rakuten
-      case playbackPolicyContainerEntryType: // 4
-         // Rakuten
-      case keyMaterialContainerEntryType: // 9
-         var j int
-         for j < int(value.Length)-16 {
-            var value1 ftlv
-            k := value1.decode(value.Value[j:])
-
-            switch xmrType(value1.Type) {
-            case contentKeyEntryType: // 10
-               l.contentKeyObject = &ContentKey{}
-               l.contentKeyObject.decode(value1.Value)
-
-            case deviceKeyEntryType: // 42
-               l.eccKeyObject = &eccKey{}
-               l.eccKeyObject.decode(value1.Value)
-
-            case auxKeyEntryType: // 81
-               l.auxKeyObject = &auxKeys{}
-               l.auxKeyObject.decode(value1.Value)
-
-            default:
-               return errors.New("FTLV.type")
-            }
-            j += k
-         }
-      case signatureEntryType: // 11
-         l.signatureObject = &signature{}
-         l.signatureObject.decode(value.Value)
-         l.signatureObject.Length = uint16(value.Length)
-
-      default:
-         return errors.New("FTLV.type")
-      }
-      size += i
-   }
-
-   return nil
 }
