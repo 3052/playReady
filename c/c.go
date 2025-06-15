@@ -29,13 +29,11 @@ func (c *Cert) Decode(data []byte) (int, error) {
    c.RawData = data[n:][:c.Length-16]
    n += len(c.RawData)
 
-   var sum uint32
-   for sum < c.Length-16 {
+   var sum int
+   for sum < int(c.Length)-16 {
       var ftlv a.FTLV
-      j, err := ftlv.Decode(c.RawData[sum:])
-      if err != nil {
-         return 0, err
-      }
+      j := ftlv.Decode(c.RawData[sum:])
+      
       switch ftlv.Type {
       case OBJTYPE_BASIC:
          c.CertificateInfo = &CertInfo{}

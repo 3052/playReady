@@ -14,65 +14,63 @@ import (
    "math/big"
 )
 
-func (c *ContentKey) Decrypt(key *ecdsa.PrivateKey, aux_keys *AuxKeys) error {
-   switch c.CipherType {
+func (c *ContentKey) Decrypt(key *ecdsa.PrivateKey, auxKeys *auxKeys) error {
+   switch c.cipherType {
    case 3:
-      decrypted := elGamal.Decrypt(c.Value, key)
-      c.Integrity.Decode(decrypted)
+      decrypted := elGamal.Decrypt(c.value, key)
+      c.Integrity.decode(decrypted)
       decrypted = decrypted[16:]
       copy(c.Key[:], decrypted)
       return nil
    case 6:
-      return c.Scalable(key, aux_keys)
+      return c.scalable(key, auxKeys)
    }
    return errors.New("cant decrypt key")
 }
 
-func (c *ContentKey) Scalable(key *ecdsa.PrivateKey, aux_keys *AuxKeys) error {
-   rootKeyInfo := c.Value[:144]
-   root_key := rootKeyInfo[128:]
-   leaf_keys := c.Value[144:]
+func (c *ContentKey) scalable(key *ecdsa.PrivateKey, auxKeys *auxKeys) error {
+   rootKeyInfo := c.value[:144]
+   rootKey := rootKeyInfo[128:]
+   leafKeys := c.value[144:]
    decrypted := elGamal.Decrypt(rootKeyInfo[:128], key)
    var (
-      CI [16]byte
-      CK [16]byte
+      ci [16]byte
+      ck [16]byte
    )
    for i := range 16 {
-      CI[i] = decrypted[i*2]
-      CK[i] = decrypted[i*2+1]
+      ci[i] = decrypted[i*2]
+      ck[i] = decrypted[i*2+1]
    }
-   magic_constant_zero, err := c.magic_constant_zero()
+   magicConstantZero, err := c.magicConstantZero()
    if err != nil {
       return err
    }
-   rgb_uplink_xkey := XorKey(CK[:], magic_constant_zero)
-   content_key_prime, err := aes_ecb_encrypt(rgb_uplink_xkey, CK[:])
+   rgbUplinkXkey := xorKey(ck[:], magicConstantZero)
+   contentKeyPrime, err := aesEcbEncrypt(rgbUplinkXkey, ck[:])
    if err != nil {
       return err
    }
-   aux_key_calc, err := aes_ecb_encrypt(
-      aux_keys.Keys[0].Key[:], content_key_prime,
-   )
+   auxKeyCalc, err := aesEcbEncrypt(auxKeys.keys[0].key[:], contentKeyPrime)
    if err != nil {
       return err
    }
    var zero [16]byte
-   up_link_xkey := XorKey(aux_key_calc, zero[:])
-   o_secondary_key, err := aes_ecb_encrypt(root_key, CK[:])
+   upLinkXkey := xorKey(auxKeyCalc, zero[:])
+   oSecondaryKey, err := aesEcbEncrypt(rootKey, ck[:])
    if err != nil {
       return err
    }
-   rgb_key, err := aes_ecb_encrypt(leaf_keys, up_link_xkey)
+   rgbKey, err := aesEcbEncrypt(leafKeys, upLinkXkey)
    if err != nil {
       return err
    }
-   rgb_key, err = aes_ecb_encrypt(rgb_key, o_secondary_key)
+   rgbKey, err = aesEcbEncrypt(rgbKey, oSecondaryKey)
    if err != nil {
       return err
    }
-   c.Integrity.Decode(rgb_key[:])
-   rgb_key = rgb_key[16:]
-   copy(c.Key[:], rgb_key)
+   c.Integrity.decode(rgbKey[:])
+   rgbKey = rgbKey[16:]
+   copy(c.Key[:], rgbKey)
    return nil
 }
 
@@ -101,9 +99,7 @@ func (e *EcKey) New() error {
 }
 
 func (e EcKey) Private() []byte {
-   var data [32]byte
-   e[0].D.FillBytes(data[:])
-   return data[:]
+   return e[0].D.Bytes()
 }
 
 type Fill byte
@@ -116,252 +112,206 @@ func (f Fill) Read(data []byte) (int, error) {
    return len(data), nil
 }
 
-type Guid struct {
-   Data1 uint32 // little endian
-   Data2 uint16 // little endian
-   Data3 uint16 // little endian
-   Data4 uint64 // big endian
+type guid struct {
+   data1 uint32 // little endian
+   data2 uint16 // little endian
+   data3 uint16 // little endian
+   data4 uint64 // big endian
 }
 
-func (g *Guid) Uuid() []byte {
-   data := binary.BigEndian.AppendUint32(nil, g.Data1)
-   data = binary.BigEndian.AppendUint16(data, g.Data2)
-   data = binary.BigEndian.AppendUint16(data, g.Data3)
-   return binary.BigEndian.AppendUint64(data, g.Data4)
+func (g *guid) Uuid() []byte {
+   data := binary.BigEndian.AppendUint32(nil, g.data1)
+   data = binary.BigEndian.AppendUint16(data, g.data2)
+   data = binary.BigEndian.AppendUint16(data, g.data3)
+   return binary.BigEndian.AppendUint64(data, g.data4)
 }
 
-func (g *Guid) Guid() []byte {
-   data := binary.LittleEndian.AppendUint32(nil, g.Data1)
-   data = binary.LittleEndian.AppendUint16(data, g.Data2)
-   data = binary.LittleEndian.AppendUint16(data, g.Data3)
-   return binary.BigEndian.AppendUint64(data, g.Data4)
+func (g *guid) Guid() []byte {
+   data := binary.LittleEndian.AppendUint32(nil, g.data1)
+   data = binary.LittleEndian.AppendUint16(data, g.data2)
+   data = binary.LittleEndian.AppendUint16(data, g.data3)
+   return binary.BigEndian.AppendUint64(data, g.data4)
 }
 
-func (g *Guid) Decode(data []byte) {
-   g.Data1 = binary.LittleEndian.Uint32(data)
+func (g *guid) decode(data []byte) {
+   g.data1 = binary.LittleEndian.Uint32(data)
    data = data[4:]
-   g.Data2 = binary.LittleEndian.Uint16(data)
+   g.data2 = binary.LittleEndian.Uint16(data)
    data = data[2:]
-   g.Data3 = binary.LittleEndian.Uint16(data)
+   g.data3 = binary.LittleEndian.Uint16(data)
    data = data[2:]
-   g.Data4 = binary.BigEndian.Uint64(data)
+   g.data4 = binary.BigEndian.Uint64(data)
 }
 
-func (l *LicenseResponse) Encode() []byte {
-   data := l.Magic[:]
-   data = binary.BigEndian.AppendUint16(data, l.Offset)
-   data = binary.BigEndian.AppendUint16(data, l.Version)
-   data = append(data, l.RightsId[:]...)
-   return append(data, l.OuterContainer.Encode()...)
-}
-
-type Signature struct {
-   Type   uint16
-   Length uint16
-   Data   []byte
-}
-
-///
-
-func (s *Signature) Decode(data []byte) error {
-   s.Type = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   s.Length = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   s.Data = make([]byte, s.Length)
-   copy(s.Data, data)
-   return nil
+func (l *LicenseResponse) encode() []byte {
+   data := l.magic[:]
+   data = binary.BigEndian.AppendUint16(data, l.offset)
+   data = binary.BigEndian.AppendUint16(data, l.version)
+   data = append(data, l.rightsId[:]...)
+   return append(data, l.outerContainer.Encode()...)
 }
 
 type LicenseResponse struct {
-   RawData          []byte
-   Magic            [4]byte
-   Offset           uint16
-   Version          uint16
-   RightsId         [16]byte
-   OuterContainer   FTLV
+   rawData          []byte
+   magic            [4]byte
+   offset           uint16
+   version          uint16
+   rightsId         [16]byte
+   outerContainer   FTLV
    ContentKeyObject *ContentKey
-   ECCKeyObject     *ECCKey
-   SignatureObject  *Signature
-   AuxKeyObject     *AuxKeys
+   EccKeyObject     *eccKey
+   signatureObject  *signature
+   AuxKeyObject     *auxKeys
 }
 
-type AuxKeys struct {
-   Count uint16
-   Keys  []AuxKey
+type auxKeys struct {
+   count uint16
+   keys  []auxKey
 }
 
-type AuxKey struct {
-   Location uint32
-   Key      [16]byte
+type auxKey struct {
+   location uint32
+   key      [16]byte
 }
 
-type ECCKey struct {
-   Curve  uint16
-   Length uint16
+type eccKey struct {
+   curve  uint16
+   length uint16
    Value  []byte
 }
 
-type FTLV struct {
-   Flags  uint16
-   Type   uint16
-   Length uint32
-   Value  []byte
-}
-
-func (a *AuxKeys) Decode(data []byte) {
-   a.Count = binary.BigEndian.Uint16(data)
+func (a *auxKeys) decode(data []byte) {
+   a.count = binary.BigEndian.Uint16(data)
    data = data[2:]
-   for range a.Count {
-      var key AuxKey
-      n := key.Decode(data)
-      a.Keys = append(a.Keys, key)
+   for range a.count {
+      var key auxKey
+      n := key.decode(data)
+      a.keys = append(a.keys, key)
       data = data[n:]
    }
 }
 
-func (a *AuxKey) Decode(data []byte) int {
-   a.Location = binary.BigEndian.Uint32(data)
+func (a *auxKey) decode(data []byte) int {
+   a.location = binary.BigEndian.Uint32(data)
    data = data[4:]
-   return copy(a.Key[:], data) + 4
+   return copy(a.key[:], data) + 4
 }
 
-func (e *ECCKey) Decode(data []byte) {
-   e.Curve = binary.BigEndian.Uint16(data)
+func (e *eccKey) decode(data []byte) {
+   e.curve = binary.BigEndian.Uint16(data)
    data = data[2:]
-
-   e.Length = binary.BigEndian.Uint16(data)
+   e.length = binary.BigEndian.Uint16(data)
    data = data[2:]
-
-   e.Value = make([]byte, e.Length)
+   e.Value = make([]byte, e.length)
    copy(e.Value, data)
 }
 
 func (f *FTLV) Encode() []byte {
-   var data []byte
-   data = binary.BigEndian.AppendUint16(data, f.Flags)
+   data := binary.BigEndian.AppendUint16(nil, f.flags)
    data = binary.BigEndian.AppendUint16(data, f.Type)
-   data = binary.BigEndian.AppendUint32(data, f.Length)
+   data = binary.BigEndian.AppendUint32(data, f.length)
    return append(data, f.Value...)
 }
 
-func (f *FTLV) Decode(data []byte) (uint32, error) {
-   var n uint32
-   f.Flags = binary.BigEndian.Uint16(data[n:])
-   n += 2
+func (f *FTLV) Decode(data []byte) int {
+   f.flags = binary.BigEndian.Uint16(data)
+   n := 2
    f.Type = binary.BigEndian.Uint16(data[n:])
    n += 2
-   f.Length = binary.BigEndian.Uint32(data[n:])
+   f.length = binary.BigEndian.Uint32(data[n:])
    n += 4
-   f.Value = data[n:][:f.Length-8]
-   n += f.Length - 8
-   return n, nil
+   f.Value = data[n:][:f.length-8]
+   n += int(f.length) - 8
+   return n
 }
 
-func (f *FTLV) New(Flags, Type int, Value []byte) {
-   f.Flags = uint16(Flags)
+type FTLV struct {
+   flags  uint16
+   Type    uint16
+   length uint32
+   Value  []byte
+}
+
+func (f *FTLV) New(flags, Type int, value []byte) {
+   f.flags = uint16(flags)
    f.Type = uint16(Type)
-   f.Length = uint32(len(Value) + 8)
-   f.Value = Value
+   f.length = uint32(len(value) + 8)
+   f.Value = value
 }
 
 type ContentKey struct {
-   KeyId      Guid
-   KeyType    uint16
-   CipherType uint16
-   Length     uint16
-   Value      []byte
-   Integrity  Guid
+   KeyId      guid
+   keyType    uint16
+   cipherType uint16
+   length     uint16
+   value      []byte
+   Integrity  guid
    Key        [16]byte
 }
 
-func (c *ContentKey) Decode(data []byte) error {
-   c.KeyId.Decode(data[:])
+func (c *ContentKey) decode(data []byte) {
+   c.KeyId.decode(data[:])
    data = data[16:]
-   c.KeyType = binary.BigEndian.Uint16(data)
+   c.keyType = binary.BigEndian.Uint16(data)
    data = data[2:]
-
-   c.CipherType = binary.BigEndian.Uint16(data)
+   c.cipherType = binary.BigEndian.Uint16(data)
    data = data[2:]
-
-   c.Length = binary.BigEndian.Uint16(data)
+   c.length = binary.BigEndian.Uint16(data)
    data = data[2:]
-
-   c.Value = make([]byte, c.Length)
-
-   copy(c.Value[:], data)
-
-   return nil
+   c.value = make([]byte, c.length)
+   copy(c.value[:], data)
 }
 
-type XmrType uint16
+type xmrType uint16
 
 const (
-   OUTER_CONTAINER_ENTRY_TYPE                   XmrType = 1
-   GLOBAL_POLICY_CONTAINER_ENTRY_TYPE           XmrType = 2
-   PLAYBACK_POLICY_CONTAINER_ENTRY_TYPE         XmrType = 4
-   MINIMUM_OUTPUT_PROTECTION_LEVELS_ENTRY_TYPE  XmrType = 5
-   EXPLICIT_ANALOG_VIDEO_PROTECTION_ENTRY_TYPE  XmrType = 7
-   ANALOG_VIDEO_OPL_ENTRY_TYPE                  XmrType = 8
-   KEY_MATERIAL_CONTAINER_ENTRY_TYPE            XmrType = 9
-   CONTENT_KEY_ENTRY_TYPE                       XmrType = 10
-   SIGNATURE_ENTRY_TYPE                         XmrType = 11
-   SERIAL_NUMBER_ENTRY_TYPE                     XmrType = 12
-   RIGHTS_ENTRY_TYPE                            XmrType = 13
-   EXPIRATION_ENTRY_TYPE                        XmrType = 18
-   ISSUEDATE_ENTRY_TYPE                         XmrType = 19
-   METERING_ENTRY_TYPE                          XmrType = 22
-   GRACEPERIOD_ENTRY_TYPE                       XmrType = 26
-   SOURCEID_ENTRY_TYPE                          XmrType = 34
-   RESTRICTED_SOURCEID_ENTRY_TYPE               XmrType = 40
-   DOMAIN_ID_ENTRY_TYPE                         XmrType = 41
-   DEVICE_KEY_ENTRY_TYPE                        XmrType = 42
-   POLICY_METADATA_ENTRY_TYPE                   XmrType = 44
-   OPTIMIZED_CONTENT_KEY_ENTRY_TYPE             XmrType = 45
-   EXPLICIT_DIGITAL_AUDIO_PROTECTION_ENTRY_TYPE XmrType = 46
-   EXPIRE_AFTER_FIRST_USE_ENTRY_TYPE            XmrType = 48
-   DIGITAL_AUDIO_OPL_ENTRY_TYPE                 XmrType = 49
-   REVOCATION_INFO_VERSION_ENTRY_TYPE           XmrType = 50
-   EMBEDDING_BEHAVIOR_ENTRY_TYPE                XmrType = 51
-   SECURITY_LEVEL_ENTRY_TYPE                    XmrType = 52
-   MOVE_ENABLER_ENTRY_TYPE                      XmrType = 55
-   UPLINK_KID_ENTRY_TYPE                        XmrType = 59
-   COPY_POLICIES_CONTAINER_ENTRY_TYPE           XmrType = 60
-   COPY_COUNT_ENTRY_TYPE                        XmrType = 61
-   REMOVAL_DATE_ENTRY_TYPE                      XmrType = 80
-   AUX_KEY_ENTRY_TYPE                           XmrType = 81
-   UPLINKX_ENTRY_TYPE                           XmrType = 82
-   REAL_TIME_EXPIRATION_ENTRY_TYPE              XmrType = 85
-   EXPLICIT_DIGITAL_VIDEO_PROTECTION_ENTRY_TYPE XmrType = 88
-   DIGITAL_VIDEO_OPL_ENTRY_TYPE                 XmrType = 89
-   SECURESTOP_ENTRY_TYPE                        XmrType = 90
-   COPY_UNKNOWN_OBJECT_ENTRY_TYPE               XmrType = 65533
-   GLOBAL_POLICY_UNKNOWN_OBJECT_ENTRY_TYPE      XmrType = 65533
-   PLAYBACK_UNKNOWN_OBJECT_ENTRY_TYPE           XmrType = 65533
-   COPY_UNKNOWN_CONTAINER_ENTRY_TYPE            XmrType = 65534
-   UNKNOWN_CONTAINERS_ENTRY_TYPE                XmrType = 65534
-   PLAYBACK_UNKNOWN_CONTAINER_ENTRY_TYPE        XmrType = 65534
+   outerContainerEntryType             xmrType = 1
+   globalPolicyContainerEntryType      xmrType = 2
+   playbackPolicyContainerEntryType    xmrType = 4
+   minimumOutputProtectionLevelsEntryType xmrType = 5
+   explicitAnalogVideoProtectionEntryType xmrType = 7
+   analogVideoOplEntryType             xmrType = 8
+   keyMaterialContainerEntryType       xmrType = 9
+   contentKeyEntryType                 xmrType = 10
+   signatureEntryType                  xmrType = 11
+   serialNumberEntryType               xmrType = 12
+   rightsEntryType                     xmrType = 13
+   expirationEntryType                 xmrType = 18
+   issueDateEntryType                  xmrType = 19
+   meteringEntryType                   xmrType = 22
+   gracePeriodEntryType                xmrType = 26
+   sourceIDEntryType                   xmrType = 34
+   restrictedSourceIDEntryType         xmrType = 40
+   domainIDEntryType                   xmrType = 41
+   deviceKeyEntryType                  xmrType = 42
+   policyMetadataEntryType             xmrType = 44
+   optimizedContentKeyEntryType        xmrType = 45
+   explicitDigitalAudioProtectionEntryType xmrType = 46
+   expireAfterFirstUseEntryType        xmrType = 48
+   digitalAudioOplEntryType            xmrType = 49
+   revocationInfoVersionEntryType      xmrType = 50
+   embeddingBehaviorEntryType          xmrType = 51
+   securityLevelEntryType              xmrType = 52
+   moveEnablerEntryType                xmrType = 55
+   uplinkKIDEntryType                  xmrType = 59
+   copyPoliciesContainerEntryType      xmrType = 60
+   copyCountEntryType                  xmrType = 61
+   removalDateEntryType                xmrType = 80
+   auxKeyEntryType                     xmrType = 81
+   uplinkxEntryType                    xmrType = 82
+   realTimeExpirationEntryType         xmrType = 85
+   explicitDigitalVideoProtectionEntryType xmrType = 88
+   digitalVideoOplEntryType            xmrType = 89
+   secureStopEntryType                 xmrType = 90
+   copyUnknownObjectEntryType          xmrType = 65533
+   globalPolicyUnknownObjectEntryType  xmrType = 65533
+   playbackUnknownObjectEntryType      xmrType = 65533
+   copyUnknownContainerEntryType       xmrType = 65534
+   unknownContainersEntryType          xmrType = 65534
+   playbackUnknownContainerEntryType   xmrType = 65534
 )
 
-func (p *PlayReadyRecord) Decode(data []byte) bool {
-   p.Length = binary.LittleEndian.Uint32(data)
-   if int(p.Length) > len(data) {
-      return false
-   }
-   data = data[4:]
-   p.Count = binary.LittleEndian.Uint16(data)
-   data = data[2:]
-   p.Data = data
-   return true
-}
-
-type PlayReadyRecord struct {
-   Length uint32
-   Count  uint16
-   Data   []byte
-}
-
-func XorKey(root, second []byte) []byte {
+func xorKey(root, second []byte) []byte {
    data := make([]byte, len(second))
    copy(data, root)
    for i := range 16 {
@@ -370,79 +320,63 @@ func XorKey(root, second []byte) []byte {
    return data
 }
 
-func (*ContentKey) magic_constant_zero() ([]byte, error) {
+func (*ContentKey) magicConstantZero() ([]byte, error) {
    return hex.DecodeString("7ee9ed4af773224f00b8ea7efb027cbb")
 }
 
 func (l *LicenseResponse) Decode(data []byte) error {
-   l.RawData = make([]byte, len(data))
-   copy(l.RawData, data)
+   l.rawData = make([]byte, len(data))
+   copy(l.rawData, data)
 
-   n := copy(l.Magic[:], data)
-   l.Offset = binary.BigEndian.Uint16(data[n:])
+   n := copy(l.magic[:], data)
+   l.offset = binary.BigEndian.Uint16(data[n:])
    n += 2
-   l.Version = binary.BigEndian.Uint16(data[n:])
+   l.version = binary.BigEndian.Uint16(data[n:])
    n += 2
-   n += copy(l.RightsId[:], data[n:])
+   n += copy(l.rightsId[:], data[n:])
+   n += l.outerContainer.Decode(data[n:])
 
-   j, err := l.OuterContainer.Decode(data[n:])
+   var size int
 
-   if err != nil {
-      return err
-   }
-   n += int(j)
-
-   var size uint32
-
-   for size < l.OuterContainer.Length-16 {
+   for size < int(l.outerContainer.length)-16 {
       var value FTLV
-      i, err := value.Decode(l.OuterContainer.Value[int(size):])
-      if err != nil {
-         return err
-      }
-      switch XmrType(value.Type) {
-      case GLOBAL_POLICY_CONTAINER_ENTRY_TYPE: // 2
+      i := value.Decode(l.outerContainer.Value[size:])
+      switch xmrType(value.Type) {
+      case globalPolicyContainerEntryType: // 2
          // Rakuten
-      case PLAYBACK_POLICY_CONTAINER_ENTRY_TYPE: // 4
+      case playbackPolicyContainerEntryType: // 4
          // Rakuten
-      case KEY_MATERIAL_CONTAINER_ENTRY_TYPE: // 9
-         var j uint32
-         for j < value.Length-16 {
+      case keyMaterialContainerEntryType: // 9
+         var j int
+         for j < int(value.length)-16 {
             var value1 FTLV
-            k, err := value1.Decode(value.Value[j:])
-            if err != nil {
-               return err
-            }
-            switch XmrType(value1.Type) {
-            case CONTENT_KEY_ENTRY_TYPE: // 10
+            k := value1.Decode(value.Value[j:])
+
+            switch xmrType(value1.Type) {
+            case contentKeyEntryType: // 10
                l.ContentKeyObject = &ContentKey{}
-               err = l.ContentKeyObject.Decode(value1.Value)
-               if err != nil {
-                  return err
-               }
-            
-            case DEVICE_KEY_ENTRY_TYPE: // 42
-               l.ECCKeyObject = &ECCKey{}
-               l.ECCKeyObject.Decode(value1.Value)
-            
-            case AUX_KEY_ENTRY_TYPE: // 81
-               l.AuxKeyObject = &AuxKeys{}
-               l.AuxKeyObject.Decode(value1.Value)
-            
+               l.ContentKeyObject.decode(value1.Value)
+
+            case deviceKeyEntryType: // 42
+               l.EccKeyObject = &eccKey{}
+               l.EccKeyObject.decode(value1.Value)
+
+            case auxKeyEntryType: // 81
+               l.AuxKeyObject = &auxKeys{}
+               l.AuxKeyObject.decode(value1.Value)
+
             default:
-               return errors.New("FTLV.Type")
+               return errors.New("FTLV.type")
             }
             j += k
          }
-      case SIGNATURE_ENTRY_TYPE: // 11
-         l.SignatureObject = &Signature{}
-         err := l.SignatureObject.Decode(value.Value)
-         l.SignatureObject.Length = uint16(value.Length)
-         if err != nil {
-            return err
-         }
+      case signatureEntryType: // 11
+         l.signatureObject = &signature{}
+         l.signatureObject.decode(value.Value)
+         l.signatureObject.length = uint16(value.length)
+
       default:
-         return errors.New("FTLV.Type")
+         return errors.New("FTLV.type")
       }
       size += i
    }
@@ -450,21 +384,35 @@ func (l *LicenseResponse) Decode(data []byte) error {
    return nil
 }
 
-func (l *LicenseResponse) Verify(content_integrity []byte) error {
-   data := l.Encode()
-   data = data[:len(l.RawData)-int(l.SignatureObject.Length)]
-   block, err := aes.NewCipher(content_integrity)
+func (s *signature) decode(data []byte) {
+   s.Type = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   s.length = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   s.data = data
+}
+
+type signature struct {
+   Type    uint16
+   length uint16
+   data   []byte
+}
+
+func (l *LicenseResponse) Verify(contentIntegrity []byte) error {
+   data := l.encode()
+   data = data[:len(l.rawData)-int(l.signatureObject.length)]
+   block, err := aes.NewCipher(contentIntegrity)
    if err != nil {
       return err
    }
    data = mac.NewCMAC(block, aes.BlockSize).MAC(data)
-   if !bytes.Equal(data, l.SignatureObject.Data) {
+   if !bytes.Equal(data, l.signatureObject.data) {
       return errors.New("failed to decrypt the keys")
    }
    return nil
 }
 
-func aes_ecb_encrypt(data, key []byte) ([]byte, error) {
+func aesEcbEncrypt(data, key []byte) ([]byte, error) {
    bin := crypto.FromBytes(data).WithKey(key).
       Aes().ECB().NoPadding().Encrypt()
    return bin.ToBytes(), bin.Error()
@@ -480,7 +428,7 @@ type EcKey [1]*ecdsa.PrivateKey
 
 type XmlKey struct {
    PublicKey ecdsa.PublicKey
-   x [32]byte
+   x         [32]byte
 }
 
 func (x *XmlKey) New() {

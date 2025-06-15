@@ -137,7 +137,7 @@ func ParseLicense(device *c.LocalDevice, data []byte) (*a.ContentKey, error) {
    if err != nil {
       return nil, err
    }
-   if !bytes.Equal(license.ECCKeyObject.Value, device.EncryptKey.PublicBytes()) {
+   if !bytes.Equal(license.EccKeyObject.Value, device.EncryptKey.PublicBytes()) {
       return nil, errors.New("license response is not for this device")
    }
    err = license.ContentKeyObject.Decrypt(
