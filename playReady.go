@@ -8,11 +8,38 @@ import (
    "encoding/base64"
    "encoding/binary"
    "encoding/hex"
-   "errors"
    "github.com/deatil/go-cryptobin/cryptobin/crypto"
    "math/big"
    "slices"
 )
+
+// aesECBHandler performs AES ECB encryption/decryption.
+// Encrypts if encrypt is true, decrypts otherwise.
+func aesECBHandler(data, key []byte, encrypt bool) ([]byte, error) {
+   if encrypt {
+      bin := crypto.FromBytes(data).WithKey(key).
+         Aes().ECB().NoPadding().Encrypt()
+      return bin.ToBytes(), bin.Error()
+   } else {
+      bin := crypto.FromBytes(data).WithKey(key).
+         Aes().ECB().NoPadding().Decrypt()
+      return bin.ToBytes(), bin.Error()
+   }
+}
+
+// aesCBCHandler performs AES CBC encryption/decryption with PKCS7 padding.
+// Encrypts if encrypt is true, decrypts otherwise.
+func aesCBCHandler(data, key, iv []byte, encrypt bool) ([]byte, error) {
+   if encrypt {
+      bin := crypto.FromBytes(data).WithKey(key).WithIv(iv).
+         Aes().CBC().PKCS7Padding().Encrypt()
+      return bin.ToBytes(), bin.Error()
+   } else {
+      bin := crypto.FromBytes(data).WithKey(key).WithIv(iv).
+         Aes().CBC().PKCS7Padding().Decrypt()
+      return bin.ToBytes(), bin.Error()
+   }
+}
 
 // newLa creates a new XML License Acquisition structure.
 func newLa(m *ecdsa.PublicKey, cipherData []byte, kid string) xml.La {
@@ -115,66 +142,6 @@ func NewEnvelope(device *LocalDevice, kid string) (*xml.Envelope, error) {
    }, nil
 }
 
-func (c *ContentKey) decrypt(key *ecdsa.PrivateKey, auxKeys *auxKeys) error {
-   switch c.CipherType {
-   case 3:
-      decrypted := elGamalDecrypt(c.Value, key)
-      c.Integrity.Decode(decrypted)
-      decrypted = decrypted[16:]
-      copy(c.Key[:], decrypted)
-      return nil
-   case 6:
-      return c.scalable(key, auxKeys)
-   }
-   return errors.New("cannot decrypt key")
-}
-
-func (c *ContentKey) scalable(key *ecdsa.PrivateKey, auxKeys *auxKeys) error {
-   rootKeyInfo := c.Value[:144]
-   rootKey := rootKeyInfo[128:]
-   leafKeys := c.Value[144:]
-   decrypted := elGamalDecrypt(rootKeyInfo[:128], key)
-   var (
-      ci [16]byte
-      ck [16]byte
-   )
-   for i := range 16 {
-      ci[i] = decrypted[i*2]
-      ck[i] = decrypted[i*2+1]
-   }
-   magicConstantZero, err := c.magicConstantZero()
-   if err != nil {
-      return err
-   }
-   rgbUplinkXkey := xorKey(ck[:], magicConstantZero)
-   contentKeyPrime, err := aesECBHandler(rgbUplinkXkey, ck[:], true)
-   if err != nil {
-      return err
-   }
-   auxKeyCalc, err := aesECBHandler(auxKeys.Keys[0].Key[:], contentKeyPrime, true)
-   if err != nil {
-      return err
-   }
-   var zero [16]byte
-   upLinkXkey := xorKey(auxKeyCalc, zero[:])
-   oSecondaryKey, err := aesECBHandler(rootKey, ck[:], true)
-   if err != nil {
-      return err
-   }
-   rgbKey, err := aesECBHandler(leafKeys, upLinkXkey, true)
-   if err != nil {
-      return err
-   }
-   rgbKey, err = aesECBHandler(rgbKey, oSecondaryKey, true)
-   if err != nil {
-      return err
-   }
-   c.Integrity.Decode(rgbKey[:])
-   rgbKey = rgbKey[16:]
-   copy(c.Key[:], rgbKey)
-   return nil
-}
-
 // LoadBytes loads an ECDSA private key from bytes.
 func (e *EcKey) LoadBytes(data []byte) {
    var public ecdsa.PublicKey
@@ -241,6 +208,14 @@ func (g *GUID) Decode(data []byte) {
    g.Data4 = binary.BigEndian.Uint64(data)
 }
 
+// Decode decodes a byte slice into an AuxKey structure.
+func (a *auxKey) decode(data []byte) int {
+   a.Location = binary.BigEndian.Uint32(data)
+   n := 4
+   n += copy(a.Key[:], data[n:])
+   return n
+}
+
 // Decode decodes a byte slice into an AuxKeys structure.
 func (a *auxKeys) decode(data []byte) {
    a.Count = binary.BigEndian.Uint16(data)
@@ -251,14 +226,6 @@ func (a *auxKeys) decode(data []byte) {
       a.Keys = append(a.Keys, key)
       data = data[n:]
    }
-}
-
-// Decode decodes a byte slice into an AuxKey structure.
-func (a *auxKey) decode(data []byte) int {
-   a.Location = binary.BigEndian.Uint32(data)
-   n := 4
-   n += copy(a.Key[:], data[n:])
-   return n
 }
 
 // Decode decodes a byte slice into an ECCKey structure.
@@ -299,24 +266,6 @@ func (f *ftlv) new(flags, Type int, value []byte) {
    f.Value = value
 }
 
-// magicConstantZero returns a specific hex-decoded byte slice.
-func (*ContentKey) magicConstantZero() ([]byte, error) {
-   return hex.DecodeString("7ee9ed4af773224f00b8ea7efb027cbb")
-}
-
-// decode decodes a byte slice into a ContentKey structure.
-func (c *ContentKey) decode(data []byte) {
-   c.KeyID.Decode(data[:])
-   data = data[16:]
-   c.KeyType = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   c.CipherType = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   c.Length = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   c.Value = data[:c.Length]
-}
-
 // decode decodes a byte slice into a Signature structure.
 func (s *signature) decode(data []byte) {
    s.Type = binary.BigEndian.Uint16(data)
@@ -326,33 +275,7 @@ func (s *signature) decode(data []byte) {
    s.Data = data
 }
 
-// aesECBHandler performs AES ECB encryption/decryption.
-// Encrypts if encrypt is true, decrypts otherwise.
-func aesECBHandler(data, key []byte, encrypt bool) ([]byte, error) {
-   if encrypt {
-      bin := crypto.FromBytes(data).WithKey(key).
-         Aes().ECB().NoPadding().Encrypt()
-      return bin.ToBytes(), bin.Error()
-   } else {
-      bin := crypto.FromBytes(data).WithKey(key).
-         Aes().ECB().NoPadding().Decrypt()
-      return bin.ToBytes(), bin.Error()
-   }
-}
-
-// aesCBCHandler performs AES CBC encryption/decryption with PKCS7 padding.
-// Encrypts if encrypt is true, decrypts otherwise.
-func aesCBCHandler(data, key, iv []byte, encrypt bool) ([]byte, error) {
-   if encrypt {
-      bin := crypto.FromBytes(data).WithKey(key).WithIv(iv).
-         Aes().CBC().PKCS7Padding().Encrypt()
-      return bin.ToBytes(), bin.Error()
-   } else {
-      bin := crypto.FromBytes(data).WithKey(key).WithIv(iv).
-         Aes().CBC().PKCS7Padding().Decrypt()
-      return bin.ToBytes(), bin.Error()
-   }
-}
+///
 
 // New initializes a new xmlKey.
 func (x *xmlKey) New() {
@@ -716,16 +639,6 @@ type ftlv struct {
    Type   uint16
    Length uint32
    Value  []byte
-}
-
-type ContentKey struct {
-   KeyID      GUID
-   KeyType    uint16
-   CipherType uint16
-   Length     uint16
-   Value      []byte
-   Integrity  GUID
-   Key        [16]byte
 }
 
 type xmrType uint16
