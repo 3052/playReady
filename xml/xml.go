@@ -2,67 +2,13 @@ package xml
 
 import "encoding/xml"
 
-type InnerChallenge struct { // Renamed from Challenge
-   XmlNs     string `xml:"xmlns,attr"`
-   La        La
-   Signature Signature
+type AcquireLicense struct {
+   XmlNs     string    `xml:"xmlns,attr"`
+   Challenge Challenge `xml:"challenge"`
 }
 
-func (s *SignedInfo) Marshal() ([]byte, error) {
-   return xml.Marshal(s)
-}
-
-type SignedInfo struct {
-   XmlNs     string `xml:"xmlns,attr"`
-   Reference Reference
-}
-
-func (l *La) Marshal() ([]byte, error) {
-   return xml.Marshal(l)
-}
-
-type La struct {
-   XMLName       xml.Name `xml:"LA"`
-   XmlNs         string   `xml:"xmlns,attr"`
-   Id            string   `xml:"Id,attr"`
-   Version       string
-   ContentHeader ContentHeader
-   EncryptedData EncryptedData
-}
-
-func (d *Data) Marshal() ([]byte, error) {
-   return xml.Marshal(d)
-}
-
-type Data struct {
-   CertificateChains CertificateChains
-   Features          Features
-}
-
-func (e *EnvelopeResponse) Unmarshal(data []byte) error {
-   return xml.Unmarshal(data, e)
-}
-
-type EnvelopeResponse struct {
-   Body Body
-}
-
-type CertificateChains struct {
-   CertificateChain string
-}
-
-type Features struct {
-   Feature Feature
-}
-
-type Feature struct {
-   Name string `xml:",attr"`
-}
-
-type Envelope struct {
-   XMLName xml.Name `xml:"soap:Envelope"`
-   Soap    string   `xml:"xmlns:soap,attr"`
-   Body    Body     `xml:"soap:Body"`
+type Algorithm struct {
+   Algorithm string `xml:"Algorithm,attr"`
 }
 
 type Body struct {
@@ -83,51 +29,29 @@ type Body struct {
    }
 }
 
-type AcquireLicense struct {
-   XmlNs     string    `xml:"xmlns,attr"`
-   Challenge Challenge `xml:"challenge"`
+type CertificateChains struct {
+   CertificateChain string
 }
 
 type Challenge struct {
    Challenge InnerChallenge
 }
 
-type Signature struct {
-   SignedInfo     SignedInfo
-   SignatureValue string
-}
-
-type Reference struct {
-   Uri         string `xml:"URI,attr"`
-   DigestValue string
+type CipherData struct {
+   CipherValue string
 }
 
 type ContentHeader struct {
    WrmHeader WrmHeader `xml:"WRMHEADER"`
 }
 
-type WrmHeader struct {
-   XmlNs   string        `xml:"xmlns,attr"`
-   Version string        `xml:"version,attr"`
-   Data    WrmHeaderData `xml:"DATA"`
+func (d *Data) Marshal() ([]byte, error) {
+   return xml.Marshal(d)
 }
 
-type ProtectInfo struct {
-   KeyLen string `xml:"KEYLEN"`
-   AlgId  string `xml:"ALGID"`
-}
-
-type WrmHeaderData struct { // Renamed from DATA
-   ProtectInfo ProtectInfo `xml:"PROTECTINFO"`
-   Kid         string      `xml:"KID"`
-}
-
-type CipherData struct {
-   CipherValue string
-}
-
-type Algorithm struct {
-   Algorithm string `xml:"Algorithm,attr"`
+type Data struct {
+   CertificateChains CertificateChains
+   Features          Features
 }
 
 type EncryptedData struct {
@@ -138,9 +62,11 @@ type EncryptedData struct {
    CipherData       CipherData
 }
 
-type KeyInfo struct { // This is the chosen "KeyInfo" type
-   XmlNs        string `xml:"xmlns,attr"`
-   EncryptedKey EncryptedKey
+type EncryptedKey struct {
+   XmlNs            string `xml:"xmlns,attr"`
+   EncryptionMethod Algorithm
+   CipherData       CipherData
+   KeyInfo          EncryptedKeyInfo
 }
 
 type EncryptedKeyInfo struct { // Renamed from KeyInfo
@@ -148,9 +74,83 @@ type EncryptedKeyInfo struct { // Renamed from KeyInfo
    KeyName string
 }
 
-type EncryptedKey struct {
-   XmlNs            string `xml:"xmlns,attr"`
-   EncryptionMethod Algorithm
-   CipherData       CipherData
-   KeyInfo          EncryptedKeyInfo
+type Envelope struct {
+   XMLName xml.Name `xml:"soap:Envelope"`
+   Soap    string   `xml:"xmlns:soap,attr"`
+   Body    Body     `xml:"soap:Body"`
+}
+
+func (e *EnvelopeResponse) Unmarshal(data []byte) error {
+   return xml.Unmarshal(data, e)
+}
+
+type EnvelopeResponse struct {
+   Body Body
+}
+
+type Feature struct {
+   Name string `xml:",attr"`
+}
+
+type Features struct {
+   Feature Feature
+}
+
+type InnerChallenge struct { // Renamed from Challenge
+   XmlNs     string `xml:"xmlns,attr"`
+   La        La
+   Signature Signature
+}
+
+type KeyInfo struct { // This is the chosen "KeyInfo" type
+   XmlNs        string `xml:"xmlns,attr"`
+   EncryptedKey EncryptedKey
+}
+
+func (l *La) Marshal() ([]byte, error) {
+   return xml.Marshal(l)
+}
+
+type La struct {
+   XMLName       xml.Name `xml:"LA"`
+   XmlNs         string   `xml:"xmlns,attr"`
+   Id            string   `xml:"Id,attr"`
+   Version       string
+   ContentHeader ContentHeader
+   EncryptedData EncryptedData
+}
+
+type ProtectInfo struct {
+   KeyLen string `xml:"KEYLEN"`
+   AlgId  string `xml:"ALGID"`
+}
+
+type Reference struct {
+   Uri         string `xml:"URI,attr"`
+   DigestValue string
+}
+
+type Signature struct {
+   SignedInfo     SignedInfo
+   SignatureValue string
+}
+
+func (s *SignedInfo) Marshal() ([]byte, error) {
+   return xml.Marshal(s)
+}
+
+type SignedInfo struct {
+   XmlNs     string `xml:"xmlns,attr"`
+   Reference Reference
+}
+
+type WrmHeader struct {
+   XmlNs   string        `xml:"xmlns,attr"`
+   Version string        `xml:"version,attr"`
+   Data    WrmHeaderData `xml:"DATA"`
+}
+
+type WrmHeaderData struct { // Renamed from DATA
+   ProtectInfo ProtectInfo `xml:"PROTECTINFO"`
+   Kid         string      `xml:"KID"`
 }

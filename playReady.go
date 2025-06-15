@@ -1,4 +1,4 @@
-package core
+package playReady
 
 import (
    "bytes"
@@ -626,17 +626,17 @@ func (s *ecdsaSignature) Decode(data []byte) {
 
 // Constants for object types within the certificate structure.
 const (
-   objTypeBasic          = 0x0001
-   objTypeDomain         = 0x0002
-   objTypePc             = 0x0003
-   objTypeDevice         = 0x0004
-   objTypeFeature        = 0x0005
-   objTypeKey            = 0x0006
-   objTypeManufacturer   = 0x0007
-   objTypeSignature      = 0x0008
-   objTypeSilverlight    = 0x0009
-   objTypeMetering       = 0x000A
-   objTypeExtDataSignKey = 0x000B
+   objTypeBasic            = 0x0001
+   objTypeDomain           = 0x0002
+   objTypePc               = 0x0003
+   objTypeDevice           = 0x0004
+   objTypeFeature          = 0x0005
+   objTypeKey              = 0x0006
+   objTypeManufacturer     = 0x0007
+   objTypeSignature        = 0x0008
+   objTypeSilverlight      = 0x0009
+   objTypeMetering         = 0x000A
+   objTypeExtDataSignKey   = 0x000B
    objTypeExtDataContainer = 0x000C
    objTypeExtDataSignature = 0x000D
    objTypeExtDataHwid      = 0x000E
@@ -719,15 +719,15 @@ func (c *Chain) CreateLeaf(modelKey, signingKey, encryptKey EcKey) error {
    }
 
    var (
-      builtKeyInfo    KeyInfo
-      certificateInfo CertInfo
-      signatureData   ecdsaSignature
-      signatureFtlv   FTLV
-      deviceFtlv      FTLV
-      featureFtlv     FTLV
-      keyInfoFtlv     FTLV
+      builtKeyInfo     KeyInfo
+      certificateInfo  CertInfo
+      signatureData    ecdsaSignature
+      signatureFtlv    FTLV
+      deviceFtlv       FTLV
+      featureFtlv      FTLV
+      keyInfoFtlv      FTLV
       manufacturerFtlv FTLV
-      certificateFtlv FTLV
+      certificateFtlv  FTLV
    )
 
    // Calculate digest for the signing key.
@@ -998,8 +998,8 @@ type Key struct {
 
 // New initializes a new Key with provided data and type.
 func (k *Key) New(keyData []byte, Type int) {
-   k.keyType = 1    // Assuming type 1 is for ECDSA keys
-   k.length = 512   // Assuming key length in bits
+   k.keyType = 1  // Assuming type 1 is for ECDSA keys
+   k.length = 512 // Assuming key length in bits
    copy(k.publicKey[:], keyData)
    k.usage.New(Type)
 }
@@ -1089,10 +1089,10 @@ func (m *ManufacturerInfo) decode(data []byte) int {
 
 // Manufacturer represents manufacturer details. Renamed to avoid conflict.
 type Manufacturer struct {
-   flags          uint32
+   flags            uint32
    manufacturerName ManufacturerInfo
-   modelName      ManufacturerInfo
-   modelNumber    ManufacturerInfo
+   modelName        ManufacturerInfo
+   modelNumber      ManufacturerInfo
 }
 
 // encode encodes the Manufacturer structure into a byte slice.
@@ -1226,50 +1226,50 @@ type ContentKey struct {
 type XMRType uint16
 
 const (
-   OuterContainerEntryType          XMRType = 1
-   GlobalPolicyContainerEntryType   XMRType = 2
-   PlaybackPolicyContainerEntryType XMRType = 4
-   MinimumOutputProtectionLevelsEntryType XMRType = 5
-   ExplicitAnalogVideoProtectionEntryType XMRType = 7
-   AnalogVideoOPLEntryType          XMRType = 8
-   KeyMaterialContainerEntryType    XMRType = 9
-   ContentKeyEntryType              XMRType = 10
-   SignatureEntryType               XMRType = 11
-   SerialNumberEntryType            XMRType = 12
-   RightsEntryType                  XMRType = 13
-   ExpirationEntryType              XMRType = 18
-   IssueDateEntryType               XMRType = 19
-   MeteringEntryType                XMRType = 22
-   GracePeriodEntryType             XMRType = 26
-   SourceIDEntryType                XMRType = 34
-   RestrictedSourceIDEntryType      XMRType = 40
-   DomainIDEntryType                XMRType = 41
-   DeviceKeyEntryType               XMRType = 42
-   PolicyMetadataEntryType          XMRType = 44
-   OptimizedContentKeyEntryType     XMRType = 45
+   OuterContainerEntryType                 XMRType = 1
+   GlobalPolicyContainerEntryType          XMRType = 2
+   PlaybackPolicyContainerEntryType        XMRType = 4
+   MinimumOutputProtectionLevelsEntryType  XMRType = 5
+   ExplicitAnalogVideoProtectionEntryType  XMRType = 7
+   AnalogVideoOPLEntryType                 XMRType = 8
+   KeyMaterialContainerEntryType           XMRType = 9
+   ContentKeyEntryType                     XMRType = 10
+   SignatureEntryType                      XMRType = 11
+   SerialNumberEntryType                   XMRType = 12
+   RightsEntryType                         XMRType = 13
+   ExpirationEntryType                     XMRType = 18
+   IssueDateEntryType                      XMRType = 19
+   MeteringEntryType                       XMRType = 22
+   GracePeriodEntryType                    XMRType = 26
+   SourceIDEntryType                       XMRType = 34
+   RestrictedSourceIDEntryType             XMRType = 40
+   DomainIDEntryType                       XMRType = 41
+   DeviceKeyEntryType                      XMRType = 42
+   PolicyMetadataEntryType                 XMRType = 44
+   OptimizedContentKeyEntryType            XMRType = 45
    ExplicitDigitalAudioProtectionEntryType XMRType = 46
-   ExpireAfterFirstUseEntryType     XMRType = 48
-   DigitalAudioOPLEntryType         XMRType = 49
-   RevocationInfoVersionEntryType   XMRType = 50
-   EmbeddingBehaviorEntryType       XMRType = 51
-   SecurityLevelEntryType           XMRType = 52
-   MoveEnablerEntryType             XMRType = 55
-   UplinkKIDEntryType               XMRType = 59
-   CopyPoliciesContainerEntryType   XMRType = 60
-   CopyCountEntryType               XMRType = 61
-   RemovalDateEntryType             XMRType = 80
-   AuxKeyEntryType                  XMRType = 81
-   UplinkXEntryType                 XMRType = 82
-   RealTimeExpirationEntryType      XMRType = 85
+   ExpireAfterFirstUseEntryType            XMRType = 48
+   DigitalAudioOPLEntryType                XMRType = 49
+   RevocationInfoVersionEntryType          XMRType = 50
+   EmbeddingBehaviorEntryType              XMRType = 51
+   SecurityLevelEntryType                  XMRType = 52
+   MoveEnablerEntryType                    XMRType = 55
+   UplinkKIDEntryType                      XMRType = 59
+   CopyPoliciesContainerEntryType          XMRType = 60
+   CopyCountEntryType                      XMRType = 61
+   RemovalDateEntryType                    XMRType = 80
+   AuxKeyEntryType                         XMRType = 81
+   UplinkXEntryType                        XMRType = 82
+   RealTimeExpirationEntryType             XMRType = 85
    ExplicitDigitalVideoProtectionEntryType XMRType = 88
-   DigitalVideoOPLEntryType         XMRType = 89
-   SecureStopEntryType              XMRType = 90
-   CopyUnknownObjectEntryType       XMRType = 65533
-   GlobalPolicyUnknownObjectEntryType XMRType = 65533
-   PlaybackUnknownObjectEntryType   XMRType = 65533
-   CopyUnknownContainerEntryType    XMRType = 65534
-   UnknownContainersEntryType       XMRType = 65534
-   PlaybackUnknownContainerEntryType XMRType = 65534
+   DigitalVideoOPLEntryType                XMRType = 89
+   SecureStopEntryType                     XMRType = 90
+   CopyUnknownObjectEntryType              XMRType = 65533
+   GlobalPolicyUnknownObjectEntryType      XMRType = 65533
+   PlaybackUnknownObjectEntryType          XMRType = 65533
+   CopyUnknownContainerEntryType           XMRType = 65534
+   UnknownContainersEntryType              XMRType = 65534
+   PlaybackUnknownContainerEntryType       XMRType = 65534
 )
 
 type Signature struct {
