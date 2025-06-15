@@ -3,48 +3,41 @@ package b
 import "encoding/binary"
 
 type Signature struct {
-   Type            uint16
-   SignatureLength uint16
+   signatureType   uint16
+   signatureLength uint16
    SignatureData   []byte
-   IssuerLength    uint32
+   issuerLength    uint32
    IssuerKey       []byte
 }
 
-func (s *Signature) New(Signature, SigningKey []byte) {
-   s.Type = 1
-   s.SignatureLength = uint16(len(Signature))
-   s.SignatureData = make([]byte, len(Signature))
-   copy(s.SignatureData, Signature)
-   s.IssuerLength = uint32(len(SigningKey))
-   s.IssuerKey = make([]byte, len(SigningKey))
-   copy(s.IssuerKey, SigningKey)
+func (s *Signature) New(signatureData, signingKey []byte) {
+   s.signatureType = 1
+   s.signatureLength = uint16(len(signatureData))
+   s.SignatureData = make([]byte, len(signatureData))
+   copy(s.SignatureData, signatureData)
+   s.issuerLength = uint32(len(signingKey))
+   s.IssuerKey = make([]byte, len(signingKey))
+   copy(s.IssuerKey, signingKey)
 }
 
 func (s *Signature) Encode() []byte {
-   var data []byte
-   data = binary.BigEndian.AppendUint16(data, s.Type)
-   data = binary.BigEndian.AppendUint16(data, s.SignatureLength)
+   data := binary.BigEndian.AppendUint16(nil, s.signatureType)
+   data = binary.BigEndian.AppendUint16(data, s.signatureLength)
    data = append(data, s.SignatureData...)
-   data = binary.BigEndian.AppendUint32(data, s.IssuerLength*8)
+   data = binary.BigEndian.AppendUint32(data, s.issuerLength*8)
    return append(data, s.IssuerKey...)
 }
 
-func (s *Signature) Decode(data []byte) error {
-   s.Type = binary.BigEndian.Uint16(data)
+func (s *Signature) Decode(data []byte) {
+   s.signatureType = binary.BigEndian.Uint16(data)
    data = data[2:]
-
-   s.SignatureLength = binary.BigEndian.Uint16(data)
+   s.signatureLength = binary.BigEndian.Uint16(data)
    data = data[2:]
-
-   s.SignatureData = make([]byte, int(s.SignatureLength))
+   s.SignatureData = make([]byte, int(s.signatureLength))
    n := copy(s.SignatureData[:], data)
    data = data[n:]
-
-   s.IssuerLength = binary.BigEndian.Uint32(data)
+   s.issuerLength = binary.BigEndian.Uint32(data)
    data = data[4:]
-
-   s.IssuerKey = make([]byte, int(s.IssuerLength)/8)
+   s.IssuerKey = make([]byte, int(s.issuerLength)/8)
    copy(s.IssuerKey[:], data)
-
-   return nil
 }
