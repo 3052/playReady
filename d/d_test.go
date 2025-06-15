@@ -1,4 +1,4 @@
-package soap
+package d
 
 import (
    "41.neocities.org/playReady/a"
@@ -28,7 +28,7 @@ var rakuten = struct {
    kid_pr:  "zn6PMa9p48/pbeMb5rdycg==",
 }
 
-var SL2000 = struct{
+var SL2000 = struct {
    dir string
    g1  string
    z1  string
@@ -109,7 +109,7 @@ func TestScalable(t *testing.T) {
    }
    device.EncryptKey.LoadBytes(data)
    key_id := [16]byte{1}
-   envelope1, err := new_envelope(
+   envelope1, err := NewEnvelope(
       &device, base64.StdEncoding.EncodeToString(key_id[:]),
    )
    if err != nil {
@@ -163,7 +163,7 @@ func TestRakuten(t *testing.T) {
       t.Fatal(err)
    }
    device.EncryptKey.LoadBytes(data)
-   envelope1, err := new_envelope(&device, rakuten.kid_pr)
+   envelope1, err := NewEnvelope(&device, rakuten.kid_pr)
    if err != nil {
       t.Fatal(err)
    }

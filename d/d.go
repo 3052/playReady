@@ -1,10 +1,10 @@
-package soap
+package d
 
 import (
    "41.neocities.org/playReady/a"
    "41.neocities.org/playReady/c"
-   "41.neocities.org/playReady/xml"
    "41.neocities.org/playReady/elGamal"
+   "41.neocities.org/playReady/xml"
    "bytes"
    "crypto/ecdsa"
    "crypto/sha256"
@@ -12,7 +12,7 @@ import (
    "errors"
 )
 
-func new_la(m *ecdsa.PublicKey, cipher_data []byte, kid string) xml.La {
+func newLa(m *ecdsa.PublicKey, cipherData []byte, kid string) xml.La {
    return xml.La{
       XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/protocols",
       Id:      "SignedData",
@@ -55,38 +55,40 @@ func new_la(m *ecdsa.PublicKey, cipher_data []byte, kid string) xml.La {
             },
          },
          CipherData: xml.CipherData{
-            CipherValue: base64.StdEncoding.EncodeToString(cipher_data),
+            CipherValue: base64.StdEncoding.EncodeToString(cipherData),
          },
       },
    }
 }
 
-func new_envelope(device *c.LocalDevice, kid string) (*xml.Envelope, error) {
+// NewEnvelope creates a new SOAP envelope for a license acquisition challenge.
+// This function remains public because it's likely intended for external use.
+func NewEnvelope(device *c.LocalDevice, kid string) (*xml.Envelope, error) {
    var key a.XmlKey
    key.New()
-   cipher_data, err := get_cipher_data(&device.CertificateChain, &key)
+   cipherData, err := getCipherData(&device.CertificateChain, &key)
    if err != nil {
       return nil, err
    }
-   la := new_la(&key.PublicKey, cipher_data, kid)
-   la_data, err := la.Marshal()
+   la := newLa(&key.PublicKey, cipherData, kid)
+   laData, err := la.Marshal()
    if err != nil {
       return nil, err
    }
-   la_digest := sha256.Sum256(la_data)
-   signed_info := xml.SignedInfo{
+   laDigest := sha256.Sum256(laData)
+   signedInfo := xml.SignedInfo{
       XmlNs: "http://www.w3.org/2000/09/xmldsig#",
       Reference: xml.Reference{
          Uri:         "#SignedData",
-         DigestValue: base64.StdEncoding.EncodeToString(la_digest[:]),
+         DigestValue: base64.StdEncoding.EncodeToString(laDigest[:]),
       },
    }
-   signed_data, err := signed_info.Marshal()
+   signedData, err := signedInfo.Marshal()
    if err != nil {
       return nil, err
    }
-   signed_digest := sha256.Sum256(signed_data)
-   r, s, err := ecdsa.Sign(a.Fill('C'), device.SigningKey[0], signed_digest[:])
+   signedDigest := sha256.Sum256(signedData)
+   r, s, err := ecdsa.Sign(a.Fill('C'), device.SigningKey[0], signedDigest[:])
    if err != nil {
       return nil, err
    }
@@ -101,7 +103,7 @@ func new_envelope(device *c.LocalDevice, kid string) (*xml.Envelope, error) {
                   XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols/messages",
                   La:    la,
                   Signature: xml.Signature{
-                     SignedInfo:     signed_info,
+                     SignedInfo:     signedInfo,
                      SignatureValue: base64.StdEncoding.EncodeToString(sign),
                   },
                },
@@ -111,6 +113,8 @@ func new_envelope(device *c.LocalDevice, kid string) (*xml.Envelope, error) {
    }, nil
 }
 
+// ParseLicense parses a SOAP response containing a PlayReady license.
+// This function remains public because it's likely intended for external use.
 func ParseLicense(device *c.LocalDevice, data []byte) (*a.ContentKey, error) {
    var response xml.EnvelopeResponse
    err := response.Unmarshal(data)
@@ -153,7 +157,7 @@ func ParseLicense(device *c.LocalDevice, data []byte) (*a.ContentKey, error) {
    return license.ContentKeyObject, nil
 }
 
-func get_cipher_data(chain *c.Chain, key *a.XmlKey) ([]byte, error) {
+func getCipherData(chain *c.Chain, key *a.XmlKey) ([]byte, error) {
    value := xml.Data{
       CertificateChains: xml.CertificateChains{
          CertificateChain: base64.StdEncoding.EncodeToString(chain.Encode()),
@@ -172,4 +176,3 @@ func get_cipher_data(chain *c.Chain, key *a.XmlKey) ([]byte, error) {
    }
    return append(key.AesIv(), data1...), nil
 }
-

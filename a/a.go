@@ -227,7 +227,7 @@ func (f *FTLV) Decode(data []byte) int {
 
 type FTLV struct {
    flags  uint16
-   Type    uint16
+   Type   uint16
    length uint32
    Value  []byte
 }
@@ -265,50 +265,50 @@ func (c *ContentKey) decode(data []byte) {
 type xmrType uint16
 
 const (
-   outerContainerEntryType             xmrType = 1
-   globalPolicyContainerEntryType      xmrType = 2
-   playbackPolicyContainerEntryType    xmrType = 4
-   minimumOutputProtectionLevelsEntryType xmrType = 5
-   explicitAnalogVideoProtectionEntryType xmrType = 7
-   analogVideoOplEntryType             xmrType = 8
-   keyMaterialContainerEntryType       xmrType = 9
-   contentKeyEntryType                 xmrType = 10
-   signatureEntryType                  xmrType = 11
-   serialNumberEntryType               xmrType = 12
-   rightsEntryType                     xmrType = 13
-   expirationEntryType                 xmrType = 18
-   issueDateEntryType                  xmrType = 19
-   meteringEntryType                   xmrType = 22
-   gracePeriodEntryType                xmrType = 26
-   sourceIDEntryType                   xmrType = 34
-   restrictedSourceIDEntryType         xmrType = 40
-   domainIDEntryType                   xmrType = 41
-   deviceKeyEntryType                  xmrType = 42
-   policyMetadataEntryType             xmrType = 44
-   optimizedContentKeyEntryType        xmrType = 45
+   outerContainerEntryType                 xmrType = 1
+   globalPolicyContainerEntryType          xmrType = 2
+   playbackPolicyContainerEntryType        xmrType = 4
+   minimumOutputProtectionLevelsEntryType  xmrType = 5
+   explicitAnalogVideoProtectionEntryType  xmrType = 7
+   analogVideoOplEntryType                 xmrType = 8
+   keyMaterialContainerEntryType           xmrType = 9
+   contentKeyEntryType                     xmrType = 10
+   signatureEntryType                      xmrType = 11
+   serialNumberEntryType                   xmrType = 12
+   rightsEntryType                         xmrType = 13
+   expirationEntryType                     xmrType = 18
+   issueDateEntryType                      xmrType = 19
+   meteringEntryType                       xmrType = 22
+   gracePeriodEntryType                    xmrType = 26
+   sourceIDEntryType                       xmrType = 34
+   restrictedSourceIDEntryType             xmrType = 40
+   domainIDEntryType                       xmrType = 41
+   deviceKeyEntryType                      xmrType = 42
+   policyMetadataEntryType                 xmrType = 44
+   optimizedContentKeyEntryType            xmrType = 45
    explicitDigitalAudioProtectionEntryType xmrType = 46
-   expireAfterFirstUseEntryType        xmrType = 48
-   digitalAudioOplEntryType            xmrType = 49
-   revocationInfoVersionEntryType      xmrType = 50
-   embeddingBehaviorEntryType          xmrType = 51
-   securityLevelEntryType              xmrType = 52
-   moveEnablerEntryType                xmrType = 55
-   uplinkKIDEntryType                  xmrType = 59
-   copyPoliciesContainerEntryType      xmrType = 60
-   copyCountEntryType                  xmrType = 61
-   removalDateEntryType                xmrType = 80
-   auxKeyEntryType                     xmrType = 81
-   uplinkxEntryType                    xmrType = 82
-   realTimeExpirationEntryType         xmrType = 85
+   expireAfterFirstUseEntryType            xmrType = 48
+   digitalAudioOplEntryType                xmrType = 49
+   revocationInfoVersionEntryType          xmrType = 50
+   embeddingBehaviorEntryType              xmrType = 51
+   securityLevelEntryType                  xmrType = 52
+   moveEnablerEntryType                    xmrType = 55
+   uplinkKIDEntryType                      xmrType = 59
+   copyPoliciesContainerEntryType          xmrType = 60
+   copyCountEntryType                      xmrType = 61
+   removalDateEntryType                    xmrType = 80
+   auxKeyEntryType                         xmrType = 81
+   uplinkxEntryType                        xmrType = 82
+   realTimeExpirationEntryType             xmrType = 85
    explicitDigitalVideoProtectionEntryType xmrType = 88
-   digitalVideoOplEntryType            xmrType = 89
-   secureStopEntryType                 xmrType = 90
-   copyUnknownObjectEntryType          xmrType = 65533
-   globalPolicyUnknownObjectEntryType  xmrType = 65533
-   playbackUnknownObjectEntryType      xmrType = 65533
-   copyUnknownContainerEntryType       xmrType = 65534
-   unknownContainersEntryType          xmrType = 65534
-   playbackUnknownContainerEntryType   xmrType = 65534
+   digitalVideoOplEntryType                xmrType = 89
+   secureStopEntryType                     xmrType = 90
+   copyUnknownObjectEntryType              xmrType = 65533
+   globalPolicyUnknownObjectEntryType      xmrType = 65533
+   playbackUnknownObjectEntryType          xmrType = 65533
+   copyUnknownContainerEntryType           xmrType = 65534
+   unknownContainersEntryType              xmrType = 65534
+   playbackUnknownContainerEntryType       xmrType = 65534
 )
 
 func xorKey(root, second []byte) []byte {
@@ -393,7 +393,7 @@ func (s *signature) decode(data []byte) {
 }
 
 type signature struct {
-   Type    uint16
+   Type   uint16
    length uint16
    data   []byte
 }

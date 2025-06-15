@@ -87,16 +87,16 @@ type Chain struct {
 }
 
 type cert struct {
-   magic           [4]byte
-   version         uint32
-   length          uint32
+   magic             [4]byte
+   version           uint32
+   length            uint32
    lengthToSignature uint32
-   rawData         []byte
-   certificateInfo *certInfo
-   features        *feature
-   keyData         *keyInfo
-   manufacturerInfo *manufacturer
-   signatureData   *b.Signature // See comment above regarding b.Signature
+   rawData           []byte
+   certificateInfo   *certInfo
+   features          *feature
+   keyData           *keyInfo
+   manufacturerInfo  *manufacturer
+   signatureData     *b.Signature // See comment above regarding b.Signature
 }
 
 func (c *cert) newNoSig(value []byte) {
@@ -199,13 +199,13 @@ func (c *Chain) CreateLeaf(modelKey, signingKey, encryptKey a.EcKey) error {
       return errors.New("cert is not valid")
    }
    var (
-      builtKeyInfo    keyInfo
-      certificateInfo certInfo
-      signatureData   b.Signature // See comment above regarding b.Signature
-      signatureFtlv   a.FTLV
-      deviceFtlv      a.FTLV
-      featureFtlv     a.FTLV
-      keyInfoFtlv     a.FTLV
+      builtKeyInfo     keyInfo
+      certificateInfo  certInfo
+      signatureData    b.Signature // See comment above regarding b.Signature
+      signatureFtlv    a.FTLV
+      deviceFtlv       a.FTLV
+      featureFtlv      a.FTLV
+      keyInfoFtlv      a.FTLV
       manufacturerFtlv a.FTLV
       certificateFtlv  a.FTLV
    )
@@ -217,7 +217,7 @@ func (c *Chain) CreateLeaf(modelKey, signingKey, encryptKey a.EcKey) error {
    certificateFtlv.New(1, 1, certificateInfo.encode()) // a.FTLV.New remains public
    var newDevice device
    newDevice.new()
-   keyInfoFtlv.New(1, 6, builtKeyInfo.encode())       // a.FTLV.New remains public
+   keyInfoFtlv.New(1, 6, builtKeyInfo.encode())                     // a.FTLV.New remains public
    manufacturerFtlv.New(0, 7, c.certs[0].manufacturerInfo.encode()) // a.FTLV.New remains public
    feature := feature{
       entries: 1,
@@ -225,9 +225,9 @@ func (c *Chain) CreateLeaf(modelKey, signingKey, encryptKey a.EcKey) error {
       // SUPPORTS_PR3_FEATURES
       features: []uint32{0xD},
    }
-   featureFtlv.New(1, 5, feature.encode()) // a.FTLV.New remains public
+   featureFtlv.New(1, 5, feature.encode())  // a.FTLV.New remains public
    deviceFtlv.New(1, 4, newDevice.Encode()) // a.FTLV.New remains public
-   leaf_data := certificateFtlv.Encode()     // a.FTLV.Encode remains public
+   leaf_data := certificateFtlv.Encode()    // a.FTLV.Encode remains public
    leaf_data = append(leaf_data, deviceFtlv.Encode()...)
    leaf_data = append(leaf_data, featureFtlv.Encode()...)
    leaf_data = append(leaf_data, keyInfoFtlv.Encode()...)
@@ -471,21 +471,21 @@ func (c *certInfo) encode() []byte {
 }
 
 const (
-   objTypeBasic         = 0x0001
-   objTypeDomain        = 0x0002
-   objTypePc            = 0x0003
-   objTypeDevice        = 0x0004
-   objTypeFeature       = 0x0005
-   objTypeKey           = 0x0006
-   objTypeManufacturer  = 0x0007
-   objTypeSignature     = 0x0008
-   objTypeSilverlight   = 0x0009
-   objTypeMetering      = 0x000A
-   objTypeExtDataSignKey = 0x000B
+   objTypeBasic            = 0x0001
+   objTypeDomain           = 0x0002
+   objTypePc               = 0x0003
+   objTypeDevice           = 0x0004
+   objTypeFeature          = 0x0005
+   objTypeKey              = 0x0006
+   objTypeManufacturer     = 0x0007
+   objTypeSignature        = 0x0008
+   objTypeSilverlight      = 0x0009
+   objTypeMetering         = 0x000A
+   objTypeExtDataSignKey   = 0x000B
    objTypeExtDataContainer = 0x000C
    objTypeExtDataSignature = 0x000D
-   objTypeExtDataHwid   = 0x000E
-   objTypeServer        = 0x000F
-   objTypeSecurityVersion = 0x0010
+   objTypeExtDataHwid      = 0x000E
+   objTypeServer           = 0x000F
+   objTypeSecurityVersion  = 0x0010
    objTypeSecurityVersion2 = 0x0011
 )
