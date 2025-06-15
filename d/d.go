@@ -12,17 +12,83 @@ import (
    "errors"
 )
 
-func new_envelope(device *c.LocalDevice, kid string) (*xml.Envelope, error) {
-   var key a.XmlKey
-   err := key.New()
+func get_cipher_data(chain *c.Chain, key *a.XmlKey) ([]byte, error) {
+   value := xml.Data{
+      CertificateChains: xml.CertificateChains{
+         CertificateChain: base64.StdEncoding.EncodeToString(chain.Encode()),
+      },
+      Features: xml.Features{
+         Feature: xml.Feature{"AESCBC"}, // SCALABLE
+      },
+   }
+   data1, err := value.Marshal()
    if err != nil {
       return nil, err
    }
+   data1, err = a.AesCbcPaddingEncrypt(data1, key.AesKey(), key.AesIv())
+   if err != nil {
+      return nil, err
+   }
+   return append(key.AesIv(), data1...), nil
+}
+
+func new_la(m *ecdsa.PublicKey, cipher_data []byte, kid string) xml.La {
+   hX, hY := elGamal.KeyGeneration()
+   return xml.La{
+      XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/protocols",
+      Id:      "SignedData",
+      Version: "1",
+      ContentHeader: xml.ContentHeader{
+         WrmHeader: xml.WrmHeader{
+            XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/PlayReadyHeader",
+            Version: "4.0.0.0",
+            Data: xml.WrmHeaderData{
+               ProtectInfo: xml.ProtectInfo{
+                  KeyLen: "16",
+                  AlgId:  "AESCTR",
+               },
+               Kid: kid,
+            },
+         },
+      },
+      EncryptedData: xml.EncryptedData{
+         XmlNs: "http://www.w3.org/2001/04/xmlenc#",
+         Type:  "http://www.w3.org/2001/04/xmlenc#Element",
+         EncryptionMethod: xml.Algorithm{
+            Algorithm: "http://www.w3.org/2001/04/xmlenc#aes128-cbc",
+         },
+         KeyInfo: xml.KeyInfo{
+            XmlNs: "http://www.w3.org/2000/09/xmldsig#",
+            EncryptedKey: xml.EncryptedKey{
+               XmlNs: "http://www.w3.org/2001/04/xmlenc#",
+               EncryptionMethod: xml.Algorithm{
+                  Algorithm: "http://schemas.microsoft.com/DRM/2007/03/protocols#ecc256",
+               },
+               KeyInfo: xml.EncryptedKeyInfo{
+                  XmlNs:   "http://www.w3.org/2000/09/xmldsig#",
+                  KeyName: "WMRMServer",
+               },
+               CipherData: xml.CipherData{
+                  CipherValue: base64.StdEncoding.EncodeToString(
+                     elGamal.Encrypt(m, hX, hY),
+                  ),
+               },
+            },
+         },
+         CipherData: xml.CipherData{
+            CipherValue: base64.StdEncoding.EncodeToString(cipher_data),
+         },
+      },
+   }
+}
+func new_envelope(device *c.LocalDevice, kid string) (*xml.Envelope, error) {
+   var key a.XmlKey
+   key.New()
    cipher_data, err := get_cipher_data(&device.CertificateChain, &key)
    if err != nil {
       return nil, err
    }
-   la := new_la(&key.PublicKey, cipher_data, kid)
+   la := new_la(&key[0], cipher_data, kid)
    la_data, err := la.Marshal()
    if err != nil {
       return nil, err
@@ -107,72 +173,3 @@ func ParseLicense(device *c.LocalDevice, data []byte) (*a.ContentKey, error) {
    return license.ContentKeyObject, nil
 }
 
-func get_cipher_data(chain *c.Chain, key *a.XmlKey) ([]byte, error) {
-   value := xml.Data{
-      CertificateChains: xml.CertificateChains{
-         CertificateChain: base64.StdEncoding.EncodeToString(chain.Encode()),
-      },
-      Features: xml.Features{
-         Feature: xml.Feature{"AESCBC"}, // SCALABLE
-      },
-   }
-   data1, err := value.Marshal()
-   if err != nil {
-      return nil, err
-   }
-   data1, err = a.AesCbcPaddingEncrypt(data1, key.AesKey[:], key.AesIv[:])
-   if err != nil {
-      return nil, err
-   }
-   return append(key.AesIv[:], data1...), nil
-}
-
-func new_la(m *ecdsa.PublicKey, cipher_data []byte, kid string) xml.La {
-   hX, hY := elGamal.KeyGeneration()
-   return xml.La{
-      XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/protocols",
-      Id:      "SignedData",
-      Version: "1",
-      ContentHeader: xml.ContentHeader{
-         WrmHeader: xml.WrmHeader{
-            XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/PlayReadyHeader",
-            Version: "4.0.0.0",
-            Data: xml.WrmHeaderData{
-               ProtectInfo: xml.ProtectInfo{
-                  KeyLen: "16",
-                  AlgId:  "AESCTR",
-               },
-               Kid: kid,
-            },
-         },
-      },
-      EncryptedData: xml.EncryptedData{
-         XmlNs: "http://www.w3.org/2001/04/xmlenc#",
-         Type:  "http://www.w3.org/2001/04/xmlenc#Element",
-         EncryptionMethod: xml.Algorithm{
-            Algorithm: "http://www.w3.org/2001/04/xmlenc#aes128-cbc",
-         },
-         KeyInfo: xml.KeyInfo{
-            XmlNs: "http://www.w3.org/2000/09/xmldsig#",
-            EncryptedKey: xml.EncryptedKey{
-               XmlNs: "http://www.w3.org/2001/04/xmlenc#",
-               EncryptionMethod: xml.Algorithm{
-                  Algorithm: "http://schemas.microsoft.com/DRM/2007/03/protocols#ecc256",
-               },
-               KeyInfo: xml.EncryptedKeyInfo{
-                  XmlNs:   "http://www.w3.org/2000/09/xmldsig#",
-                  KeyName: "WMRMServer",
-               },
-               CipherData: xml.CipherData{
-                  CipherValue: base64.StdEncoding.EncodeToString(
-                     elGamal.Encrypt(m, hX, hY),
-                  ),
-               },
-            },
-         },
-         CipherData: xml.CipherData{
-            CipherValue: base64.StdEncoding.EncodeToString(cipher_data),
-         },
-      },
-   }
-}

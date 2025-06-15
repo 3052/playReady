@@ -14,6 +14,30 @@ import (
    "math/big"
 )
 
+type XmlKey [1]ecdsa.PublicKey
+
+func (x *XmlKey) New() {
+   x[0].X, x[0].Y = elliptic.P256().ScalarBaseMult([]byte{1})
+}
+
+func (x *XmlKey) AesIv() []byte {
+   return x[0].X.Bytes()[:16]
+}
+
+func (x *XmlKey) AesKey() []byte {
+   return x[0].X.Bytes()[16:]
+}
+
+func (e *EcKey) LoadBytes(data []byte) {
+   var public ecdsa.PublicKey
+   public.Curve = elliptic.P256()
+   public.X, public.Y = public.Curve.ScalarBaseMult(data)
+   var private ecdsa.PrivateKey
+   private.D = new(big.Int).SetBytes(data)
+   private.PublicKey = public
+   e[0] = &private
+}
+
 func (c *ContentKey) Decrypt(key *ecdsa.PrivateKey, aux_keys *AuxKeys) error {
    switch c.CipherType {
    case 3:
@@ -75,39 +99,10 @@ func (c *ContentKey) Scalable(key *ecdsa.PrivateKey, aux_keys *AuxKeys) error {
    copy(c.Key[:], rgb_key)
    return nil
 }
-// pkg.go.dev/crypto/ecdsa#PublicKey
-func (x *XmlKey) New() error {
-   key, err := ecdsa.GenerateKey(elliptic.P256(), Fill('A'))
-   if err != nil {
-      return err
-   }
-   data := key.PublicKey.X.Bytes()
-   n := copy(x.AesIv[:], data)
-   data = data[n:]
-   copy(x.AesKey[:], data)
-   x.PublicKey = key.PublicKey
-   return nil
-}
-
-type XmlKey struct {
-   AesIv     [16]byte
-   AesKey    [16]byte
-   PublicKey ecdsa.PublicKey
-}
 
 // pkg.go.dev/crypto/ecdsa#PublicKey
 func (e *EcKey) PublicBytes() []byte {
    return append(e[0].PublicKey.X.Bytes(), e[0].PublicKey.Y.Bytes()...)
-}
-
-func (e *EcKey) LoadBytes(data []byte) {
-   var public ecdsa.PublicKey
-   public.Curve = elliptic.P256()
-   public.X, public.Y = public.Curve.ScalarBaseMult(data)
-   var private ecdsa.PrivateKey
-   private.D = new(big.Int).SetBytes(data)
-   private.PublicKey = public
-   e[0] = &private
 }
 
 func (e *EcKey) New() error {
@@ -494,4 +489,3 @@ func AesCbcPaddingEncrypt(data, key, iv []byte) ([]byte, error) {
 }
 
 type EcKey [1]*ecdsa.PrivateKey
-
