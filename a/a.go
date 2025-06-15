@@ -14,20 +14,6 @@ import (
    "math/big"
 )
 
-type XmlKey [1]ecdsa.PublicKey
-
-func (x *XmlKey) New() {
-   x[0].X, x[0].Y = elliptic.P256().ScalarBaseMult([]byte{1})
-}
-
-func (x *XmlKey) AesIv() []byte {
-   return x[0].X.Bytes()[:16]
-}
-
-func (x *XmlKey) AesKey() []byte {
-   return x[0].X.Bytes()[16:]
-}
-
 func (e *EcKey) LoadBytes(data []byte) {
    var public ecdsa.PublicKey
    public.Curve = elliptic.P256()
@@ -489,3 +475,21 @@ func AesCbcPaddingEncrypt(data, key, iv []byte) ([]byte, error) {
 }
 
 type EcKey [1]*ecdsa.PrivateKey
+
+type XmlKey struct {
+   PublicKey ecdsa.PublicKey
+   x []byte
+}
+
+func (x *XmlKey) New() {
+   x.PublicKey.X, x.PublicKey.Y = elliptic.P256().ScalarBaseMult([]byte{1})
+   x.x = x.PublicKey.X.Bytes()
+}
+
+func (x *XmlKey) AesIv() []byte {
+   return x.x[:16]
+}
+
+func (x *XmlKey) AesKey() []byte {
+   return x.x[16:]
+}
