@@ -37,10 +37,7 @@ func (c *cert) decode(data []byte) (int, error) {
       switch ftlv.Type {
       case objTypeBasic:
          c.certificateInfo = &certInfo{}
-         err := c.certificateInfo.decode(ftlv.Value)
-         if err != nil {
-            return 0, err
-         }
+         c.certificateInfo.decode(ftlv.Value)
 
       case objTypeFeature:
          c.features = &feature{}
@@ -99,13 +96,12 @@ type cert struct {
    signatureData     *b.Signature // See comment above regarding b.Signature
 }
 
-func (c *cert) newNoSig(value []byte) {
+func (c *cert) newNoSig(data []byte) {
    copy(c.magic[:], "CERT")
    c.version = 1
-   c.length = uint32(len(value)) + 16 + 144
-   c.lengthToSignature = uint32(len(value)) + 16
-   c.rawData = make([]byte, len(value))
-   copy(c.rawData, value)
+   c.length = uint32(len(data)) + 16 + 144
+   c.lengthToSignature = uint32(len(data)) + 16
+   c.rawData = data
 }
 
 func (c *Chain) Encode() []byte {
@@ -176,7 +172,7 @@ type device struct {
    maxLicenseChainDepth uint32
 }
 
-func (d *device) new() {
+func (d *device) New() {
    d.maxLicenseSize = 10240
    d.maxHeaderSize = 15360
    d.maxLicenseChainDepth = 2
@@ -210,13 +206,13 @@ func (c *Chain) CreateLeaf(modelKey, signingKey, encryptKey a.EcKey) error {
       certificateFtlv  a.FTLV
    )
    signingKeyDigest := sha256.Sum256(signingKey.PublicBytes())
-   certificateInfo.new(
+   certificateInfo.New(
       c.certs[0].certificateInfo.securityLevel, signingKeyDigest[:],
    )
-   builtKeyInfo.new(signingKey.PublicBytes(), encryptKey.PublicBytes())
+   builtKeyInfo.New(signingKey.PublicBytes(), encryptKey.PublicBytes())
    certificateFtlv.New(1, 1, certificateInfo.encode()) // a.FTLV.New remains public
    var newDevice device
-   newDevice.new()
+   newDevice.New()
    keyInfoFtlv.New(1, 6, builtKeyInfo.encode())                     // a.FTLV.New remains public
    manufacturerFtlv.New(0, 7, c.certs[0].manufacturerInfo.encode()) // a.FTLV.New remains public
    feature := feature{
@@ -284,7 +280,7 @@ type feature struct {
    features []uint32
 }
 
-func (f *feature) new(Type int) {
+func (f *feature) New(Type int) {
    f.entries = 1
    f.features = []uint32{uint32(Type)}
 }
@@ -300,31 +296,11 @@ func (f *feature) encode() []byte {
    return data
 }
 
-func (k *key) new(keyData []byte, Type int) {
+func (k *key) New(keyData []byte, Type int) {
    k.keyType = 1
    k.length = 512
    copy(k.publicKey[:], keyData)
-   k.usage.new(Type)
-}
-
-type key struct {
-   keyType   uint16
-   length    uint16
-   flags     uint32
-   publicKey [64]byte
-   usage     feature
-}
-
-func (k *key) decode(data []byte) int {
-   k.keyType = binary.BigEndian.Uint16(data)
-   n := 2
-   k.length = binary.BigEndian.Uint16(data[n:])
-   n += 2
-   k.flags = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   n += copy(k.publicKey[:], data[n:])
-   n += k.usage.decode(data[n:])
-   return n
+   k.usage.New(Type)
 }
 
 func (k *key) encode() []byte {
@@ -335,11 +311,11 @@ func (k *key) encode() []byte {
    return append(data, k.usage.encode()...)
 }
 
-func (k *keyInfo) new(signingKey, encryptKey []byte) {
+func (k *keyInfo) New(signingKey, encryptKey []byte) {
    k.entries = 2
    k.keys = make([]key, 2)
-   k.keys[0].new(signingKey, 1)
-   k.keys[1].new(encryptKey, 2)
+   k.keys[0].New(signingKey, 1)
+   k.keys[1].New(encryptKey, 2)
 }
 
 type keyInfo struct {
@@ -379,12 +355,13 @@ func (m *manufacturerInfo) encode() []byte {
    return append(data, []byte(m.value)...)
 }
 
-func (m *manufacturerInfo) decode(data []byte) (uint32, error) {
+func (m *manufacturerInfo) decode(data []byte) int {
    m.length = binary.BigEndian.Uint32(data)
-   var n uint32 = 4
+   n := 4
    padded_length := (m.length + 3) &^ 3
    m.value = string(data[n:][:padded_length])
-   return n + padded_length, nil
+   n += int(padded_length)
+   return n
 }
 
 type manufacturer struct {
@@ -395,8 +372,7 @@ type manufacturer struct {
 }
 
 func (m *manufacturer) encode() []byte {
-   var data []byte
-   data = binary.BigEndian.AppendUint32(data, m.flags)
+   data := binary.BigEndian.AppendUint32(nil, m.flags)
    data = append(data, m.manufacturerName.encode()...)
    data = append(data, m.modelName.encode()...)
    return append(data, m.modelNumber.encode()...)
@@ -405,58 +381,11 @@ func (m *manufacturer) encode() []byte {
 func (m *manufacturer) decode(data []byte) error {
    m.flags = binary.BigEndian.Uint32(data)
    data = data[4:]
-   n, err := m.manufacturerName.decode(data)
-   if err != nil {
-      return err
-   }
+   n := m.manufacturerName.decode(data)
    data = data[n:]
-   n, err = m.modelName.decode(data)
-   if err != nil {
-      return err
-   }
+   n = m.modelName.decode(data)
    data = data[n:]
-   _, err = m.modelNumber.decode(data)
-   if err != nil {
-      return err
-   }
-   return nil
-}
-func (c *certInfo) new(securityLevel uint32, digest []byte) {
-   c.securityLevel = securityLevel
-   c.flags = 0
-   c.infoType = 2
-   copy(c.digest[:], digest)
-   c.expiry = 4294967295
-}
-
-type certInfo struct {
-   certificateId [16]byte
-   securityLevel uint32
-   flags         uint32
-   infoType      uint32
-   digest        [32]byte
-   expiry        uint32
-   // NOTE SOME SERVERS, FOR EXAMPLE
-   // rakuten.tv
-   // WILL LOCK LICENSE TO THE FIRST DEVICE, USING "ClientId" TO DETECT, SO BE
-   // CAREFUL USING A VALUE HERE
-   clientId [16]byte
-}
-
-func (c *certInfo) decode(data []byte) error {
-   n := copy(c.certificateId[:], data)
-   data = data[n:]
-   c.securityLevel = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   c.flags = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   c.infoType = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   n = copy(c.digest[:], data)
-   data = data[n:]
-   c.expiry = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   copy(c.clientId[:], data)
+   m.modelNumber.decode(data)
    return nil
 }
 
@@ -489,3 +418,60 @@ const (
    objTypeSecurityVersion  = 0x0010
    objTypeSecurityVersion2 = 0x0011
 )
+
+func (c *certInfo) New(securityLevel uint32, digest []byte) {
+   c.securityLevel = securityLevel
+   c.infoType = 2
+   copy(c.digest[:], digest)
+   c.expiry = 4294967295
+}
+
+type key struct {
+   keyType   uint16
+   length    uint16
+   flags     uint32
+   publicKey [64]byte
+   usage     feature
+}
+
+func (k *key) decode(data []byte) int {
+   k.keyType = binary.BigEndian.Uint16(data)
+   n := 2
+   k.length = binary.BigEndian.Uint16(data[n:])
+   n += 2
+   k.flags = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   n += copy(k.publicKey[:], data[n:])
+   n += k.usage.decode(data[n:])
+   return n
+}
+
+type certInfo struct {
+   certificateId [16]byte
+   securityLevel uint32
+   flags         uint32
+   infoType      uint32
+   digest        [32]byte
+   expiry        uint32
+   // NOTE SOME SERVERS, FOR EXAMPLE
+   // rakuten.tv
+   // WILL LOCK LICENSE TO THE FIRST DEVICE, USING "ClientId" TO DETECT, SO BE
+   // CAREFUL USING A VALUE HERE
+   clientId [16]byte
+}
+
+func (c *certInfo) decode(data []byte) {
+   n := copy(c.certificateId[:], data)
+   data = data[n:]
+   c.securityLevel = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   c.flags = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   c.infoType = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   n = copy(c.digest[:], data)
+   data = data[n:]
+   c.expiry = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   copy(c.clientId[:], data)
+}

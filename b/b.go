@@ -10,16 +10,6 @@ type Signature struct {
    IssuerKey       []byte
 }
 
-func (s *Signature) New(signatureData, signingKey []byte) {
-   s.signatureType = 1
-   s.signatureLength = uint16(len(signatureData))
-   s.SignatureData = make([]byte, len(signatureData))
-   copy(s.SignatureData, signatureData)
-   s.issuerLength = uint32(len(signingKey))
-   s.IssuerKey = make([]byte, len(signingKey))
-   copy(s.IssuerKey, signingKey)
-}
-
 func (s *Signature) Encode() []byte {
    data := binary.BigEndian.AppendUint16(nil, s.signatureType)
    data = binary.BigEndian.AppendUint16(data, s.signatureLength)
@@ -28,16 +18,22 @@ func (s *Signature) Encode() []byte {
    return append(data, s.IssuerKey...)
 }
 
+func (s *Signature) New(signatureData, signingKey []byte) {
+   s.signatureType = 1
+   s.signatureLength = uint16(len(signatureData))
+   s.SignatureData = signatureData
+   s.issuerLength = uint32(len(signingKey))
+   s.IssuerKey = signingKey
+}
+
 func (s *Signature) Decode(data []byte) {
    s.signatureType = binary.BigEndian.Uint16(data)
    data = data[2:]
    s.signatureLength = binary.BigEndian.Uint16(data)
    data = data[2:]
-   s.SignatureData = make([]byte, int(s.signatureLength))
-   n := copy(s.SignatureData[:], data)
-   data = data[n:]
+   s.SignatureData = data[:s.signatureLength]
+   data = data[s.signatureLength:]
    s.issuerLength = binary.BigEndian.Uint32(data)
    data = data[4:]
-   s.IssuerKey = make([]byte, int(s.issuerLength)/8)
-   copy(s.IssuerKey[:], data)
+   s.IssuerKey = data[:s.issuerLength/8]
 }

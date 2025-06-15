@@ -193,8 +193,9 @@ func (a *auxKeys) decode(data []byte) {
 
 func (a *auxKey) decode(data []byte) int {
    a.location = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   return copy(a.key[:], data) + 4
+   n := 4
+   n += copy(a.key[:], data[n:])
+   return n
 }
 
 func (e *eccKey) decode(data []byte) {
@@ -202,8 +203,7 @@ func (e *eccKey) decode(data []byte) {
    data = data[2:]
    e.length = binary.BigEndian.Uint16(data)
    data = data[2:]
-   e.Value = make([]byte, e.length)
-   copy(e.Value, data)
+   e.Value = data[:e.length]
 }
 
 func (f *FTLV) Encode() []byte {
@@ -247,19 +247,6 @@ type ContentKey struct {
    value      []byte
    Integrity  guid
    Key        [16]byte
-}
-
-func (c *ContentKey) decode(data []byte) {
-   c.KeyId.decode(data[:])
-   data = data[16:]
-   c.keyType = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   c.cipherType = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   c.length = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   c.value = make([]byte, c.length)
-   copy(c.value[:], data)
 }
 
 type xmrType uint16
@@ -324,10 +311,20 @@ func (*ContentKey) magicConstantZero() ([]byte, error) {
    return hex.DecodeString("7ee9ed4af773224f00b8ea7efb027cbb")
 }
 
-func (l *LicenseResponse) Decode(data []byte) error {
-   l.rawData = make([]byte, len(data))
-   copy(l.rawData, data)
+func (c *ContentKey) decode(data []byte) {
+   c.KeyId.decode(data[:])
+   data = data[16:]
+   c.keyType = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   c.cipherType = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   c.length = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   c.value = data[:c.length]
+}
 
+func (l *LicenseResponse) Decode(data []byte) error {
+   l.rawData = data
    n := copy(l.magic[:], data)
    l.offset = binary.BigEndian.Uint16(data[n:])
    n += 2
