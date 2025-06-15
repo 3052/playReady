@@ -236,7 +236,7 @@ func (c *Chain) CreateLeaf(ModelKey, SigningKey, EncryptKey a.EcKey) error {
    var UnsignedCert Cert
    UnsignedCert.NewNoSig(leaf_data)
    SignatureDigest := sha256.Sum256(UnsignedCert.Encode())
-   r, s, err := ecdsa.Sign(a.Fill('C'), ModelKey[0], SignatureDigest[:])
+   r, s, err := ecdsa.Sign(a.Fill('B'), ModelKey[0], SignatureDigest[:])
    if err != nil {
       return err
    }

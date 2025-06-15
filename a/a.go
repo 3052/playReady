@@ -14,20 +14,10 @@ import (
    "math/big"
 )
 
-func (e *EcKey) LoadBytes(data []byte) {
-   var public ecdsa.PublicKey
-   public.Curve = elliptic.P256()
-   public.X, public.Y = public.Curve.ScalarBaseMult(data)
-   var private ecdsa.PrivateKey
-   private.D = new(big.Int).SetBytes(data)
-   private.PublicKey = public
-   e[0] = &private
-}
-
 func (c *ContentKey) Decrypt(key *ecdsa.PrivateKey, aux_keys *AuxKeys) error {
    switch c.CipherType {
    case 3:
-      decrypted := elGamal.Decrypt(c.Value, key.D)
+      decrypted := elGamal.Decrypt(c.Value, key)
       c.Integrity.Decode(decrypted)
       decrypted = decrypted[16:]
       copy(c.Key[:], decrypted)
@@ -42,7 +32,7 @@ func (c *ContentKey) Scalable(key *ecdsa.PrivateKey, aux_keys *AuxKeys) error {
    rootKeyInfo := c.Value[:144]
    root_key := rootKeyInfo[128:]
    leaf_keys := c.Value[144:]
-   decrypted := elGamal.Decrypt(rootKeyInfo[:128], key.D)
+   decrypted := elGamal.Decrypt(rootKeyInfo[:128], key)
    var (
       CI [16]byte
       CK [16]byte
@@ -86,6 +76,16 @@ func (c *ContentKey) Scalable(key *ecdsa.PrivateKey, aux_keys *AuxKeys) error {
    return nil
 }
 
+func (e *EcKey) LoadBytes(data []byte) {
+   var public ecdsa.PublicKey
+   public.Curve = elliptic.P256()
+   public.X, public.Y = public.Curve.ScalarBaseMult(data)
+   var private ecdsa.PrivateKey
+   private.D = new(big.Int).SetBytes(data)
+   private.PublicKey = public
+   e[0] = &private
+}
+
 // pkg.go.dev/crypto/ecdsa#PublicKey
 func (e *EcKey) PublicBytes() []byte {
    return append(e[0].PublicKey.X.Bytes(), e[0].PublicKey.Y.Bytes()...)
@@ -93,7 +93,7 @@ func (e *EcKey) PublicBytes() []byte {
 
 func (e *EcKey) New() error {
    var err error
-   e[0], err = ecdsa.GenerateKey(elliptic.P256(), Fill('B'))
+   e[0], err = ecdsa.GenerateKey(elliptic.P256(), Fill('A'))
    if err != nil {
       return err
    }
@@ -123,34 +123,28 @@ type Guid struct {
    Data4 uint64 // big endian
 }
 
-func (k *Guid) Uuid() []byte {
-   data := binary.BigEndian.AppendUint32(nil, k.Data1)
-   data = binary.BigEndian.AppendUint16(data, k.Data2)
-   data = binary.BigEndian.AppendUint16(data, k.Data3)
-   return binary.BigEndian.AppendUint64(data, k.Data4)
+func (g *Guid) Uuid() []byte {
+   data := binary.BigEndian.AppendUint32(nil, g.Data1)
+   data = binary.BigEndian.AppendUint16(data, g.Data2)
+   data = binary.BigEndian.AppendUint16(data, g.Data3)
+   return binary.BigEndian.AppendUint64(data, g.Data4)
 }
 
-func (k *Guid) Guid() []byte {
-   data := binary.LittleEndian.AppendUint32(nil, k.Data1)
-   data = binary.LittleEndian.AppendUint16(data, k.Data2)
-   data = binary.LittleEndian.AppendUint16(data, k.Data3)
-   return binary.BigEndian.AppendUint64(data, k.Data4)
+func (g *Guid) Guid() []byte {
+   data := binary.LittleEndian.AppendUint32(nil, g.Data1)
+   data = binary.LittleEndian.AppendUint16(data, g.Data2)
+   data = binary.LittleEndian.AppendUint16(data, g.Data3)
+   return binary.BigEndian.AppendUint64(data, g.Data4)
 }
 
-type Signature struct {
-   Type   uint16
-   Length uint16
-   Data   []byte
-}
-
-func (k *Guid) Decode(data []byte) {
-   k.Data1 = binary.LittleEndian.Uint32(data)
+func (g *Guid) Decode(data []byte) {
+   g.Data1 = binary.LittleEndian.Uint32(data)
    data = data[4:]
-   k.Data2 = binary.LittleEndian.Uint16(data)
+   g.Data2 = binary.LittleEndian.Uint16(data)
    data = data[2:]
-   k.Data3 = binary.LittleEndian.Uint16(data)
+   g.Data3 = binary.LittleEndian.Uint16(data)
    data = data[2:]
-   k.Data4 = binary.BigEndian.Uint64(data)
+   g.Data4 = binary.BigEndian.Uint64(data)
 }
 
 func (l *LicenseResponse) Encode() []byte {
@@ -160,6 +154,14 @@ func (l *LicenseResponse) Encode() []byte {
    data = append(data, l.RightsId[:]...)
    return append(data, l.OuterContainer.Encode()...)
 }
+
+type Signature struct {
+   Type   uint16
+   Length uint16
+   Data   []byte
+}
+
+///
 
 func (s *Signature) Decode(data []byte) error {
    s.Type = binary.BigEndian.Uint16(data)
