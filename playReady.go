@@ -368,6 +368,7 @@ const (
    objTypeSecurityVersion  = 0x0010
    objTypeSecurityVersion2 = 0x0011
 )
+
 // LocalDevice represents a device with its certificate chain and keys.
 type LocalDevice struct {
    CertificateChain Chain
@@ -556,57 +557,6 @@ func (m *manufacturer) decode(data []byte) {
    n = m.modelName.decode(data)
    data = data[n:]
    m.modelNumber.decode(data)
-}
-
-// certInfo contains basic certificate information. Renamed to avoid conflict.
-type certInfo struct {
-   certificateId [16]byte
-   securityLevel uint32
-   flags         uint32
-   infoType      uint32
-   digest        [32]byte
-   expiry        uint32
-   // NOTE SOME SERVERS, FOR EXAMPLE
-   // rakuten.tv
-   // WILL LOCK LICENSE TO THE FIRST DEVICE, USING "ClientId" TO DETECT, SO BE
-   // CAREFUL USING A VALUE HERE
-   clientId [16]byte
-}
-
-// encode encodes the certInfo structure into a byte slice.
-func (c *certInfo) encode() []byte {
-   data := c.certificateId[:]
-   data = binary.BigEndian.AppendUint32(data, c.securityLevel)
-   data = binary.BigEndian.AppendUint32(data, c.flags)
-   data = binary.BigEndian.AppendUint32(data, c.infoType)
-   data = append(data, c.digest[:]...)
-   data = binary.BigEndian.AppendUint32(data, c.expiry)
-   return append(data, c.clientId[:]...)
-}
-
-// new initializes a new certInfo with security level and digest.
-func (c *certInfo) new(securityLevel uint32, digest []byte) {
-   c.securityLevel = securityLevel
-   c.infoType = 2 // Assuming infoType 2 is a standard type
-   copy(c.digest[:], digest)
-   c.expiry = 4294967295 // Max uint32, effectively never expires
-}
-
-// decode decodes a byte slice into the certInfo structure.
-func (c *certInfo) decode(data []byte) {
-   n := copy(c.certificateId[:], data)
-   data = data[n:]
-   c.securityLevel = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   c.flags = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   c.infoType = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   n = copy(c.digest[:], data)
-   data = data[n:]
-   c.expiry = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   copy(c.clientId[:], data)
 }
 
 type Fill byte
