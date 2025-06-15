@@ -478,12 +478,12 @@ type EcKey [1]*ecdsa.PrivateKey
 
 type XmlKey struct {
    PublicKey ecdsa.PublicKey
-   x []byte
+   x [32]byte
 }
 
 func (x *XmlKey) New() {
    x.PublicKey.X, x.PublicKey.Y = elliptic.P256().ScalarBaseMult([]byte{1})
-   x.x = x.PublicKey.X.Bytes()
+   x.PublicKey.X.FillBytes(x.x[:])
 }
 
 func (x *XmlKey) AesIv() []byte {
