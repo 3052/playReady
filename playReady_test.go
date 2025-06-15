@@ -51,7 +51,7 @@ func TestChain(t *testing.T) {
       t.Fatal(err)
    }
    var z1 EcKey
-   z1.LoadBytes(data)
+   z1.unmarshal(data)
    // they downgrade certs from the cert digest (hash of the signing key)
    var signing_key EcKey
    err = signing_key.New()
@@ -100,20 +100,20 @@ func TestScalable(t *testing.T) {
    if err != nil {
       t.Fatal(err)
    }
-   device.SigningKey.LoadBytes(data)
+   device.SigningKey.unmarshal(data)
    data, err = os.ReadFile(SL2000.dir + "encrypt_key.txt")
    if err != nil {
       t.Fatal(err)
    }
-   device.EncryptKey.LoadBytes(data)
+   device.EncryptKey.unmarshal(data)
    key_id := [16]byte{1}
-   envelope1, err := NewEnvelope(
+   envelope, err := NewEnvelope(
       &device, base64.StdEncoding.EncodeToString(key_id[:]),
    )
    if err != nil {
       t.Fatal(err)
    }
-   data, err = xml.Marshal(envelope1)
+   data, err = xml.Marshal(envelope)
    if err != nil {
       t.Fatal(err)
    }
@@ -156,17 +156,17 @@ func TestRakuten(t *testing.T) {
    if err != nil {
       t.Fatal(err)
    }
-   device.SigningKey.LoadBytes(data)
+   device.SigningKey.unmarshal(data)
    data, err = os.ReadFile(SL2000.dir + "encrypt_key.txt")
    if err != nil {
       t.Fatal(err)
    }
-   device.EncryptKey.LoadBytes(data)
-   envelope1, err := NewEnvelope(&device, rakuten.kid_pr)
+   device.EncryptKey.unmarshal(data)
+   envelope, err := NewEnvelope(&device, rakuten.kid_pr)
    if err != nil {
       t.Fatal(err)
    }
-   data, err = xml.Marshal(envelope1)
+   data, err = xml.Marshal(envelope)
    if err != nil {
       t.Fatal(err)
    }

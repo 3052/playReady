@@ -9,6 +9,39 @@ import (
    "math/big"
 )
 
+// LoadBytes loads an ECDSA private key from bytes.
+func (e *EcKey) unmarshal(data []byte) {
+   var public ecdsa.PublicKey
+   public.Curve = elliptic.P256()
+   public.X, public.Y = public.Curve.ScalarBaseMult(data)
+   var private ecdsa.PrivateKey
+   private.D = new(big.Int).SetBytes(data)
+   private.PublicKey = public
+   e[0] = &private
+}
+
+// PublicBytes returns the public key bytes.
+func (e *EcKey) PublicBytes() []byte {
+   return append(e[0].PublicKey.X.Bytes(), e[0].PublicKey.Y.Bytes()...)
+}
+
+// New generates a new ECDSA private key.
+func (e *EcKey) New() error {
+   var err error
+   e[0], err = ecdsa.GenerateKey(elliptic.P256(), Fill('A'))
+   if err != nil {
+      return err
+   }
+   return nil
+}
+
+// Private returns the private key bytes.
+func (e EcKey) Private() []byte {
+   return e[0].D.Bytes()
+}
+
+type EcKey [1]*ecdsa.PrivateKey
+
 // xorKey performs XOR operation on two byte slices.
 func xorKey(a, b []byte) []byte {
    if len(a) != len(b) {
@@ -144,38 +177,6 @@ type ContentKey struct {
    Integrity  GUID
    Key        [16]byte
 }
-// LoadBytes loads an ECDSA private key from bytes.
-func (e *EcKey) LoadBytes(data []byte) {
-   var public ecdsa.PublicKey
-   public.Curve = elliptic.P256()
-   public.X, public.Y = public.Curve.ScalarBaseMult(data)
-   var private ecdsa.PrivateKey
-   private.D = new(big.Int).SetBytes(data)
-   private.PublicKey = public
-   e[0] = &private
-}
-
-// PublicBytes returns the public key bytes.
-func (e *EcKey) PublicBytes() []byte {
-   return append(e[0].PublicKey.X.Bytes(), e[0].PublicKey.Y.Bytes()...)
-}
-
-// New generates a new ECDSA private key.
-func (e *EcKey) New() error {
-   var err error
-   e[0], err = ecdsa.GenerateKey(elliptic.P256(), Fill('A'))
-   if err != nil {
-      return err
-   }
-   return nil
-}
-
-// Private returns the private key bytes.
-func (e EcKey) Private() []byte {
-   return e[0].D.Bytes()
-}
-
-type EcKey [1]*ecdsa.PrivateKey
 
 type feature struct {
    entries  uint32

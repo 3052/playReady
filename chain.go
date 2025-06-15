@@ -45,7 +45,7 @@ func (c *certificate) encode() []byte {
    data = binary.BigEndian.AppendUint32(data, c.version)
    data = binary.BigEndian.AppendUint32(data, c.length)
    data = binary.BigEndian.AppendUint32(data, c.lengthToSignature)
-   return append(data, c.rawData[:]...)
+   return append(data, c.rawData...)
 }
 
 // certInfo contains basic certificate information. Renamed to avoid conflict.
@@ -204,6 +204,31 @@ func (c *Chain) Decode(data []byte) error {
    return nil
 }
 
+// verify verifies the signature of the certificate using the provided public
+// key.
+func (c *certificate) verify(pubKey []byte) bool {
+   // Check if the issuer key in the signature matches the provided public key.
+   if !bytes.Equal(c.signatureData.IssuerKey, pubKey) {
+      return false
+   }
+   // Reconstruct the ECDSA public key from the byte slice.
+   publicKey := ecdsa.PublicKey{
+      Curve: elliptic.P256(), // Assuming P256 curve
+      X: new(big.Int).SetBytes(pubKey[:32]),
+      Y: new(big.Int).SetBytes(pubKey[32:]),
+   }
+   // Get the data that was signed (up to lengthToSignature).
+   data := c.encode()
+   data = data[:c.lengthToSignature]
+   signatureDigest := sha256.Sum256(data)
+   // Extract R and S components from the signature data.
+   sign := c.signatureData.SignatureData
+   r := new(big.Int).SetBytes(sign[:32])
+   s := new(big.Int).SetBytes(sign[32:])
+   // Verify the signature.
+   return ecdsa.Verify(&publicKey, signatureDigest[:], r, s)
+}
+
 // decode decodes a byte slice into the Cert structure.
 func (c *certificate) decode(data []byte) (int, error) {
    n := copy(c.magic[:], data)
@@ -243,116 +268,63 @@ func (c *certificate) decode(data []byte) (int, error) {
    return n, nil
 }
 
-// verify verifies the signature of the certificate using the provided public
-// key.
-func (c *certificate) verify(pubKey []byte) bool {
-   // Check if the issuer key in the signature matches the provided public key.
-   if !bytes.Equal(c.signatureData.IssuerKey, pubKey) {
-      return false
-   }
-   // Reconstruct the ECDSA public key from the byte slice.
-   publicKey := ecdsa.PublicKey{
-      Curve: elliptic.P256(), // Assuming P256 curve
-      X: new(big.Int).SetBytes(pubKey[:32]),
-      Y: new(big.Int).SetBytes(pubKey[32:]),
-   }
-   // Get the data that was signed (up to lengthToSignature).
-   data := c.encode()
-   data = data[:c.lengthToSignature]
-   signatureDigest := sha256.Sum256(data)
-   // Extract R and S components from the signature data.
-   sign := c.signatureData.SignatureData
-   r := new(big.Int).SetBytes(sign[:32])
-   s := new(big.Int).SetBytes(sign[32:])
-   // Verify the signature.
-   return ecdsa.Verify(&publicKey, signatureDigest[:], r, s)
-}
-
-///
-
 // Decode decodes a byte slice into a LicenseResponse structure.
 func (l *licenseResponse) decode(data []byte) error {
    l.RawData = data
    n := copy(l.Magic[:], data)
-   l.Offset = binary.BigEndian.Uint16(data[n:])
-   n += 2
-   l.Version = binary.BigEndian.Uint16(data[n:])
-   n += 2
-   n += copy(l.RightsID[:], data[n:])
-   n += l.OuterContainer.decode(data[n:])
-
-   var size int
-
-   for size < int(l.OuterContainer.Length)-16 {
+   data = data[n:]
+   l.Offset = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   l.Version = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   n = copy(l.RightsID[:], data)
+   data = data[n:]
+   l.OuterContainer.decode(data)
+   var n1 int
+   for n1 < int(l.OuterContainer.Length)-16 {
       var value ftlv
-      i := value.decode(l.OuterContainer.Value[size:])
+      n1 += value.decode(l.OuterContainer.Value[n1:])
       switch xmrType(value.Type) {
       case globalPolicyContainerEntryType: // 2
          // Rakuten
       case playbackPolicyContainerEntryType: // 4
          // Rakuten
       case keyMaterialContainerEntryType: // 9
-         var j int
-         for j < int(value.Length)-16 {
+         var n2 int
+         for n2 < int(value.Length)-16 {
             var value1 ftlv
-            k := value1.decode(value.Value[j:])
-
+            n2 += value1.decode(value.Value[n2:])
             switch xmrType(value1.Type) {
             case contentKeyEntryType: // 10
                l.contentKeyObject = &ContentKey{}
                l.contentKeyObject.decode(value1.Value)
-
             case deviceKeyEntryType: // 42
                l.eccKeyObject = &eccKey{}
                l.eccKeyObject.decode(value1.Value)
-
             case auxKeyEntryType: // 81
                l.auxKeyObject = &auxKeys{}
                l.auxKeyObject.decode(value1.Value)
-
             default:
                return errors.New("FTLV.type")
             }
-            j += k
          }
       case signatureEntryType: // 11
          l.signatureObject = &signature{}
          l.signatureObject.decode(value.Value)
          l.signatureObject.Length = uint16(value.Length)
-
       default:
          return errors.New("FTLV.type")
       }
-      size += i
    }
-
    return nil
 }
 
-// getCipherData prepares cipher data for the license acquisition challenge.
-func getCipherData(chain *Chain, key *xmlKey) ([]byte, error) {
-   value := xml.Data{
-      CertificateChains: xml.CertificateChains{
-         CertificateChain: base64.StdEncoding.EncodeToString(chain.Encode()),
-      },
-      Features: xml.Features{
-         Feature: xml.Feature{"AESCBC"}, // SCALABLE
-      },
-   }
-   data1, err := value.Marshal()
-   if err != nil {
-      return nil, err
-   }
-   data1, err = aesCBCHandler(data1, key.aesKey(), key.aesIv(), true)
-   if err != nil {
-      return nil, err
-   }
-   return append(key.aesIv(), data1...), nil
-}
+///
 
 // CreateLeaf creates a new leaf certificate and adds it to the chain.
 func (c *Chain) CreateLeaf(modelKey, signingKey, encryptKey EcKey) error {
-   // Verify that the provided modelKey matches the public key in the chain's first certificate.
+   // Verify that the provided modelKey matches the public key in the chain's
+   // first certificate.
    if !bytes.Equal(
       c.certs[0].keyData.keys[0].publicKey[:], modelKey.PublicBytes(),
    ) {
@@ -443,6 +415,27 @@ func (c *Chain) CreateLeaf(modelKey, signingKey, encryptKey EcKey) error {
    c.certCount += 1
    c.certs = slices.Insert(c.certs, 0, unsignedCert)
    return nil
+}
+
+// getCipherData prepares cipher data for the license acquisition challenge.
+func getCipherData(chain *Chain, key *xmlKey) ([]byte, error) {
+   value := xml.Data{
+      CertificateChains: xml.CertificateChains{
+         CertificateChain: base64.StdEncoding.EncodeToString(chain.Encode()),
+      },
+      Features: xml.Features{
+         Feature: xml.Feature{"AESCBC"}, // SCALABLE
+      },
+   }
+   data1, err := value.Marshal()
+   if err != nil {
+      return nil, err
+   }
+   data1, err = aesCBCHandler(data1, key.aesKey(), key.aesIv(), true)
+   if err != nil {
+      return nil, err
+   }
+   return append(key.aesIv(), data1...), nil
 }
 
 // ParseLicense parses a SOAP response containing a PlayReady license.
