@@ -31,7 +31,7 @@ var SL2000 = struct {
    g1  string
    z1  string
 }{
-   dir: "../ignore/",
+   dir: "ignore/",
    g1:  "g1",
    z1:  "z1",
 }

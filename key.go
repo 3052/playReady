@@ -9,6 +9,33 @@ import (
    "math/big"
 )
 
+// xorKey performs XOR operation on two byte slices.
+func xorKey(a, b []byte) []byte {
+   if len(a) != len(b) {
+      panic("slices have different lengths")
+   }
+   c := make([]byte, len(a))
+   for i := 0; i < len(a); i++ {
+      c[i] = a[i] ^ b[i]
+   }
+   return c
+}
+
+// Decode decodes a byte slice into an ECCKey structure.
+func (e *eccKey) decode(data []byte) {
+   e.Curve = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   e.Length = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   e.Value = data[:e.Length]
+}
+
+type eccKey struct {
+   Curve  uint16
+   Length uint16
+   Value  []byte
+}
+
 // New initializes a new xmlKey.
 func (x *xmlKey) New() {
    x.PublicKey.X, x.PublicKey.Y = elliptic.P256().ScalarBaseMult([]byte{1})

@@ -13,21 +13,6 @@ import (
    "slices"
 )
 
-// Decode decodes a byte slice into an ECCKey structure.
-func (e *eccKey) decode(data []byte) {
-   e.Curve = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   e.Length = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   e.Value = data[:e.Length]
-}
-
-type eccKey struct {
-   Curve  uint16
-   Length uint16
-   Value  []byte
-}
-
 // aesECBHandler performs AES ECB encryption/decryption.
 // Encrypts if encrypt is true, decrypts otherwise.
 func aesECBHandler(data, key []byte, encrypt bool) ([]byte, error) {
@@ -248,18 +233,6 @@ func (s *signature) decode(data []byte) {
    s.Length = binary.BigEndian.Uint16(data)
    data = data[2:]
    s.Data = data
-}
-
-// xorKey performs XOR operation on two byte slices.
-func xorKey(a, b []byte) []byte {
-   if len(a) != len(b) {
-      panic("slices have different lengths")
-   }
-   c := make([]byte, len(a))
-   for i := 0; i < len(a); i++ {
-      c[i] = a[i] ^ b[i]
-   }
-   return c
 }
 
 // ecdsaSignature represents an ECDSA signature structure within a certificate.
