@@ -13,6 +13,21 @@ import (
    "slices"
 )
 
+// Decode decodes a byte slice into an ECCKey structure.
+func (e *eccKey) decode(data []byte) {
+   e.Curve = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   e.Length = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   e.Value = data[:e.Length]
+}
+
+type eccKey struct {
+   Curve  uint16
+   Length uint16
+   Value  []byte
+}
+
 // aesECBHandler performs AES ECB encryption/decryption.
 // Encrypts if encrypt is true, decrypts otherwise.
 func aesECBHandler(data, key []byte, encrypt bool) ([]byte, error) {
@@ -142,37 +157,6 @@ func NewEnvelope(device *LocalDevice, kid string) (*xml.Envelope, error) {
    }, nil
 }
 
-// LoadBytes loads an ECDSA private key from bytes.
-func (e *EcKey) LoadBytes(data []byte) {
-   var public ecdsa.PublicKey
-   public.Curve = elliptic.P256()
-   public.X, public.Y = public.Curve.ScalarBaseMult(data)
-   var private ecdsa.PrivateKey
-   private.D = new(big.Int).SetBytes(data)
-   private.PublicKey = public
-   e[0] = &private
-}
-
-// PublicBytes returns the public key bytes.
-func (e *EcKey) PublicBytes() []byte {
-   return append(e[0].PublicKey.X.Bytes(), e[0].PublicKey.Y.Bytes()...)
-}
-
-// New generates a new ECDSA private key.
-func (e *EcKey) New() error {
-   var err error
-   e[0], err = ecdsa.GenerateKey(elliptic.P256(), Fill('A'))
-   if err != nil {
-      return err
-   }
-   return nil
-}
-
-// Private returns the private key bytes.
-func (e EcKey) Private() []byte {
-   return e[0].D.Bytes()
-}
-
 // Read implements the io.Reader interface for Fill.
 func (f Fill) Read(data []byte) (int, error) {
    for index := range data {
@@ -228,15 +212,6 @@ func (a *auxKeys) decode(data []byte) {
    }
 }
 
-// Decode decodes a byte slice into an ECCKey structure.
-func (e *eccKey) decode(data []byte) {
-   e.Curve = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   e.Length = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   e.Value = data[:e.Length]
-}
-
 // Encode encodes an FTLV structure into a byte slice.
 func (f *ftlv) encode() []byte {
    data := binary.BigEndian.AppendUint16(nil, f.Flags)
@@ -273,24 +248,6 @@ func (s *signature) decode(data []byte) {
    s.Length = binary.BigEndian.Uint16(data)
    data = data[2:]
    s.Data = data
-}
-
-///
-
-// New initializes a new xmlKey.
-func (x *xmlKey) New() {
-   x.PublicKey.X, x.PublicKey.Y = elliptic.P256().ScalarBaseMult([]byte{1})
-   x.PublicKey.X.FillBytes(x.X[:])
-}
-
-// aesIv returns the AES IV from the xmlKey's internal data.
-func (x *xmlKey) aesIv() []byte {
-   return x.X[:16]
-}
-
-// aesKey returns the AES Key from the xmlKey's internal data.
-func (x *xmlKey) aesKey() []byte {
-   return x.X[16:]
 }
 
 // xorKey performs XOR operation on two byte slices.
@@ -467,12 +424,6 @@ type auxKey struct {
    Key      [16]byte
 }
 
-type eccKey struct {
-   Curve  uint16
-   Length uint16
-   Value  []byte
-}
-
 type ftlv struct {
    Flags  uint16
    Type   uint16
@@ -533,13 +484,6 @@ type signature struct {
    Type   uint16
    Length uint16
    Data   []byte
-}
-
-type EcKey [1]*ecdsa.PrivateKey
-
-type xmlKey struct {
-   PublicKey ecdsa.PublicKey
-   X         [32]byte
 }
 
 // wmrmPublicKey is the Windows Media DRM public key used in ElGamal encryption.
