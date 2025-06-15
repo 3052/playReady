@@ -268,7 +268,7 @@ func (c *certInfo) encode() []byte {
 }
 
 // new initializes a new certInfo with security level and digest.
-func (c *certInfo) new(securityLevel uint32, digest []byte) {
+func (c *certInfo) New(securityLevel uint32, digest []byte) {
    c.securityLevel = securityLevel
    c.infoType = 2 // Assuming infoType 2 is a standard type
    copy(c.digest[:], digest)
@@ -471,25 +471,25 @@ func (c *Chain) CreateLeaf(modelKey, signingKey, encryptKey EcKey) error {
    signingKeyDigest := sha256.Sum256(signingKey.PublicBytes())
 
    // Initialize certificate information.
-   certificateInfo.new(
+   certificateInfo.New(
       c.certs[0].certificateInfo.securityLevel, signingKeyDigest[:],
    )
    // Initialize key information for signing and encryption keys.
-   builtKeyInfo.new(signingKey.PublicBytes(), encryptKey.PublicBytes())
+   builtKeyInfo.New(signingKey.PublicBytes(), encryptKey.PublicBytes())
 
    // Create FTLV (Fixed Tag Length Value) for certificate info.
-   certificateFtlv.new(1, 1, certificateInfo.encode())
+   certificateFtlv.New(1, 1, certificateInfo.encode())
 
    // Create a new device and its FTLV.
    var newDevice device
-   newDevice.new()
-   deviceFtlv.new(1, 4, newDevice.encode())
+   newDevice.New()
+   deviceFtlv.New(1, 4, newDevice.encode())
 
    // Create FTLV for key information.
-   keyInfoFtlv.new(1, 6, builtKeyInfo.encode())
+   keyInfoFtlv.New(1, 6, builtKeyInfo.encode())
 
    // Create FTLV for manufacturer information, copying from the existing chain's first cert.
-   manufacturerFtlv.new(0, 7, c.certs[0].manufacturerInfo.encode())
+   manufacturerFtlv.New(0, 7, c.certs[0].manufacturerInfo.encode())
 
    // Define feature for the new certificate.
    feature := feature{
@@ -497,7 +497,7 @@ func (c *Chain) CreateLeaf(modelKey, signingKey, encryptKey EcKey) error {
       features: []uint32{0xD}, // SCALABLE with SL2000, SUPPORTS_PR3_FEATURES
    }
    // Create FTLV for features.
-   featureFtlv.new(1, 5, feature.encode())
+   featureFtlv.New(1, 5, feature.encode())
 
    // Assemble raw data for the unsigned certificate.
    leaf_data := certificateFtlv.encode()
@@ -519,9 +519,9 @@ func (c *Chain) CreateLeaf(modelKey, signingKey, encryptKey EcKey) error {
    sign := append(r.Bytes(), s.Bytes()...)
 
    // Initialize the signature data for the new certificate.
-   signatureData.new(sign, modelKey.PublicBytes())
+   signatureData.New(sign, modelKey.PublicBytes())
    // Create FTLV for the signature.
-   signatureFtlv.new(1, 8, signatureData.encode())
+   signatureFtlv.New(1, 8, signatureData.encode())
 
    // Append the signature FTLV to the leaf data.
    leaf_data = append(leaf_data, signatureFtlv.encode()...)
