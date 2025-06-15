@@ -1,8 +1,6 @@
-package d
+package core
 
 import (
-   "41.neocities.org/playReady/a"
-   "41.neocities.org/playReady/cert"
    "bytes"
    "encoding/base64"
    "encoding/hex"
@@ -43,8 +41,8 @@ func TestChain(t *testing.T) {
    if err != nil {
       t.Fatal(err)
    }
-   var chain cert.Chain
-   err = chain.Decode(data)
+   var chain1 Chain
+   err = chain1.Decode(data)
    if err != nil {
       t.Fatal(err)
    }
@@ -52,24 +50,24 @@ func TestChain(t *testing.T) {
    if err != nil {
       t.Fatal(err)
    }
-   var z1 a.EcKey
+   var z1 EcKey
    z1.LoadBytes(data)
    // they downgrade certs from the cert digest (hash of the signing key)
-   var signing_key a.EcKey
+   var signing_key EcKey
    err = signing_key.New()
    if err != nil {
       t.Fatal(err)
    }
-   var encrypt_key a.EcKey
+   var encrypt_key EcKey
    err = encrypt_key.New()
    if err != nil {
       t.Fatal(err)
    }
-   err = chain.CreateLeaf(z1, signing_key, encrypt_key)
+   err = chain1.CreateLeaf(z1, signing_key, encrypt_key)
    if err != nil {
       t.Fatal(err)
    }
-   err = write_file(SL2000.dir+"chain.txt", chain.Encode())
+   err = write_file(SL2000.dir+"chain.txt", chain1.Encode())
    if err != nil {
       t.Fatal(err)
    }
@@ -89,7 +87,7 @@ func write_file(name string, data []byte) error {
 }
 
 func TestScalable(t *testing.T) {
-   var device cert.LocalDevice
+   var device LocalDevice
    data, err := os.ReadFile(SL2000.dir + "chain.txt")
    if err != nil {
       t.Fatal(err)
@@ -135,8 +133,8 @@ func TestScalable(t *testing.T) {
    if err != nil {
       t.Fatal(err)
    }
-   if !bytes.Equal(key.KeyId.Guid(), key_id[:]) {
-      t.Fatal(".KeyId")
+   if !bytes.Equal(key.KeyID.GUID(), key_id[:]) {
+      t.Fatal(".KeyID")
    }
    var zero [16]byte
    if !bytes.Equal(key.Key[:], zero[:]) {
@@ -145,7 +143,7 @@ func TestScalable(t *testing.T) {
 }
 
 func TestRakuten(t *testing.T) {
-   var device cert.LocalDevice
+   var device LocalDevice
    data, err := os.ReadFile(SL2000.dir + "chain.txt")
    if err != nil {
       t.Fatal(err)
@@ -185,8 +183,8 @@ func TestRakuten(t *testing.T) {
    if err != nil {
       t.Fatal(err)
    }
-   if hex.EncodeToString(key.KeyId.Uuid()) != rakuten.kid_wv {
-      t.Fatal(".KeyId")
+   if hex.EncodeToString(key.KeyID.UUID()) != rakuten.kid_wv {
+      t.Fatal(".KeyID")
    }
    if hex.EncodeToString(key.Key[:]) != rakuten.key {
       t.Fatal(".Key")
