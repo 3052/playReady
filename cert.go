@@ -60,10 +60,7 @@ func (c *cert) decode(data []byte) (int, error) {
 
       case objTypeManufacturer:
          c.manufacturerInfo = &manufacturer{}
-         err := c.manufacturerInfo.decode(ftlv.Value)
-         if err != nil {
-            return 0, err
-         }
+         c.manufacturerInfo.decode(ftlv.Value)
 
       case objTypeSignature:
          c.signatureData = &ecdsaSignature{}
