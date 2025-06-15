@@ -2,7 +2,7 @@ package d
 
 import (
    "41.neocities.org/playReady/a"
-   "41.neocities.org/playReady/c"
+   "41.neocities.org/playReady/cert"
    "bytes"
    "encoding/base64"
    "encoding/hex"
@@ -21,7 +21,7 @@ var rakuten = struct {
    kid_wv  string
    kid_pr  string
 }{
-   url:     "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=47010db8-4a78-4527-8e30-0eba8e153b3a",
+   url:     "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=f64334db-c146-4f16-a351-514cd8f351a4",
    content: "rakuten.tv/cz?content_type=movies&content_id=transvulcania-the-people-s-run",
    key:     "ab82952e8b567a2359393201e4dde4b4",
    kid_wv:  "318f7ece69afcfe3e96de31be6b77272",
@@ -43,7 +43,7 @@ func TestChain(t *testing.T) {
    if err != nil {
       t.Fatal(err)
    }
-   var chain c.Chain
+   var chain cert.Chain
    err = chain.Decode(data)
    if err != nil {
       t.Fatal(err)
@@ -89,7 +89,7 @@ func write_file(name string, data []byte) error {
 }
 
 func TestScalable(t *testing.T) {
-   var device c.LocalDevice
+   var device cert.LocalDevice
    data, err := os.ReadFile(SL2000.dir + "chain.txt")
    if err != nil {
       t.Fatal(err)
@@ -143,8 +143,9 @@ func TestScalable(t *testing.T) {
       t.Fatal(".Key")
    }
 }
+
 func TestRakuten(t *testing.T) {
-   var device c.LocalDevice
+   var device cert.LocalDevice
    data, err := os.ReadFile(SL2000.dir + "chain.txt")
    if err != nil {
       t.Fatal(err)

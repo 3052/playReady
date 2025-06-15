@@ -2,7 +2,7 @@ package d
 
 import (
    "41.neocities.org/playReady/a"
-   "41.neocities.org/playReady/c"
+   "41.neocities.org/playReady/cert"
    "41.neocities.org/playReady/elGamal"
    "41.neocities.org/playReady/xml"
    "bytes"
@@ -63,7 +63,7 @@ func newLa(m *ecdsa.PublicKey, cipherData []byte, kid string) xml.La {
 
 // NewEnvelope creates a new SOAP envelope for a license acquisition challenge.
 // This function remains public because it's likely intended for external use.
-func NewEnvelope(device *c.LocalDevice, kid string) (*xml.Envelope, error) {
+func NewEnvelope(device *cert.LocalDevice, kid string) (*xml.Envelope, error) {
    var key a.XmlKey
    key.New()
    cipherData, err := getCipherData(&device.CertificateChain, &key)
@@ -115,7 +115,7 @@ func NewEnvelope(device *c.LocalDevice, kid string) (*xml.Envelope, error) {
 
 // ParseLicense parses a SOAP response containing a PlayReady license.
 // This function remains public because it's likely intended for external use.
-func ParseLicense(device *c.LocalDevice, data []byte) (*a.ContentKey, error) {
+func ParseLicense(device *cert.LocalDevice, data []byte) (*a.ContentKey, error) {
    var response xml.EnvelopeResponse
    err := response.Unmarshal(data)
    if err != nil {
@@ -157,7 +157,7 @@ func ParseLicense(device *c.LocalDevice, data []byte) (*a.ContentKey, error) {
    return license.ContentKeyObject, nil
 }
 
-func getCipherData(chain *c.Chain, key *a.XmlKey) ([]byte, error) {
+func getCipherData(chain *cert.Chain, key *a.XmlKey) ([]byte, error) {
    value := xml.Data{
       CertificateChains: xml.CertificateChains{
          CertificateChain: base64.StdEncoding.EncodeToString(chain.Encode()),
