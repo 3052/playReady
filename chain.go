@@ -64,15 +64,15 @@ func (c *Chain) CreateLeaf(modelKey, signingKey, encryptKey EcKey) error {
    }
 
    var (
-      builtKeyInfo    keyInfo
-      certificateInfo certInfo
-      signatureData   ecdsaSignature
-      signatureFtlv   ftlv
-      deviceFtlv      ftlv
-      featureFtlv     ftlv
-      keyInfoFtlv     ftlv
+      builtKeyInfo     keyInfo
+      certificateInfo  certInfo
+      signatureData    ecdsaSignature
+      signatureFtlv    ftlv
+      deviceFtlv       ftlv
+      featureFtlv      ftlv
+      keyInfoFtlv      ftlv
       manufacturerFtlv ftlv
-      certificateFtlv ftlv
+      certificateFtlv  ftlv
    )
 
    // Calculate digest for the signing key.
