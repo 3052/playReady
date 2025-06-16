@@ -217,45 +217,6 @@ func (c *certificate) verify(pubKey []byte) bool {
    return ecdsa.Verify(&publicKey, signatureDigest[:], r, s)
 }
 
-// decode decodes a byte slice into the Cert structure.
-func (c *certificate) decode(data []byte) (int, error) {
-   n := copy(c.magic[:], data)
-   if string(c.magic[:]) != "CERT" {
-      return 0, errors.New("failed to find cert magic")
-   }
-   c.version = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   c.length = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   c.lengthToSignature = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   c.rawData = data[n:][:c.length-16]
-   n += len(c.rawData)
-   var n1 int
-   for n1 < len(c.rawData) {
-      var value ftlv
-      n1 += value.decode(c.rawData[n1:])
-      switch value.Type {
-      case objTypeBasic:
-         c.certificateInfo = &certificateInfo{}
-         c.certificateInfo.decode(value.Value)
-      case objTypeFeature:
-         c.features = &features{}
-         c.features.decode(value.Value)
-      case objTypeKey:
-         c.keyData = &keyInfo{}
-         c.keyData.decode(value.Value)
-      case objTypeManufacturer:
-         c.manufacturerInfo = &manufacturer{}
-         c.manufacturerInfo.decode(value.Value)
-      case objTypeSignature:
-         c.signatureData = &ecdsaSignature{}
-         c.signatureData.decode(value.Value)
-      }
-   }
-   return n, nil
-}
-
 type certificate struct {
    magic             [4]byte
    version           uint32
@@ -447,4 +408,43 @@ func (l *license) decrypt(encrypt EcKey, data []byte) error {
       return err
    }
    return l.verify(l.contentKey.Integrity.GUID())
+}
+
+// decode decodes a byte slice into the Cert structure.
+func (c *certificate) decode(data []byte) (int, error) {
+   n := copy(c.magic[:], data)
+   if string(c.magic[:]) != "CERT" {
+      return 0, errors.New("failed to find cert magic")
+   }
+   c.version = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   c.length = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   c.lengthToSignature = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   c.rawData = data[n:][:c.length-16]
+   n += len(c.rawData)
+   var n1 int
+   for n1 < len(c.rawData) {
+      var value ftlv
+      n1 += value.decode(c.rawData[n1:])
+      switch value.Type {
+      case objTypeBasic:
+         c.certificateInfo = &certificateInfo{}
+         c.certificateInfo.decode(value.Value)
+      case objTypeFeature:
+         c.features = &features{}
+         c.features.decode(value.Value)
+      case objTypeKey:
+         c.keyData = &keyInfo{}
+         c.keyData.decode(value.Value)
+      case objTypeManufacturer:
+         c.manufacturerInfo = &manufacturer{}
+         c.manufacturerInfo.decode(value.Value)
+      case objTypeSignature:
+         c.signatureData = &ecdsaSignature{}
+         c.signatureData.decode(value.Value)
+      }
+   }
+   return n, nil
 }

@@ -9,6 +9,66 @@ import (
    "math/big"
 )
 
+// key represents a cryptographic key within keyInfo. Renamed to avoid conflict.
+type key struct {
+   keyType   uint16
+   length    uint16
+   flags     uint32
+   publicKey [64]byte // ECDSA P256 public key is 64 bytes (X and Y coordinates, 32 bytes each)
+   usage     features // Features indicating key usage
+}
+
+// new initializes a new key with provided data and type.
+func (k *key) New(keyData []byte, Type int) {
+   k.keyType = 1  // Assuming type 1 is for ECDSA keys
+   k.length = 512 // Assuming key length in bits
+   copy(k.publicKey[:], keyData)
+   k.usage.New(Type)
+}
+
+// encode encodes the key structure into a byte slice.
+func (k *key) encode() []byte {
+   data := binary.BigEndian.AppendUint16(nil, k.keyType)
+   data = binary.BigEndian.AppendUint16(data, k.length)
+   data = binary.BigEndian.AppendUint32(data, k.flags)
+   data = append(data, k.publicKey[:]...)
+   return append(data, k.usage.encode()...)
+}
+
+// new initializes a new keyInfo with signing and encryption keys.
+func (k *keyInfo) New(signingKey, encryptKey []byte) {
+   k.entries = 2
+   k.keys = make([]key, 2)
+   k.keys[0].New(signingKey, 1) // Type 1 for signing key
+   k.keys[1].New(encryptKey, 2) // Type 2 for encryption key
+}
+
+type keyInfo struct {
+   entries uint32
+   keys    []key
+}
+
+// New initializes a new xmlKey.
+func (x *xmlKey) New() {
+   x.PublicKey.X, x.PublicKey.Y = elliptic.P256().ScalarBaseMult([]byte{1})
+   x.PublicKey.X.FillBytes(x.X[:])
+}
+
+// aesIv returns the AES IV from the xmlKey's internal data.
+func (x *xmlKey) aesIv() []byte {
+   return x.X[:16]
+}
+
+// aesKey returns the AES Key from the xmlKey's internal data.
+func (x *xmlKey) aesKey() []byte {
+   return x.X[16:]
+}
+
+type xmlKey struct {
+   PublicKey ecdsa.PublicKey
+   X         [32]byte
+}
+
 // xorKey performs XOR operation on two byte slices.
 func xorKey(a, b []byte) []byte {
    if len(a) != len(b) {
@@ -34,6 +94,13 @@ func (c *ContentKey) decrypt(key *ecdsa.PrivateKey, auxKeys *auxKeys) error {
    }
    return errors.New("cannot decrypt key")
 }
+
+// magicConstantZero returns a specific hex-decoded byte slice.
+func (*ContentKey) magicConstantZero() ([]byte, error) {
+   return hex.DecodeString("7ee9ed4af773224f00b8ea7efb027cbb")
+}
+
+///
 
 func (c *ContentKey) scalable(key *ecdsa.PrivateKey, auxKeys *auxKeys) error {
    rootKeyInfo := c.Value[:144]
@@ -79,11 +146,6 @@ func (c *ContentKey) scalable(key *ecdsa.PrivateKey, auxKeys *auxKeys) error {
    rgbKey = rgbKey[16:]
    copy(c.Key[:], rgbKey)
    return nil
-}
-
-// magicConstantZero returns a specific hex-decoded byte slice.
-func (*ContentKey) magicConstantZero() ([]byte, error) {
-   return hex.DecodeString("7ee9ed4af773224f00b8ea7efb027cbb")
 }
 
 // decode decodes a byte slice into a ContentKey structure.
@@ -186,32 +248,6 @@ func (f *features) encode() []byte {
    return data
 }
 
-// key represents a cryptographic key within keyInfo. Renamed to avoid conflict.
-type key struct {
-   keyType   uint16
-   length    uint16
-   flags     uint32
-   publicKey [64]byte // ECDSA P256 public key is 64 bytes (X and Y coordinates, 32 bytes each)
-   usage     features // Features indicating key usage
-}
-
-// new initializes a new key with provided data and type.
-func (k *key) New(keyData []byte, Type int) {
-   k.keyType = 1  // Assuming type 1 is for ECDSA keys
-   k.length = 512 // Assuming key length in bits
-   copy(k.publicKey[:], keyData)
-   k.usage.New(Type)
-}
-
-// encode encodes the key structure into a byte slice.
-func (k *key) encode() []byte {
-   data := binary.BigEndian.AppendUint16(nil, k.keyType)
-   data = binary.BigEndian.AppendUint16(data, k.length)
-   data = binary.BigEndian.AppendUint32(data, k.flags)
-   data = append(data, k.publicKey[:]...)
-   return append(data, k.usage.encode()...)
-}
-
 // decode decodes a byte slice into the key structure.
 func (k *key) decode(data []byte) int {
    k.keyType = binary.BigEndian.Uint16(data)
@@ -223,20 +259,6 @@ func (k *key) decode(data []byte) int {
    n += copy(k.publicKey[:], data[n:])
    n += k.usage.decode(data[n:])
    return n
-}
-
-// keyInfo represents information about multiple keys. Renamed to avoid conflict.
-type keyInfo struct {
-   entries uint32
-   keys    []key
-}
-
-// new initializes a new keyInfo with signing and encryption keys.
-func (k *keyInfo) New(signingKey, encryptKey []byte) {
-   k.entries = 2
-   k.keys = make([]key, 2)
-   k.keys[0].New(signingKey, 1) // Type 1 for signing key
-   k.keys[1].New(encryptKey, 2) // Type 2 for encryption key
 }
 
 // encode encodes the keyInfo structure into a byte slice.
@@ -261,25 +283,4 @@ func (k *keyInfo) decode(data []byte) {
       k.keys = append(k.keys, key_data)
       data = data[n:]
    }
-}
-
-// New initializes a new xmlKey.
-func (x *xmlKey) New() {
-   x.PublicKey.X, x.PublicKey.Y = elliptic.P256().ScalarBaseMult([]byte{1})
-   x.PublicKey.X.FillBytes(x.X[:])
-}
-
-// aesIv returns the AES IV from the xmlKey's internal data.
-func (x *xmlKey) aesIv() []byte {
-   return x.X[:16]
-}
-
-// aesKey returns the AES Key from the xmlKey's internal data.
-func (x *xmlKey) aesKey() []byte {
-   return x.X[16:]
-}
-
-type xmlKey struct {
-   PublicKey ecdsa.PublicKey
-   X         [32]byte
 }
