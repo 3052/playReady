@@ -7,7 +7,6 @@ import (
    "crypto/ecdsa"
    "crypto/elliptic"
    "crypto/sha256"
-   "encoding/base64"
    "encoding/binary"
    "errors"
    "github.com/deatil/go-cryptobin/mac"
@@ -95,8 +94,7 @@ func (c *certificateInfo) decode(data []byte) {
    copy(c.clientId[:], data)
 }
 
-// Encode encodes a LicenseResponse into a byte slice.
-func (l *licenseResponse) encode() []byte {
+func (l *license) encode() []byte {
    data := l.Magic[:]
    data = binary.BigEndian.AppendUint16(data, l.Offset)
    data = binary.BigEndian.AppendUint16(data, l.Version)
@@ -104,8 +102,7 @@ func (l *licenseResponse) encode() []byte {
    return append(data, l.OuterContainer.encode()...)
 }
 
-// Verify verifies the license response signature.
-func (l *licenseResponse) verify(contentIntegrity []byte) error {
+func (l *license) verify(contentIntegrity []byte) error {
    data := l.encode()
    data = data[:len(l.RawData)-int(l.signatureObject.Length)]
    block, err := aes.NewCipher(contentIntegrity)
@@ -117,19 +114,6 @@ func (l *licenseResponse) verify(contentIntegrity []byte) error {
       return errors.New("failed to decrypt the keys")
    }
    return nil
-}
-
-type licenseResponse struct {
-   RawData          []byte
-   Magic            [4]byte
-   Offset           uint16
-   Version          uint16
-   RightsID         [16]byte
-   OuterContainer   ftlv
-   contentKeyObject *ContentKey
-   eccKeyObject     *eccKey
-   signatureObject  *signature
-   auxKeyObject     *auxKeys
 }
 
 // Encode encodes the Chain into a byte slice.
@@ -210,8 +194,8 @@ func (c *certificate) verify(pubKey []byte) bool {
    // Reconstruct the ECDSA public key from the byte slice.
    publicKey := ecdsa.PublicKey{
       Curve: elliptic.P256(), // Assuming P256 curve
-      X: new(big.Int).SetBytes(pubKey[:32]),
-      Y: new(big.Int).SetBytes(pubKey[32:]),
+      X:     new(big.Int).SetBytes(pubKey[:32]),
+      Y:     new(big.Int).SetBytes(pubKey[32:]),
    }
    // Get the data that was signed (up to lengthToSignature).
    data := c.encode()
@@ -264,8 +248,7 @@ func (c *certificate) decode(data []byte) (int, error) {
    return n, nil
 }
 
-// Decode decodes a byte slice into a LicenseResponse structure.
-func (l *licenseResponse) decode(data []byte) error {
+func (l *license) decode(data []byte) error {
    l.RawData = data
    n := copy(l.Magic[:], data)
    data = data[n:]
@@ -292,8 +275,8 @@ func (l *licenseResponse) decode(data []byte) error {
             n2 += value1.decode(value.Value[n2:])
             switch xmrType(value1.Type) {
             case contentKeyEntryType: // 10
-               l.contentKeyObject = &ContentKey{}
-               l.contentKeyObject.decode(value1.Value)
+               l.contentKey = &ContentKey{}
+               l.contentKey.decode(value1.Value)
             case deviceKeyEntryType: // 42
                l.eccKeyObject = &eccKey{}
                l.eccKeyObject.decode(value1.Value)
@@ -405,19 +388,16 @@ func (c *Chain) CreateLeaf(modelKey, signingKey, encryptKey EcKey) error {
    return nil
 }
 
-///
-
-// getCipherData prepares cipher data for the license acquisition challenge.
-func getCipherData(chain *Chain, key *xmlKey) ([]byte, error) {
-   value := xml.Data{
+func (c *Chain) cipherData(key *xmlKey) ([]byte, error) {
+   data := xml.Data{
       CertificateChains: xml.CertificateChains{
-         CertificateChain: base64.StdEncoding.EncodeToString(chain.Encode()),
+         CertificateChain: c.Encode(),
       },
       Features: xml.Features{
          Feature: xml.Feature{"AESCBC"}, // SCALABLE
       },
    }
-   data1, err := value.Marshal()
+   data1, err := data.Marshal()
    if err != nil {
       return nil, err
    }
@@ -428,17 +408,30 @@ func getCipherData(chain *Chain, key *xmlKey) ([]byte, error) {
    return append(key.aesIv(), data1...), nil
 }
 
-// ParseLicense parses a SOAP response containing a PlayReady license.
-func ParseLicense(device *LocalDevice, data []byte) (*ContentKey, error) {
-   var response xml.EnvelopeResponse
-   err := response.Unmarshal(data)
+type license struct {
+   RawData         []byte
+   Magic           [4]byte
+   Offset          uint16
+   Version         uint16
+   RightsID        [16]byte
+   OuterContainer  ftlv
+   contentKey      *ContentKey
+   eccKeyObject    *eccKey
+   signatureObject *signature
+   auxKeyObject    *auxKeys
+}
+
+func (l *LocalDevice) key(data []byte) (*ContentKey, error) {
+   var envelope xml.EnvelopeResponse
+   err := envelope.Unmarshal(data)
    if err != nil {
       return nil, err
    }
-   if fault := response.Body.Fault; fault != nil {
+   if fault := envelope.Body.Fault; fault != nil {
       return nil, errors.New(fault.Fault)
    }
-   decoded, err := base64.StdEncoding.DecodeString(response.
+   var license1 license
+   err = license1.decode(envelope.
       Body.
       AcquireLicenseResponse.
       AcquireLicenseResult.
@@ -450,23 +443,16 @@ func ParseLicense(device *LocalDevice, data []byte) (*ContentKey, error) {
    if err != nil {
       return nil, err
    }
-   var license licenseResponse
-   err = license.decode(decoded)
-   if err != nil {
-      return nil, err
-   }
-   if !bytes.Equal(license.eccKeyObject.Value, device.EncryptKey.Public()) {
+   if !bytes.Equal(license1.eccKeyObject.Value, l.EncryptKey.Public()) {
       return nil, errors.New("license response is not for this device")
    }
-   err = license.contentKeyObject.decrypt(
-      device.EncryptKey[0], license.auxKeyObject,
-   )
+   err = license1.contentKey.decrypt(l.EncryptKey[0], license1.auxKeyObject)
    if err != nil {
       return nil, err
    }
-   err = license.verify(license.contentKeyObject.Integrity.GUID())
+   err = license1.verify(license1.contentKey.Integrity.GUID())
    if err != nil {
       return nil, err
    }
-   return license.contentKeyObject, nil
+   return license1.contentKey, nil
 }

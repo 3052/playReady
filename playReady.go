@@ -5,7 +5,6 @@ import (
    "crypto/ecdsa"
    "crypto/elliptic"
    "crypto/sha256"
-   "encoding/base64"
    "encoding/binary"
    "encoding/hex"
    "github.com/deatil/go-cryptobin/cryptobin/crypto"
@@ -100,14 +99,12 @@ func newLa(m *ecdsa.PublicKey, cipherData []byte, kid string) xml.La {
                   KeyName: "WMRMServer",
                },
                CipherData: xml.CipherData{
-                  CipherValue: base64.StdEncoding.EncodeToString(
-                     elGamalEncrypt(m, elGamalKeyGeneration()),
-                  ),
+                  CipherValue: elGamalEncrypt(m, elGamalKeyGeneration()),
                },
             },
          },
          CipherData: xml.CipherData{
-            CipherValue: base64.StdEncoding.EncodeToString(cipherData),
+            CipherValue: cipherData,
          },
       },
    }
@@ -117,7 +114,7 @@ func newLa(m *ecdsa.PublicKey, cipherData []byte, kid string) xml.La {
 func NewEnvelope(device *LocalDevice, kid string) (*xml.Envelope, error) {
    var key xmlKey
    key.New()
-   cipherData, err := getCipherData(&device.CertificateChain, &key)
+   cipherData, err := device.CertificateChain.cipherData(&key)
    if err != nil {
       return nil, err
    }
@@ -131,7 +128,7 @@ func NewEnvelope(device *LocalDevice, kid string) (*xml.Envelope, error) {
       XmlNs: "http://www.w3.org/2000/09/xmldsig#",
       Reference: xml.Reference{
          Uri:         "#SignedData",
-         DigestValue: base64.StdEncoding.EncodeToString(laDigest[:]),
+         DigestValue: laDigest[:],
       },
    }
    signedData, err := signedInfo.Marshal()
@@ -143,7 +140,7 @@ func NewEnvelope(device *LocalDevice, kid string) (*xml.Envelope, error) {
    if err != nil {
       return nil, err
    }
-   sign := append(r.Bytes(), s.Bytes()...)
+   signature := append(r.Bytes(), s.Bytes()...)
    return &xml.Envelope{
       Soap: "http://schemas.xmlsoap.org/soap/envelope/",
       Body: xml.Body{
@@ -155,7 +152,7 @@ func NewEnvelope(device *LocalDevice, kid string) (*xml.Envelope, error) {
                   La:    la,
                   Signature: xml.Signature{
                      SignedInfo:     signedInfo,
-                     SignatureValue: base64.StdEncoding.EncodeToString(sign),
+                     SignatureValue: signature,
                   },
                },
             },

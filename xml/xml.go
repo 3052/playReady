@@ -1,14 +1,35 @@
 package xml
 
-import "encoding/xml"
+import (
+   "encoding/base64"
+   "encoding/xml"
+)
 
-type AcquireLicense struct {
-   XmlNs     string    `xml:"xmlns,attr"`
-   Challenge Challenge `xml:"challenge"`
+type Signature struct {
+   SignedInfo     SignedInfo
+   SignatureValue Bytes
 }
 
-type Algorithm struct {
-   Algorithm string `xml:"Algorithm,attr"`
+type Reference struct {
+   Uri         string `xml:"URI,attr"`
+   DigestValue Bytes
+}
+
+type CipherData struct {
+   CipherValue Bytes
+}
+
+func (b *Bytes) UnmarshalText(data []byte) error {
+   var err error
+   *b, err = base64.StdEncoding.AppendDecode(nil, data)
+   if err != nil {
+      return err
+   }
+   return nil
+}
+
+func (b Bytes) MarshalText() ([]byte, error) {
+   return base64.StdEncoding.AppendEncode(nil, b), nil
 }
 
 type Body struct {
@@ -18,7 +39,7 @@ type Body struct {
          Response struct {
             LicenseResponse struct {
                Licenses struct {
-                  License string
+                  License Bytes
                }
             }
          }
@@ -29,16 +50,23 @@ type Body struct {
    }
 }
 
+type Bytes []byte
+
 type CertificateChains struct {
-   CertificateChain string
+   CertificateChain Bytes
+}
+
+type AcquireLicense struct {
+   XmlNs     string    `xml:"xmlns,attr"`
+   Challenge Challenge `xml:"challenge"`
+}
+
+type Algorithm struct {
+   Algorithm string `xml:"Algorithm,attr"`
 }
 
 type Challenge struct {
    Challenge InnerChallenge
-}
-
-type CipherData struct {
-   CipherValue string
 }
 
 type ContentHeader struct {
@@ -123,16 +151,6 @@ type La struct {
 type ProtectInfo struct {
    KeyLen string `xml:"KEYLEN"`
    AlgId  string `xml:"ALGID"`
-}
-
-type Reference struct {
-   Uri         string `xml:"URI,attr"`
-   DigestValue string
-}
-
-type Signature struct {
-   SignedInfo     SignedInfo
-   SignatureValue string
 }
 
 func (s *SignedInfo) Marshal() ([]byte, error) {

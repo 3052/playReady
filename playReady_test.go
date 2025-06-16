@@ -12,6 +12,111 @@ import (
    "testing"
 )
 
+func TestScalable(t *testing.T) {
+   var device LocalDevice
+   data, err := os.ReadFile(SL2000.dir + "chain.txt")
+   if err != nil {
+      t.Fatal(err)
+   }
+   err = device.CertificateChain.Decode(data)
+   if err != nil {
+      t.Fatal(err)
+   }
+   data, err = os.ReadFile(SL2000.dir + "signing_key.txt")
+   if err != nil {
+      t.Fatal(err)
+   }
+   device.SigningKey.unmarshal(data)
+   data, err = os.ReadFile(SL2000.dir + "encrypt_key.txt")
+   if err != nil {
+      t.Fatal(err)
+   }
+   device.EncryptKey.unmarshal(data)
+   key_id := [16]byte{1}
+   envelope, err := NewEnvelope(
+      &device, base64.StdEncoding.EncodeToString(key_id[:]),
+   )
+   if err != nil {
+      t.Fatal(err)
+   }
+   data, err = xml.Marshal(envelope)
+   if err != nil {
+      t.Fatal(err)
+   }
+   resp, err := http.Post(
+      "https://test.playready.microsoft.com/service/rightsmanager.asmx?cfg=(persist:false,ck:AAAAAAAAAAAAAAAAAAAAAA==,ckt:aescbc)",
+      "text/xml", bytes.NewReader(data),
+   )
+   if err != nil {
+      t.Fatal(err)
+   }
+   defer resp.Body.Close()
+   data, err = io.ReadAll(resp.Body)
+   if err != nil {
+      t.Fatal(err)
+   }
+   key, err := device.key(data)
+   if err != nil {
+      t.Fatal(err)
+   }
+   if !bytes.Equal(key.KeyID.GUID(), key_id[:]) {
+      t.Fatal(".KeyID")
+   }
+   var zero [16]byte
+   if !bytes.Equal(key.Key[:], zero[:]) {
+      t.Fatal(".Key")
+   }
+}
+
+func TestRakuten(t *testing.T) {
+   var device LocalDevice
+   data, err := os.ReadFile(SL2000.dir + "chain.txt")
+   if err != nil {
+      t.Fatal(err)
+   }
+   err = device.CertificateChain.Decode(data)
+   if err != nil {
+      t.Fatal(err)
+   }
+   data, err = os.ReadFile(SL2000.dir + "signing_key.txt")
+   if err != nil {
+      t.Fatal(err)
+   }
+   device.SigningKey.unmarshal(data)
+   data, err = os.ReadFile(SL2000.dir + "encrypt_key.txt")
+   if err != nil {
+      t.Fatal(err)
+   }
+   device.EncryptKey.unmarshal(data)
+   envelope, err := NewEnvelope(&device, rakuten.kid_pr)
+   if err != nil {
+      t.Fatal(err)
+   }
+   data, err = xml.Marshal(envelope)
+   if err != nil {
+      t.Fatal(err)
+   }
+   resp, err := http.Post(rakuten.url, "", bytes.NewReader(data))
+   if err != nil {
+      t.Fatal(err)
+   }
+   defer resp.Body.Close()
+   data, err = io.ReadAll(resp.Body)
+   if err != nil {
+      t.Fatal(err)
+   }
+   key, err := device.key(data)
+   if err != nil {
+      t.Fatal(err)
+   }
+   if hex.EncodeToString(key.KeyID.UUID()) != rakuten.kid_wv {
+      t.Fatal(".KeyID")
+   }
+   if hex.EncodeToString(key.Key[:]) != rakuten.key {
+      t.Fatal(".Key")
+   }
+}
+
 var rakuten = struct {
    content string
    key     string
@@ -84,109 +189,4 @@ func TestChain(t *testing.T) {
 func write_file(name string, data []byte) error {
    log.Println("WriteFile", name)
    return os.WriteFile(name, data, os.ModePerm)
-}
-
-func TestScalable(t *testing.T) {
-   var device LocalDevice
-   data, err := os.ReadFile(SL2000.dir + "chain.txt")
-   if err != nil {
-      t.Fatal(err)
-   }
-   err = device.CertificateChain.Decode(data)
-   if err != nil {
-      t.Fatal(err)
-   }
-   data, err = os.ReadFile(SL2000.dir + "signing_key.txt")
-   if err != nil {
-      t.Fatal(err)
-   }
-   device.SigningKey.unmarshal(data)
-   data, err = os.ReadFile(SL2000.dir + "encrypt_key.txt")
-   if err != nil {
-      t.Fatal(err)
-   }
-   device.EncryptKey.unmarshal(data)
-   key_id := [16]byte{1}
-   envelope, err := NewEnvelope(
-      &device, base64.StdEncoding.EncodeToString(key_id[:]),
-   )
-   if err != nil {
-      t.Fatal(err)
-   }
-   data, err = xml.Marshal(envelope)
-   if err != nil {
-      t.Fatal(err)
-   }
-   resp, err := http.Post(
-      "https://test.playready.microsoft.com/service/rightsmanager.asmx?cfg=(persist:false,ck:AAAAAAAAAAAAAAAAAAAAAA==,ckt:aescbc)",
-      "text/xml", bytes.NewReader(data),
-   )
-   if err != nil {
-      t.Fatal(err)
-   }
-   defer resp.Body.Close()
-   data, err = io.ReadAll(resp.Body)
-   if err != nil {
-      t.Fatal(err)
-   }
-   key, err := ParseLicense(&device, data)
-   if err != nil {
-      t.Fatal(err)
-   }
-   if !bytes.Equal(key.KeyID.GUID(), key_id[:]) {
-      t.Fatal(".KeyID")
-   }
-   var zero [16]byte
-   if !bytes.Equal(key.Key[:], zero[:]) {
-      t.Fatal(".Key")
-   }
-}
-
-func TestRakuten(t *testing.T) {
-   var device LocalDevice
-   data, err := os.ReadFile(SL2000.dir + "chain.txt")
-   if err != nil {
-      t.Fatal(err)
-   }
-   err = device.CertificateChain.Decode(data)
-   if err != nil {
-      t.Fatal(err)
-   }
-   data, err = os.ReadFile(SL2000.dir + "signing_key.txt")
-   if err != nil {
-      t.Fatal(err)
-   }
-   device.SigningKey.unmarshal(data)
-   data, err = os.ReadFile(SL2000.dir + "encrypt_key.txt")
-   if err != nil {
-      t.Fatal(err)
-   }
-   device.EncryptKey.unmarshal(data)
-   envelope, err := NewEnvelope(&device, rakuten.kid_pr)
-   if err != nil {
-      t.Fatal(err)
-   }
-   data, err = xml.Marshal(envelope)
-   if err != nil {
-      t.Fatal(err)
-   }
-   resp, err := http.Post(rakuten.url, "", bytes.NewReader(data))
-   if err != nil {
-      t.Fatal(err)
-   }
-   defer resp.Body.Close()
-   data, err = io.ReadAll(resp.Body)
-   if err != nil {
-      t.Fatal(err)
-   }
-   key, err := ParseLicense(&device, data)
-   if err != nil {
-      t.Fatal(err)
-   }
-   if hex.EncodeToString(key.KeyID.UUID()) != rakuten.kid_wv {
-      t.Fatal(".KeyID")
-   }
-   if hex.EncodeToString(key.Key[:]) != rakuten.key {
-      t.Fatal(".Key")
-   }
 }

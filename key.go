@@ -253,7 +253,7 @@ type key struct {
    length    uint16
    flags     uint32
    publicKey [64]byte // ECDSA P256 public key is 64 bytes (X and Y coordinates, 32 bytes each)
-   usage     features  // Features indicating key usage
+   usage     features // Features indicating key usage
 }
 
 // new initializes a new key with provided data and type.
