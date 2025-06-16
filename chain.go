@@ -18,7 +18,7 @@ import (
 func (c *Chain) CreateLeaf(modelKey, signingKey, encryptKey *EcKey) error {
    // Verify that the provided modelKey matches the public key in the chain's
    // first certificate.
-   if !bytes.Equal(c.certs[0].keyData.keys[0].publicKey[:], modelKey.Public()) {
+   if !bytes.Equal(c.certs[0].keyInfo.keys[0].publicKey[:], modelKey.Public()) {
       return errors.New("zgpriv not for cert")
    }
    // Verify the existing chain's validity.
@@ -149,7 +149,7 @@ func (c *Chain) verify() bool {
       }
       // The public key of the current certificate becomes the issuer key for
       // the next in the chain.
-      modelBase = c.certs[i].keyData.keys[0].publicKey[:]
+      modelBase = c.certs[i].keyInfo.keys[0].publicKey[:]
    }
    return true
 }
@@ -225,7 +225,7 @@ type certificate struct {
    rawData           []byte
    certificateInfo   *certificateInfo
    features          *features
-   keyData           *keyInfo
+   keyInfo           *keyInfo
    manufacturerInfo  *manufacturer
    signatureData     *ecdsaSignature
 }
@@ -436,8 +436,8 @@ func (c *certificate) decode(data []byte) (int, error) {
          c.features = &features{}
          c.features.decode(value.Value)
       case objTypeKey:
-         c.keyData = &keyInfo{}
-         c.keyData.decode(value.Value)
+         c.keyInfo = &keyInfo{}
+         c.keyInfo.decode(value.Value)
       case objTypeManufacturer:
          c.manufacturerInfo = &manufacturer{}
          c.manufacturerInfo.decode(value.Value)
