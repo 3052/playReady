@@ -3,7 +3,6 @@ package playReady
 import (
    "bytes"
    "encoding/hex"
-   "encoding/xml"
    "io"
    "log"
    "net/http"
@@ -12,12 +11,12 @@ import (
 )
 
 func TestKey(t *testing.T) {
-   var device LocalDevice
    data, err := os.ReadFile(SL2000.dir + "chain.txt")
    if err != nil {
       t.Fatal(err)
    }
-   err = device.CertificateChain.Decode(data)
+   var certificate Chain
+   err = certificate.Decode(data)
    if err != nil {
       t.Fatal(err)
    }
@@ -25,23 +24,21 @@ func TestKey(t *testing.T) {
    if err != nil {
       t.Fatal(err)
    }
-   device.SigningKey.unmarshal(data)
+   var signing EcKey
+   signing.decode(data)
    data, err = os.ReadFile(SL2000.dir + "encrypt_key.txt")
    if err != nil {
       t.Fatal(err)
    }
-   device.EncryptKey.unmarshal(data)
+   var encrypt EcKey
+   encrypt.decode(data)
    for _, test := range tests {
-      envelope, err := NewEnvelope(&device, test.kid_pr)
-      if err != nil {
-         t.Fatal(err)
-      }
-      data, err = xml.Marshal(envelope)
+      log.Print(test.url)
+      data, err = certificate.requestBody(signing, test.kid_pr)
       if err != nil {
          t.Fatal(err)
       }
       func() {
-         log.Print(test.url)
          resp, err := http.Post(test.url, "text/xml", bytes.NewReader(data))
          if err != nil {
             t.Fatal(err)
@@ -52,19 +49,16 @@ func TestKey(t *testing.T) {
             t.Fatal(err)
          }
       }()
-      var lic license
-      err = lic.decrypt(device.EncryptKey, data)
+      var license1 license
+      err = license1.decrypt(encrypt, data)
       if err != nil {
          t.Fatal(err)
       }
-      if hex.EncodeToString(lic.contentKey.KeyID.UUID()) != test.kid_wv {
-         t.Fatalf(
-            ".KeyID %x %x",
-            lic.contentKey.KeyID.GUID(),
-            lic.contentKey.KeyID.UUID(),
-         )
+      content := license1.contentKey
+      if hex.EncodeToString(content.KeyID.UUID()) != test.kid_wv {
+         t.Fatal(".KeyID")
       }
-      if hex.EncodeToString(lic.contentKey.Key[:]) != test.key {
+      if hex.EncodeToString(content.Key[:]) != test.key {
          t.Fatal(".Key")
       }
    }
@@ -105,8 +99,8 @@ func TestChain(t *testing.T) {
    if err != nil {
       t.Fatal(err)
    }
-   var chain1 Chain
-   err = chain1.Decode(data)
+   var certificate Chain
+   err = certificate.Decode(data)
    if err != nil {
       t.Fatal(err)
    }
@@ -115,31 +109,31 @@ func TestChain(t *testing.T) {
       t.Fatal(err)
    }
    var z1 EcKey
-   z1.unmarshal(data)
+   z1.decode(data)
    // they downgrade certs from the cert digest (hash of the signing key)
-   var signing_key EcKey
-   err = signing_key.New()
+   var signing EcKey
+   err = signing.New()
    if err != nil {
       t.Fatal(err)
    }
-   var encrypt_key EcKey
-   err = encrypt_key.New()
+   var encrypt EcKey
+   err = encrypt.New()
    if err != nil {
       t.Fatal(err)
    }
-   err = chain1.CreateLeaf(z1, signing_key, encrypt_key)
+   err = certificate.CreateLeaf(z1, signing, encrypt)
    if err != nil {
       t.Fatal(err)
    }
-   err = write_file(SL2000.dir+"chain.txt", chain1.Encode())
+   err = write_file(SL2000.dir+"chain.txt", certificate.Encode())
    if err != nil {
       t.Fatal(err)
    }
-   err = write_file(SL2000.dir+"signing_key.txt", signing_key.Private())
+   err = write_file(SL2000.dir+"signing_key.txt", signing.Private())
    if err != nil {
       t.Fatal(err)
    }
-   err = write_file(SL2000.dir+"encrypt_key.txt", encrypt_key.Private())
+   err = write_file(SL2000.dir+"encrypt_key.txt", encrypt.Private())
    if err != nil {
       t.Fatal(err)
    }

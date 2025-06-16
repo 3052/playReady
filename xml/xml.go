@@ -6,6 +6,10 @@ import (
    "errors"
 )
 
+func (e *Envelope) Marshal() ([]byte, error) {
+   return xml.Marshal(e)
+}
+
 type Envelope struct {
    XMLName xml.Name `xml:"soap:Envelope"`
    Soap    string   `xml:"xmlns:soap,attr"`

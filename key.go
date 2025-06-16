@@ -31,17 +31,6 @@ func (e *EcKey) Public() []byte {
    return append(e[0].PublicKey.X.Bytes(), e[0].PublicKey.Y.Bytes()...)
 }
 
-// LoadBytes loads an ECDSA private key from bytes.
-func (e *EcKey) unmarshal(data []byte) {
-   var public ecdsa.PublicKey
-   public.Curve = elliptic.P256()
-   public.X, public.Y = public.Curve.ScalarBaseMult(data)
-   var private ecdsa.PrivateKey
-   private.D = new(big.Int).SetBytes(data)
-   private.PublicKey = public
-   e[0] = &private
-}
-
 // xorKey performs XOR operation on two byte slices.
 func xorKey(a, b []byte) []byte {
    if len(a) != len(b) {
@@ -284,4 +273,14 @@ func (k *key) decode(data []byte) int {
    n += copy(k.publicKey[:], data[n:])
    n += k.usage.decode(data[n:])
    return n
+}
+
+func (e *EcKey) decode(data []byte) {
+   var public ecdsa.PublicKey
+   public.Curve = elliptic.P256()
+   public.X, public.Y = public.Curve.ScalarBaseMult(data)
+   var private ecdsa.PrivateKey
+   private.D = new(big.Int).SetBytes(data)
+   private.PublicKey = public
+   e[0] = &private
 }

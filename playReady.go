@@ -12,11 +12,10 @@ import (
    "slices"
 )
 
-// NewEnvelope creates a new SOAP envelope for a license acquisition challenge.
-func NewEnvelope(device *LocalDevice, kid string) (*xml.Envelope, error) {
+func (c *Chain) requestBody(signing EcKey, kid string) ([]byte, error) {
    var key xmlKey
    key.New()
-   cipherData, err := device.CertificateChain.cipherData(&key)
+   cipherData, err := c.cipherData(&key)
    if err != nil {
       return nil, err
    }
@@ -38,12 +37,11 @@ func NewEnvelope(device *LocalDevice, kid string) (*xml.Envelope, error) {
       return nil, err
    }
    signedDigest := sha256.Sum256(signedData)
-   r, s, err := ecdsa.Sign(Fill('C'), device.SigningKey[0], signedDigest[:])
+   r, s, err := ecdsa.Sign(Fill('C'), signing[0], signedDigest[:])
    if err != nil {
       return nil, err
    }
-   signature := append(r.Bytes(), s.Bytes()...)
-   return &xml.Envelope{
+   envelope := xml.Envelope{
       Soap: "http://schemas.xmlsoap.org/soap/envelope/",
       Body: xml.Body{
          AcquireLicense: &xml.AcquireLicense{
@@ -54,19 +52,14 @@ func NewEnvelope(device *LocalDevice, kid string) (*xml.Envelope, error) {
                   La:    la,
                   Signature: xml.Signature{
                      SignedInfo:     signedInfo,
-                     SignatureValue: signature,
+                     SignatureValue: append(r.Bytes(), s.Bytes()...),
                   },
                },
             },
          },
       },
-   }, nil
-}
-
-type LocalDevice struct {
-   CertificateChain Chain
-   EncryptKey       EcKey
-   SigningKey       EcKey
+   }
+   return envelope.Marshal()
 }
 
 // device represents device capabilities.

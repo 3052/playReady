@@ -14,218 +14,6 @@ import (
    "slices"
 )
 
-type certificate struct {
-   magic             [4]byte
-   version           uint32
-   length            uint32
-   lengthToSignature uint32
-   rawData           []byte
-   certificateInfo   *certificateInfo
-   features          *features
-   keyData           *keyInfo
-   manufacturerInfo  *manufacturer
-   signatureData     *ecdsaSignature
-}
-
-// newNoSig initializes a new Cert without signature data.
-func (c *certificate) newNoSig(data []byte) {
-   copy(c.magic[:], "CERT")
-   c.version = 1
-   // length = length of raw data + header size (16) + signature size (144)
-   c.length = uint32(len(data)) + 16 + 144
-   // lengthToSignature = length of raw data + header size (16)
-   c.lengthToSignature = uint32(len(data)) + 16
-   c.rawData = data
-}
-
-// encode encodes the Cert structure into a byte slice.
-func (c *certificate) encode() []byte {
-   data := c.magic[:]
-   data = binary.BigEndian.AppendUint32(data, c.version)
-   data = binary.BigEndian.AppendUint32(data, c.length)
-   data = binary.BigEndian.AppendUint32(data, c.lengthToSignature)
-   return append(data, c.rawData...)
-}
-
-type certificateInfo struct {
-   certificateId [16]byte
-   securityLevel uint32
-   flags         uint32
-   infoType      uint32
-   digest        [32]byte
-   expiry        uint32
-   // NOTE SOME SERVERS, FOR EXAMPLE
-   // rakuten.tv
-   // WILL LOCK LICENSE TO THE FIRST DEVICE, USING "ClientId" TO DETECT, SO BE
-   // CAREFUL USING A VALUE HERE
-   clientId [16]byte
-}
-
-func (c *certificateInfo) encode() []byte {
-   data := c.certificateId[:]
-   data = binary.BigEndian.AppendUint32(data, c.securityLevel)
-   data = binary.BigEndian.AppendUint32(data, c.flags)
-   data = binary.BigEndian.AppendUint32(data, c.infoType)
-   data = append(data, c.digest[:]...)
-   data = binary.BigEndian.AppendUint32(data, c.expiry)
-   return append(data, c.clientId[:]...)
-}
-
-func (c *certificateInfo) New(securityLevel uint32, digest []byte) {
-   c.securityLevel = securityLevel
-   c.infoType = 2 // Assuming infoType 2 is a standard type
-   copy(c.digest[:], digest)
-   c.expiry = 4294967295 // Max uint32, effectively never expires
-}
-
-func (c *certificateInfo) decode(data []byte) {
-   n := copy(c.certificateId[:], data)
-   data = data[n:]
-   c.securityLevel = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   c.flags = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   c.infoType = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   n = copy(c.digest[:], data)
-   data = data[n:]
-   c.expiry = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   copy(c.clientId[:], data)
-}
-
-// Encode encodes the Chain into a byte slice.
-func (c *Chain) Encode() []byte {
-   data := c.magic[:]
-   data = binary.BigEndian.AppendUint32(data, c.version)
-   data = binary.BigEndian.AppendUint32(data, c.length)
-   data = binary.BigEndian.AppendUint32(data, c.flags)
-   data = binary.BigEndian.AppendUint32(data, c.certCount)
-   for _, cert := range c.certs {
-      data = append(data, cert.encode()...)
-   }
-   return data
-}
-
-// verify verifies the entire certificate chain.
-func (c *Chain) verify() bool {
-   // Start verification with the issuer key of the last certificate in the chain.
-   modelBase := c.certs[len(c.certs)-1].signatureData.IssuerKey
-   for i := len(c.certs) - 1; i >= 0; i-- {
-      // Verify each certificate using the public key of its issuer.
-      valid := c.certs[i].verify(modelBase[:])
-      if !valid {
-         return false
-      }
-      // The public key of the current certificate becomes the issuer key for
-      // the next in the chain.
-      modelBase = c.certs[i].keyData.keys[0].publicKey[:]
-   }
-   return true
-}
-
-// Chain represents a chain of certificates.
-type Chain struct {
-   magic     [4]byte
-   version   uint32
-   length    uint32
-   flags     uint32
-   certCount uint32
-   certs     []certificate
-}
-
-// Decode decodes a byte slice into the Chain structure.
-func (c *Chain) Decode(data []byte) error {
-   n := copy(c.magic[:], data)
-   if string(c.magic[:]) != "CHAI" {
-      return errors.New("failed to find chain magic")
-   }
-   data = data[n:]
-   c.version = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   c.length = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   c.flags = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   c.certCount = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   c.certs = make([]certificate, c.certCount)
-   for i := range c.certCount {
-      var cert certificate
-      n, err := cert.decode(data)
-      if err != nil {
-         return err
-      }
-      c.certs[i] = cert
-      data = data[n:]
-   }
-   return nil
-}
-
-// verify verifies the signature of the certificate using the provided public
-// key.
-func (c *certificate) verify(pubKey []byte) bool {
-   // Check if the issuer key in the signature matches the provided public key.
-   if !bytes.Equal(c.signatureData.IssuerKey, pubKey) {
-      return false
-   }
-   // Reconstruct the ECDSA public key from the byte slice.
-   publicKey := ecdsa.PublicKey{
-      Curve: elliptic.P256(), // Assuming P256 curve
-      X:     new(big.Int).SetBytes(pubKey[:32]),
-      Y:     new(big.Int).SetBytes(pubKey[32:]),
-   }
-   // Get the data that was signed (up to lengthToSignature).
-   data := c.encode()
-   data = data[:c.lengthToSignature]
-   signatureDigest := sha256.Sum256(data)
-   // Extract R and S components from the signature data.
-   sign := c.signatureData.SignatureData
-   r := new(big.Int).SetBytes(sign[:32])
-   s := new(big.Int).SetBytes(sign[32:])
-   // Verify the signature.
-   return ecdsa.Verify(&publicKey, signatureDigest[:], r, s)
-}
-
-// decode decodes a byte slice into the Cert structure.
-func (c *certificate) decode(data []byte) (int, error) {
-   n := copy(c.magic[:], data)
-   if string(c.magic[:]) != "CERT" {
-      return 0, errors.New("failed to find cert magic")
-   }
-   c.version = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   c.length = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   c.lengthToSignature = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   c.rawData = data[n:][:c.length-16]
-   n += len(c.rawData)
-   var n1 int
-   for n1 < len(c.rawData) {
-      var value ftlv
-      n1 += value.decode(c.rawData[n1:])
-      switch value.Type {
-      case objTypeBasic:
-         c.certificateInfo = &certificateInfo{}
-         c.certificateInfo.decode(value.Value)
-      case objTypeFeature:
-         c.features = &features{}
-         c.features.decode(value.Value)
-      case objTypeKey:
-         c.keyData = &keyInfo{}
-         c.keyData.decode(value.Value)
-      case objTypeManufacturer:
-         c.manufacturerInfo = &manufacturer{}
-         c.manufacturerInfo.decode(value.Value)
-      case objTypeSignature:
-         c.signatureData = &ecdsaSignature{}
-         c.signatureData.decode(value.Value)
-      }
-   }
-   return n, nil
-}
-
 // CreateLeaf creates a new leaf certificate and adds it to the chain.
 func (c *Chain) CreateLeaf(modelKey, signingKey, encryptKey EcKey) error {
    // Verify that the provided modelKey matches the public key in the chain's
@@ -334,6 +122,218 @@ func (c *Chain) cipherData(key *xmlKey) ([]byte, error) {
       return nil, err
    }
    return append(key.aesIv(), data1...), nil
+}
+
+// Encode encodes the Chain into a byte slice.
+func (c *Chain) Encode() []byte {
+   data := c.magic[:]
+   data = binary.BigEndian.AppendUint32(data, c.version)
+   data = binary.BigEndian.AppendUint32(data, c.length)
+   data = binary.BigEndian.AppendUint32(data, c.flags)
+   data = binary.BigEndian.AppendUint32(data, c.certCount)
+   for _, cert := range c.certs {
+      data = append(data, cert.encode()...)
+   }
+   return data
+}
+
+// verify verifies the entire certificate chain.
+func (c *Chain) verify() bool {
+   // Start verification with the issuer key of the last certificate in the chain.
+   modelBase := c.certs[len(c.certs)-1].signatureData.IssuerKey
+   for i := len(c.certs) - 1; i >= 0; i-- {
+      // Verify each certificate using the public key of its issuer.
+      valid := c.certs[i].verify(modelBase[:])
+      if !valid {
+         return false
+      }
+      // The public key of the current certificate becomes the issuer key for
+      // the next in the chain.
+      modelBase = c.certs[i].keyData.keys[0].publicKey[:]
+   }
+   return true
+}
+
+// Decode decodes a byte slice into the Chain structure.
+func (c *Chain) Decode(data []byte) error {
+   n := copy(c.magic[:], data)
+   if string(c.magic[:]) != "CHAI" {
+      return errors.New("failed to find chain magic")
+   }
+   data = data[n:]
+   c.version = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   c.length = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   c.flags = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   c.certCount = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   c.certs = make([]certificate, c.certCount)
+   for i := range c.certCount {
+      var cert certificate
+      n, err := cert.decode(data)
+      if err != nil {
+         return err
+      }
+      c.certs[i] = cert
+      data = data[n:]
+   }
+   return nil
+}
+
+// Chain represents a chain of certificates.
+type Chain struct {
+   magic     [4]byte
+   version   uint32
+   length    uint32
+   flags     uint32
+   certCount uint32
+   certs     []certificate
+}
+
+// verify verifies the signature of the certificate using the provided public
+// key.
+func (c *certificate) verify(pubKey []byte) bool {
+   // Check if the issuer key in the signature matches the provided public key.
+   if !bytes.Equal(c.signatureData.IssuerKey, pubKey) {
+      return false
+   }
+   // Reconstruct the ECDSA public key from the byte slice.
+   publicKey := ecdsa.PublicKey{
+      Curve: elliptic.P256(), // Assuming P256 curve
+      X:     new(big.Int).SetBytes(pubKey[:32]),
+      Y:     new(big.Int).SetBytes(pubKey[32:]),
+   }
+   // Get the data that was signed (up to lengthToSignature).
+   data := c.encode()
+   data = data[:c.lengthToSignature]
+   signatureDigest := sha256.Sum256(data)
+   // Extract R and S components from the signature data.
+   sign := c.signatureData.SignatureData
+   r := new(big.Int).SetBytes(sign[:32])
+   s := new(big.Int).SetBytes(sign[32:])
+   // Verify the signature.
+   return ecdsa.Verify(&publicKey, signatureDigest[:], r, s)
+}
+
+// decode decodes a byte slice into the Cert structure.
+func (c *certificate) decode(data []byte) (int, error) {
+   n := copy(c.magic[:], data)
+   if string(c.magic[:]) != "CERT" {
+      return 0, errors.New("failed to find cert magic")
+   }
+   c.version = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   c.length = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   c.lengthToSignature = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   c.rawData = data[n:][:c.length-16]
+   n += len(c.rawData)
+   var n1 int
+   for n1 < len(c.rawData) {
+      var value ftlv
+      n1 += value.decode(c.rawData[n1:])
+      switch value.Type {
+      case objTypeBasic:
+         c.certificateInfo = &certificateInfo{}
+         c.certificateInfo.decode(value.Value)
+      case objTypeFeature:
+         c.features = &features{}
+         c.features.decode(value.Value)
+      case objTypeKey:
+         c.keyData = &keyInfo{}
+         c.keyData.decode(value.Value)
+      case objTypeManufacturer:
+         c.manufacturerInfo = &manufacturer{}
+         c.manufacturerInfo.decode(value.Value)
+      case objTypeSignature:
+         c.signatureData = &ecdsaSignature{}
+         c.signatureData.decode(value.Value)
+      }
+   }
+   return n, nil
+}
+
+type certificate struct {
+   magic             [4]byte
+   version           uint32
+   length            uint32
+   lengthToSignature uint32
+   rawData           []byte
+   certificateInfo   *certificateInfo
+   features          *features
+   keyData           *keyInfo
+   manufacturerInfo  *manufacturer
+   signatureData     *ecdsaSignature
+}
+
+// newNoSig initializes a new Cert without signature data.
+func (c *certificate) newNoSig(data []byte) {
+   copy(c.magic[:], "CERT")
+   c.version = 1
+   // length = length of raw data + header size (16) + signature size (144)
+   c.length = uint32(len(data)) + 16 + 144
+   // lengthToSignature = length of raw data + header size (16)
+   c.lengthToSignature = uint32(len(data)) + 16
+   c.rawData = data
+}
+
+// encode encodes the Cert structure into a byte slice.
+func (c *certificate) encode() []byte {
+   data := c.magic[:]
+   data = binary.BigEndian.AppendUint32(data, c.version)
+   data = binary.BigEndian.AppendUint32(data, c.length)
+   data = binary.BigEndian.AppendUint32(data, c.lengthToSignature)
+   return append(data, c.rawData...)
+}
+
+type certificateInfo struct {
+   certificateId [16]byte
+   securityLevel uint32
+   flags         uint32
+   infoType      uint32
+   digest        [32]byte
+   expiry        uint32
+   // NOTE SOME SERVERS, FOR EXAMPLE
+   // rakuten.tv
+   // WILL LOCK LICENSE TO THE FIRST DEVICE, USING "ClientId" TO DETECT, SO BE
+   // CAREFUL USING A VALUE HERE
+   clientId [16]byte
+}
+
+func (c *certificateInfo) encode() []byte {
+   data := c.certificateId[:]
+   data = binary.BigEndian.AppendUint32(data, c.securityLevel)
+   data = binary.BigEndian.AppendUint32(data, c.flags)
+   data = binary.BigEndian.AppendUint32(data, c.infoType)
+   data = append(data, c.digest[:]...)
+   data = binary.BigEndian.AppendUint32(data, c.expiry)
+   return append(data, c.clientId[:]...)
+}
+
+func (c *certificateInfo) New(securityLevel uint32, digest []byte) {
+   c.securityLevel = securityLevel
+   c.infoType = 2 // Assuming infoType 2 is a standard type
+   copy(c.digest[:], digest)
+   c.expiry = 4294967295 // Max uint32, effectively never expires
+}
+
+func (c *certificateInfo) decode(data []byte) {
+   n := copy(c.certificateId[:], data)
+   data = data[n:]
+   c.securityLevel = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   c.flags = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   c.infoType = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   n = copy(c.digest[:], data)
+   data = data[n:]
+   c.expiry = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   copy(c.clientId[:], data)
 }
 
 type license struct {
