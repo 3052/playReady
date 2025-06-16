@@ -9,6 +9,24 @@ import (
    "math/big"
 )
 
+func (x *xmlKey) New() {
+   x.PublicKey.X, x.PublicKey.Y = elliptic.P256().ScalarBaseMult([]byte{1})
+   x.PublicKey.X.FillBytes(x.X[:])
+}
+
+func (x *xmlKey) aesIv() []byte {
+   return x.X[:16]
+}
+
+func (x *xmlKey) aesKey() []byte {
+   return x.X[16:]
+}
+
+type xmlKey struct {
+   PublicKey ecdsa.PublicKey
+   X         [32]byte
+}
+
 type ContentKey struct {
    KeyID      GUID
    KeyType    uint16
@@ -138,27 +156,6 @@ func (k *keyInfo) New(signingKey, encryptKey []byte) {
    k.keys = make([]keyData, 2)
    k.keys[0].New(signingKey, 1) // Type 1 for signing key
    k.keys[1].New(encryptKey, 2) // Type 2 for encryption key
-}
-
-// New initializes a new xmlKey.
-func (x *xmlKey) New() {
-   x.PublicKey.X, x.PublicKey.Y = elliptic.P256().ScalarBaseMult([]byte{1})
-   x.PublicKey.X.FillBytes(x.X[:])
-}
-
-// aesIv returns the AES IV from the xmlKey's internal data.
-func (x *xmlKey) aesIv() []byte {
-   return x.X[:16]
-}
-
-// aesKey returns the AES Key from the xmlKey's internal data.
-func (x *xmlKey) aesKey() []byte {
-   return x.X[16:]
-}
-
-type xmlKey struct {
-   PublicKey ecdsa.PublicKey
-   X         [32]byte
 }
 
 // xorKey performs XOR operation on two byte slices.

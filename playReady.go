@@ -12,7 +12,64 @@ import (
    "slices"
 )
 
-// elGamalEncrypt encrypts a message m using ElGamal encryption with public key h.
+func elGamalKeyGeneration() *ecdsa.PublicKey {
+   data, _ := hex.DecodeString(wmrmPublicKey)
+   var key ecdsa.PublicKey
+   key.X = new(big.Int).SetBytes(data[:32])
+   key.Y = new(big.Int).SetBytes(data[32:])
+   return &key
+}
+
+// wmrmPublicKey is the Windows Media DRM public key used in ElGamal encryption.
+const wmrmPublicKey = "C8B6AF16EE941AADAA5389B4AF2C10E356BE42AF175EF3FACE93254E7B0B3D9B982B27B5CB2341326E56AA857DBFD5C634CE2CF9EA74FCA8F2AF5957EFEEA562"
+
+func newLa(m *ecdsa.PublicKey, cipherData []byte, kid string) xml.La {
+   return xml.La{
+      XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/protocols",
+      Id:      "SignedData",
+      Version: "1",
+      ContentHeader: xml.ContentHeader{
+         WrmHeader: xml.WrmHeader{
+            XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/PlayReadyHeader",
+            Version: "4.0.0.0",
+            Data: xml.WrmHeaderData{
+               ProtectInfo: xml.ProtectInfo{
+                  KeyLen: "16",
+                  AlgId:  "AESCTR",
+               },
+               Kid: kid,
+            },
+         },
+      },
+      EncryptedData: xml.EncryptedData{
+         XmlNs: "http://www.w3.org/2001/04/xmlenc#",
+         Type:  "http://www.w3.org/2001/04/xmlenc#Element",
+         EncryptionMethod: xml.Algorithm{
+            Algorithm: "http://www.w3.org/2001/04/xmlenc#aes128-cbc",
+         },
+         KeyInfo: xml.KeyInfo{
+            XmlNs: "http://www.w3.org/2000/09/xmldsig#",
+            EncryptedKey: xml.EncryptedKey{
+               XmlNs: "http://www.w3.org/2001/04/xmlenc#",
+               EncryptionMethod: xml.Algorithm{
+                  Algorithm: "http://schemas.microsoft.com/DRM/2007/03/protocols#ecc256",
+               },
+               KeyInfo: xml.EncryptedKeyInfo{
+                  XmlNs:   "http://www.w3.org/2000/09/xmldsig#",
+                  KeyName: "WMRMServer",
+               },
+               CipherData: xml.CipherData{
+                  CipherValue: elGamalEncrypt(m, elGamalKeyGeneration()),
+               },
+            },
+         },
+         CipherData: xml.CipherData{
+            CipherValue: cipherData,
+         },
+      },
+   }
+}
+
 func elGamalEncrypt(m, h *ecdsa.PublicKey) []byte {
    // generator
    g := elliptic.P256()
@@ -25,18 +82,6 @@ func elGamalEncrypt(m, h *ecdsa.PublicKey) []byte {
    // Second component C2 = M + s (point addition for elliptic curves)
    c2X, c2Y := g.Add(m.X, m.Y, sX, sY)
    return slices.Concat(c1X.Bytes(), c1Y.Bytes(), c2X.Bytes(), c2Y.Bytes())
-}
-
-// wmrmPublicKey is the Windows Media DRM public key used in ElGamal encryption.
-const wmrmPublicKey = "C8B6AF16EE941AADAA5389B4AF2C10E356BE42AF175EF3FACE93254E7B0B3D9B982B27B5CB2341326E56AA857DBFD5C634CE2CF9EA74FCA8F2AF5957EFEEA562"
-
-// elGamalKeyGeneration generates an ECDSA public key from the predefined WMRM public key.
-func elGamalKeyGeneration() *ecdsa.PublicKey {
-   data, _ := hex.DecodeString(wmrmPublicKey)
-   var key ecdsa.PublicKey
-   key.X = new(big.Int).SetBytes(data[:32])
-   key.Y = new(big.Int).SetBytes(data[32:])
-   return &key
 }
 
 // elGamalDecrypt decrypts a ciphertext using ElGamal decryption with private
@@ -135,53 +180,6 @@ func aesCBCHandler(data, key, iv []byte, encrypt bool) ([]byte, error) {
       bin := crypto.FromBytes(data).WithKey(key).WithIv(iv).
          Aes().CBC().PKCS7Padding().Decrypt()
       return bin.ToBytes(), bin.Error()
-   }
-}
-
-func newLa(m *ecdsa.PublicKey, cipherData []byte, kid string) xml.La {
-   return xml.La{
-      XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/protocols",
-      Id:      "SignedData",
-      Version: "1",
-      ContentHeader: xml.ContentHeader{
-         WrmHeader: xml.WrmHeader{
-            XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/PlayReadyHeader",
-            Version: "4.0.0.0",
-            Data: xml.WrmHeaderData{
-               ProtectInfo: xml.ProtectInfo{
-                  KeyLen: "16",
-                  AlgId:  "AESCTR",
-               },
-               Kid: kid,
-            },
-         },
-      },
-      EncryptedData: xml.EncryptedData{
-         XmlNs: "http://www.w3.org/2001/04/xmlenc#",
-         Type:  "http://www.w3.org/2001/04/xmlenc#Element",
-         EncryptionMethod: xml.Algorithm{
-            Algorithm: "http://www.w3.org/2001/04/xmlenc#aes128-cbc",
-         },
-         KeyInfo: xml.KeyInfo{
-            XmlNs: "http://www.w3.org/2000/09/xmldsig#",
-            EncryptedKey: xml.EncryptedKey{
-               XmlNs: "http://www.w3.org/2001/04/xmlenc#",
-               EncryptionMethod: xml.Algorithm{
-                  Algorithm: "http://schemas.microsoft.com/DRM/2007/03/protocols#ecc256",
-               },
-               KeyInfo: xml.EncryptedKeyInfo{
-                  XmlNs:   "http://www.w3.org/2000/09/xmldsig#",
-                  KeyName: "WMRMServer",
-               },
-               CipherData: xml.CipherData{
-                  CipherValue: elGamalEncrypt(m, elGamalKeyGeneration()),
-               },
-            },
-         },
-         CipherData: xml.CipherData{
-            CipherValue: cipherData,
-         },
-      },
    }
 }
 
