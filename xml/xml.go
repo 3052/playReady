@@ -3,7 +3,47 @@ package xml
 import (
    "encoding/base64"
    "encoding/xml"
+   "errors"
 )
+
+type Envelope struct {
+   XMLName xml.Name `xml:"soap:Envelope"`
+   Soap    string   `xml:"xmlns:soap,attr"`
+   Body    Body     `xml:"soap:Body"`
+}
+
+func (e *EnvelopeResponse) Unmarshal(data []byte) error {
+   err := xml.Unmarshal(data, e)
+   if err != nil {
+      return err
+   }
+   if e.Body.Fault != nil {
+      return errors.New(e.Body.Fault.Fault)
+   }
+   return nil
+}
+
+type Body struct {
+   AcquireLicense         *AcquireLicense
+   AcquireLicenseResponse *struct {
+      AcquireLicenseResult struct {
+         Response struct {
+            LicenseResponse struct {
+               Licenses struct {
+                  License Bytes
+               }
+            }
+         }
+      }
+   }
+   Fault *struct {
+      Fault string `xml:"faultstring"`
+   }
+}
+
+type EnvelopeResponse struct {
+   Body Body
+}
 
 type Signature struct {
    SignedInfo     SignedInfo
@@ -30,24 +70,6 @@ func (b *Bytes) UnmarshalText(data []byte) error {
 
 func (b Bytes) MarshalText() ([]byte, error) {
    return base64.StdEncoding.AppendEncode(nil, b), nil
-}
-
-type Body struct {
-   AcquireLicense         *AcquireLicense
-   AcquireLicenseResponse *struct {
-      AcquireLicenseResult struct {
-         Response struct {
-            LicenseResponse struct {
-               Licenses struct {
-                  License Bytes
-               }
-            }
-         }
-      }
-   }
-   Fault *struct {
-      Fault string `xml:"faultstring"`
-   }
 }
 
 type Bytes []byte
@@ -100,20 +122,6 @@ type EncryptedKey struct {
 type EncryptedKeyInfo struct { // Renamed from KeyInfo
    XmlNs   string `xml:"xmlns,attr"`
    KeyName string
-}
-
-type Envelope struct {
-   XMLName xml.Name `xml:"soap:Envelope"`
-   Soap    string   `xml:"xmlns:soap,attr"`
-   Body    Body     `xml:"soap:Body"`
-}
-
-func (e *EnvelopeResponse) Unmarshal(data []byte) error {
-   return xml.Unmarshal(data, e)
-}
-
-type EnvelopeResponse struct {
-   Body Body
 }
 
 type Feature struct {

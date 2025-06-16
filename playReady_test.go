@@ -2,7 +2,6 @@ package playReady
 
 import (
    "bytes"
-   "encoding/base64"
    "encoding/hex"
    "encoding/xml"
    "io"
@@ -12,7 +11,7 @@ import (
    "testing"
 )
 
-func TestScalable(t *testing.T) {
+func TestKey(t *testing.T) {
    var device LocalDevice
    data, err := os.ReadFile(SL2000.dir + "chain.txt")
    if err != nil {
@@ -32,103 +31,63 @@ func TestScalable(t *testing.T) {
       t.Fatal(err)
    }
    device.EncryptKey.unmarshal(data)
-   key_id := [16]byte{1}
-   envelope, err := NewEnvelope(
-      &device, base64.StdEncoding.EncodeToString(key_id[:]),
-   )
-   if err != nil {
-      t.Fatal(err)
-   }
-   data, err = xml.Marshal(envelope)
-   if err != nil {
-      t.Fatal(err)
-   }
-   resp, err := http.Post(
-      "https://test.playready.microsoft.com/service/rightsmanager.asmx?cfg=(persist:false,ck:AAAAAAAAAAAAAAAAAAAAAA==,ckt:aescbc)",
-      "text/xml", bytes.NewReader(data),
-   )
-   if err != nil {
-      t.Fatal(err)
-   }
-   defer resp.Body.Close()
-   data, err = io.ReadAll(resp.Body)
-   if err != nil {
-      t.Fatal(err)
-   }
-   key, err := device.key(data)
-   if err != nil {
-      t.Fatal(err)
-   }
-   if !bytes.Equal(key.KeyID.GUID(), key_id[:]) {
-      t.Fatal(".KeyID")
-   }
-   var zero [16]byte
-   if !bytes.Equal(key.Key[:], zero[:]) {
-      t.Fatal(".Key")
-   }
-}
-
-func TestRakuten(t *testing.T) {
-   var device LocalDevice
-   data, err := os.ReadFile(SL2000.dir + "chain.txt")
-   if err != nil {
-      t.Fatal(err)
-   }
-   err = device.CertificateChain.Decode(data)
-   if err != nil {
-      t.Fatal(err)
-   }
-   data, err = os.ReadFile(SL2000.dir + "signing_key.txt")
-   if err != nil {
-      t.Fatal(err)
-   }
-   device.SigningKey.unmarshal(data)
-   data, err = os.ReadFile(SL2000.dir + "encrypt_key.txt")
-   if err != nil {
-      t.Fatal(err)
-   }
-   device.EncryptKey.unmarshal(data)
-   envelope, err := NewEnvelope(&device, rakuten.kid_pr)
-   if err != nil {
-      t.Fatal(err)
-   }
-   data, err = xml.Marshal(envelope)
-   if err != nil {
-      t.Fatal(err)
-   }
-   resp, err := http.Post(rakuten.url, "", bytes.NewReader(data))
-   if err != nil {
-      t.Fatal(err)
-   }
-   defer resp.Body.Close()
-   data, err = io.ReadAll(resp.Body)
-   if err != nil {
-      t.Fatal(err)
-   }
-   key, err := device.key(data)
-   if err != nil {
-      t.Fatal(err)
-   }
-   if hex.EncodeToString(key.KeyID.UUID()) != rakuten.kid_wv {
-      t.Fatal(".KeyID")
-   }
-   if hex.EncodeToString(key.Key[:]) != rakuten.key {
-      t.Fatal(".Key")
+   for _, test := range tests {
+      envelope, err := NewEnvelope(&device, test.kid_pr)
+      if err != nil {
+         t.Fatal(err)
+      }
+      data, err = xml.Marshal(envelope)
+      if err != nil {
+         t.Fatal(err)
+      }
+      func() {
+         log.Print(test.url)
+         resp, err := http.Post(test.url, "text/xml", bytes.NewReader(data))
+         if err != nil {
+            t.Fatal(err)
+         }
+         defer resp.Body.Close()
+         data, err = io.ReadAll(resp.Body)
+         if err != nil {
+            t.Fatal(err)
+         }
+      }()
+      var lic license
+      err = lic.decrypt(device.EncryptKey, data)
+      if err != nil {
+         t.Fatal(err)
+      }
+      if hex.EncodeToString(lic.contentKey.KeyID.UUID()) != test.kid_wv {
+         t.Fatalf(
+            ".KeyID %x %x",
+            lic.contentKey.KeyID.GUID(),
+            lic.contentKey.KeyID.UUID(),
+         )
+      }
+      if hex.EncodeToString(lic.contentKey.Key[:]) != test.key {
+         t.Fatal(".Key")
+      }
    }
 }
 
-var rakuten = struct {
-   content string
-   key     string
-   url     string
-   kid_wv  string
-   kid_pr  string
+var tests = []struct {
+   key    string
+   kid_pr string
+   kid_wv string
+   url    string
 }{
-   url:     "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=702696eb-505d-4736-8c7c-297f9de5e9a7",
-   content: "rakuten.tv/cz?content_type=movies&content_id=transvulcania-the-people-s-run",
-   key:     "ab82952e8b567a2359393201e4dde4b4",
-   kid_wv:  "318f7ece69afcfe3e96de31be6b77272",
-   kid_pr:  "zn6PMa9p48/pbeMb5rdycg==",
+   {
+      key:    "ab82952e8b567a2359393201e4dde4b4",
+      kid_pr: "zn6PMa9p48/pbeMb5rdycg==",
+      kid_wv: "318f7ece69afcfe3e96de31be6b77272",
+      url:    "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=702696eb-505d-4736-8c7c-297f9de5e9a7",
+   },
+   {
+      key:    "00000000000000000000000000000000",
+      kid_pr: "AAAAEAAAAAAAAAAAAAAAAA==",
+      kid_wv: "10000000000000000000000000000000",
+      url:    "https://test.playready.microsoft.com/service/rightsmanager.asmx?cfg=(persist:false,ck:AAAAAAAAAAAAAAAAAAAAAA==,ckt:aescbc)",
+   },
 }
 
 var SL2000 = struct {

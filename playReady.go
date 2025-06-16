@@ -12,6 +12,63 @@ import (
    "slices"
 )
 
+// NewEnvelope creates a new SOAP envelope for a license acquisition challenge.
+func NewEnvelope(device *LocalDevice, kid string) (*xml.Envelope, error) {
+   var key xmlKey
+   key.New()
+   cipherData, err := device.CertificateChain.cipherData(&key)
+   if err != nil {
+      return nil, err
+   }
+   la := newLa(&key.PublicKey, cipherData, kid)
+   laData, err := la.Marshal()
+   if err != nil {
+      return nil, err
+   }
+   laDigest := sha256.Sum256(laData)
+   signedInfo := xml.SignedInfo{
+      XmlNs: "http://www.w3.org/2000/09/xmldsig#",
+      Reference: xml.Reference{
+         Uri:         "#SignedData",
+         DigestValue: laDigest[:],
+      },
+   }
+   signedData, err := signedInfo.Marshal()
+   if err != nil {
+      return nil, err
+   }
+   signedDigest := sha256.Sum256(signedData)
+   r, s, err := ecdsa.Sign(Fill('C'), device.SigningKey[0], signedDigest[:])
+   if err != nil {
+      return nil, err
+   }
+   signature := append(r.Bytes(), s.Bytes()...)
+   return &xml.Envelope{
+      Soap: "http://schemas.xmlsoap.org/soap/envelope/",
+      Body: xml.Body{
+         AcquireLicense: &xml.AcquireLicense{
+            XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols",
+            Challenge: xml.Challenge{
+               Challenge: xml.InnerChallenge{
+                  XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols/messages",
+                  La:    la,
+                  Signature: xml.Signature{
+                     SignedInfo:     signedInfo,
+                     SignatureValue: signature,
+                  },
+               },
+            },
+         },
+      },
+   }, nil
+}
+
+type LocalDevice struct {
+   CertificateChain Chain
+   EncryptKey       EcKey
+   SigningKey       EcKey
+}
+
 // device represents device capabilities.
 type device struct {
    maxLicenseSize       uint32
@@ -108,57 +165,6 @@ func newLa(m *ecdsa.PublicKey, cipherData []byte, kid string) xml.La {
          },
       },
    }
-}
-
-// NewEnvelope creates a new SOAP envelope for a license acquisition challenge.
-func NewEnvelope(device *LocalDevice, kid string) (*xml.Envelope, error) {
-   var key xmlKey
-   key.New()
-   cipherData, err := device.CertificateChain.cipherData(&key)
-   if err != nil {
-      return nil, err
-   }
-   la := newLa(&key.PublicKey, cipherData, kid)
-   laData, err := la.Marshal()
-   if err != nil {
-      return nil, err
-   }
-   laDigest := sha256.Sum256(laData)
-   signedInfo := xml.SignedInfo{
-      XmlNs: "http://www.w3.org/2000/09/xmldsig#",
-      Reference: xml.Reference{
-         Uri:         "#SignedData",
-         DigestValue: laDigest[:],
-      },
-   }
-   signedData, err := signedInfo.Marshal()
-   if err != nil {
-      return nil, err
-   }
-   signedDigest := sha256.Sum256(signedData)
-   r, s, err := ecdsa.Sign(Fill('C'), device.SigningKey[0], signedDigest[:])
-   if err != nil {
-      return nil, err
-   }
-   signature := append(r.Bytes(), s.Bytes()...)
-   return &xml.Envelope{
-      Soap: "http://schemas.xmlsoap.org/soap/envelope/",
-      Body: xml.Body{
-         AcquireLicense: &xml.AcquireLicense{
-            XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols",
-            Challenge: xml.Challenge{
-               Challenge: xml.InnerChallenge{
-                  XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols/messages",
-                  La:    la,
-                  Signature: xml.Signature{
-                     SignedInfo:     signedInfo,
-                     SignatureValue: signature,
-                  },
-               },
-            },
-         },
-      },
-   }, nil
 }
 
 // Read implements the io.Reader interface for Fill.
@@ -317,13 +323,6 @@ const (
    objTypeSecurityVersion  = 0x0010
    objTypeSecurityVersion2 = 0x0011
 )
-
-// LocalDevice represents a device with its certificate chain and keys.
-type LocalDevice struct {
-   CertificateChain Chain
-   EncryptKey       EcKey
-   SigningKey       EcKey
-}
 
 // manufacturerInfo contains a length-prefixed string. Renamed to avoid conflict.
 type manufacturerInfo struct {
