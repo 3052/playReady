@@ -199,15 +199,13 @@ func (k *keyInfo) encode() []byte {
    return data
 }
 
-///
-
 // Decode decodes a byte slice into an ECCKey structure.
 func (e *eccKey) decode(data []byte) {
    e.Curve = binary.BigEndian.Uint16(data)
    data = data[2:]
    e.Length = binary.BigEndian.Uint16(data)
    data = data[2:]
-   e.Value = data[:e.Length]
+   e.Value = data
 }
 
 // decode decodes a byte slice into a ContentKey structure.
@@ -220,8 +218,10 @@ func (c *ContentKey) decode(data []byte) {
    data = data[2:]
    c.Length = binary.BigEndian.Uint16(data)
    data = data[2:]
-   c.Value = data[:c.Length]
+   c.Value = data
 }
+
+///
 
 func (c *ContentKey) decrypt(key *ecdsa.PrivateKey, auxKeys *auxKeys) error {
    switch c.CipherType {
