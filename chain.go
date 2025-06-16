@@ -15,7 +15,7 @@ import (
 )
 
 // CreateLeaf creates a new leaf certificate and adds it to the chain.
-func (c *Chain) CreateLeaf(modelKey, signingKey, encryptKey EcKey) error {
+func (c *Chain) CreateLeaf(modelKey, signingKey, encryptKey *EcKey) error {
    // Verify that the provided modelKey matches the public key in the chain's
    // first certificate.
    if !bytes.Equal(c.certs[0].keyData.keys[0].publicKey[:], modelKey.Public()) {
@@ -79,7 +79,7 @@ func (c *Chain) CreateLeaf(modelKey, signingKey, encryptKey EcKey) error {
    {
       // Sign the unsigned certificate's data.
       digest := sha256.Sum256(unsignedCert.encode())
-      r, s, err := ecdsa.Sign(Fill('B'), modelKey[0], digest[:])
+      r, s, err := ecdsa.Sign(Fill('A'), modelKey[0], digest[:])
       if err != nil {
          return err
       }

@@ -37,7 +37,7 @@ func (c *Chain) requestBody(signing EcKey, kid string) ([]byte, error) {
       return nil, err
    }
    signedDigest := sha256.Sum256(signedData)
-   r, s, err := ecdsa.Sign(Fill('C'), signing[0], signedDigest[:])
+   r, s, err := ecdsa.Sign(Fill('B'), signing[0], signedDigest[:])
    if err != nil {
       return nil, err
    }
@@ -160,7 +160,6 @@ func newLa(m *ecdsa.PublicKey, cipherData []byte, kid string) xml.La {
    }
 }
 
-// Read implements the io.Reader interface for Fill.
 func (f Fill) Read(data []byte) (int, error) {
    for index := range data {
       data[index] = byte(f)

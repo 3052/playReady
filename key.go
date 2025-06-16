@@ -9,17 +9,16 @@ import (
    "math/big"
 )
 
-type EcKey [1]*ecdsa.PrivateKey
-
-// New generates a new ECDSA private key.
-func (e *EcKey) New() error {
-   var err error
-   e[0], err = ecdsa.GenerateKey(elliptic.P256(), Fill('A'))
+// they downgrade certs from the cert digest (hash of the signing key)
+func (f Fill) key() (*EcKey, error) {
+   key, err := ecdsa.GenerateKey(elliptic.P256(), f)
    if err != nil {
-      return err
+      return nil, err
    }
-   return nil
+   return &EcKey{key}, nil
 }
+
+type EcKey [1]*ecdsa.PrivateKey
 
 // Private returns the private key bytes.
 func (e EcKey) Private() []byte {
