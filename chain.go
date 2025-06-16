@@ -21,8 +21,8 @@ type certificate struct {
    length            uint32
    lengthToSignature uint32
    rawData           []byte
-   certificateInfo   *certInfo
-   features          *feature
+   certificateInfo   *certificateInfo
+   features          *features
    keyData           *keyInfo
    manufacturerInfo  *manufacturer
    signatureData     *ecdsaSignature
@@ -48,8 +48,7 @@ func (c *certificate) encode() []byte {
    return append(data, c.rawData...)
 }
 
-// certInfo contains basic certificate information. Renamed to avoid conflict.
-type certInfo struct {
+type certificateInfo struct {
    certificateId [16]byte
    securityLevel uint32
    flags         uint32
@@ -63,8 +62,7 @@ type certInfo struct {
    clientId [16]byte
 }
 
-// encode encodes the certInfo structure into a byte slice.
-func (c *certInfo) encode() []byte {
+func (c *certificateInfo) encode() []byte {
    data := c.certificateId[:]
    data = binary.BigEndian.AppendUint32(data, c.securityLevel)
    data = binary.BigEndian.AppendUint32(data, c.flags)
@@ -74,16 +72,14 @@ func (c *certInfo) encode() []byte {
    return append(data, c.clientId[:]...)
 }
 
-// new initializes a new certInfo with security level and digest.
-func (c *certInfo) New(securityLevel uint32, digest []byte) {
+func (c *certificateInfo) New(securityLevel uint32, digest []byte) {
    c.securityLevel = securityLevel
    c.infoType = 2 // Assuming infoType 2 is a standard type
    copy(c.digest[:], digest)
    c.expiry = 4294967295 // Max uint32, effectively never expires
 }
 
-// decode decodes a byte slice into the certInfo structure.
-func (c *certInfo) decode(data []byte) {
+func (c *certificateInfo) decode(data []byte) {
    n := copy(c.certificateId[:], data)
    data = data[n:]
    c.securityLevel = binary.BigEndian.Uint32(data)
@@ -249,10 +245,10 @@ func (c *certificate) decode(data []byte) (int, error) {
       n1 += value.decode(c.rawData[n1:])
       switch value.Type {
       case objTypeBasic:
-         c.certificateInfo = &certInfo{}
+         c.certificateInfo = &certificateInfo{}
          c.certificateInfo.decode(value.Value)
       case objTypeFeature:
-         c.features = &feature{}
+         c.features = &features{}
          c.features.decode(value.Value)
       case objTypeKey:
          c.keyData = &keyInfo{}
@@ -319,103 +315,97 @@ func (l *licenseResponse) decode(data []byte) error {
    return nil
 }
 
-///
-
 // CreateLeaf creates a new leaf certificate and adds it to the chain.
 func (c *Chain) CreateLeaf(modelKey, signingKey, encryptKey EcKey) error {
    // Verify that the provided modelKey matches the public key in the chain's
    // first certificate.
-   if !bytes.Equal(
-      c.certs[0].keyData.keys[0].publicKey[:], modelKey.PublicBytes(),
-   ) {
+   if !bytes.Equal(c.certs[0].keyData.keys[0].publicKey[:], modelKey.Public()) {
       return errors.New("zgpriv not for cert")
    }
    // Verify the existing chain's validity.
    if !c.verify() {
       return errors.New("cert is not valid")
    }
-
-   var (
-      builtKeyInfo     keyInfo
-      certificateInfo  certInfo
-      signatureData    ecdsaSignature
-      signatureFtlv    ftlv
-      deviceFtlv       ftlv
-      featureFtlv      ftlv
-      keyInfoFtlv      ftlv
-      manufacturerFtlv ftlv
-      certificateFtlv  ftlv
-   )
-
-   // Calculate digest for the signing key.
-   signingKeyDigest := sha256.Sum256(signingKey.PublicBytes())
-
-   // Initialize certificate information.
-   certificateInfo.New(
-      c.certs[0].certificateInfo.securityLevel, signingKeyDigest[:],
-   )
-   // Initialize key information for signing and encryption keys.
-   builtKeyInfo.New(signingKey.PublicBytes(), encryptKey.PublicBytes())
-
-   // Create FTLV (Fixed Tag Length Value) for certificate info.
-   certificateFtlv.New(1, 1, certificateInfo.encode())
-
-   // Create a new device and its FTLV.
-   var newDevice device
-   newDevice.New()
-   deviceFtlv.New(1, 4, newDevice.encode())
-
-   // Create FTLV for key information.
-   keyInfoFtlv.New(1, 6, builtKeyInfo.encode())
-
-   // Create FTLV for manufacturer information, copying from the existing chain's first cert.
-   manufacturerFtlv.New(0, 7, c.certs[0].manufacturerInfo.encode())
-
-   // Define feature for the new certificate.
-   feature := feature{
-      entries:  1,
-      features: []uint32{0xD}, // SCALABLE with SL2000, SUPPORTS_PR3_FEATURES
-   }
-   // Create FTLV for features.
-   featureFtlv.New(1, 5, feature.encode())
-
    // Assemble raw data for the unsigned certificate.
-   leaf_data := certificateFtlv.encode()
-   leaf_data = append(leaf_data, deviceFtlv.encode()...)
-   leaf_data = append(leaf_data, featureFtlv.encode()...)
-   leaf_data = append(leaf_data, keyInfoFtlv.encode()...)
-   leaf_data = append(leaf_data, manufacturerFtlv.encode()...)
-
+   var leafData bytes.Buffer
+   {
+      // Calculate digest for the signing key.
+      digest := sha256.Sum256(signingKey.Public())
+      // Initialize certificate information.
+      var info certificateInfo
+      info.New(c.certs[0].certificateInfo.securityLevel, digest[:])
+      // Create FTLV (Fixed Tag Length Value) for certificate info.
+      var value ftlv
+      value.New(1, 1, info.encode())
+      leafData.Write(value.encode())
+   }
+   {
+      // Create a new device and its FTLV.
+      var device1 device
+      device1.New()
+      var value ftlv
+      value.New(1, 4, device1.encode())
+      leafData.Write(value.encode())
+   }
+   {
+      // SCALABLE with SL2000, SUPPORTS_PR3_FEATURES
+      feature := features{
+         entries:  1,
+         features: []uint32{0xD},
+      }
+      // Create FTLV for features.
+      var value ftlv
+      value.New(1, 5, feature.encode())
+      leafData.Write(value.encode())
+   }
+   {
+      // Initialize key information for signing and encryption keys.
+      var key keyInfo
+      key.New(signingKey.Public(), encryptKey.Public())
+      // Create FTLV for key information.
+      var value ftlv
+      value.New(1, 6, key.encode())
+      leafData.Write(value.encode())
+   }
+   {
+      // Create FTLV for manufacturer information, copying from the existing
+      // chain's first cert.
+      var value ftlv
+      value.New(0, 7, c.certs[0].manufacturerInfo.encode())
+      leafData.Write(value.encode())
+   }
    // Create an unsigned certificate object.
    var unsignedCert certificate
-   unsignedCert.newNoSig(leaf_data)
-
-   // Sign the unsigned certificate's data.
-   signatureDigest := sha256.Sum256(unsignedCert.encode())
-   r, s, err := ecdsa.Sign(Fill('B'), modelKey[0], signatureDigest[:])
-   if err != nil {
-      return err
+   unsignedCert.newNoSig(leafData.Bytes())
+   {
+      // Sign the unsigned certificate's data.
+      digest := sha256.Sum256(unsignedCert.encode())
+      r, s, err := ecdsa.Sign(Fill('B'), modelKey[0], digest[:])
+      if err != nil {
+         return err
+      }
+      sign := append(r.Bytes(), s.Bytes()...)
+      // Initialize the signature data for the new certificate.
+      var signatureData ecdsaSignature
+      signatureData.New(sign, modelKey.Public())
+      // Create FTLV for the signature.
+      var value ftlv
+      value.New(1, 8, signatureData.encode())
+      // Append the signature FTLV to the leaf data.
+      leafData.Write(value.encode())
    }
-   sign := append(r.Bytes(), s.Bytes()...)
-
-   // Initialize the signature data for the new certificate.
-   signatureData.New(sign, modelKey.PublicBytes())
-   // Create FTLV for the signature.
-   signatureFtlv.New(1, 8, signatureData.encode())
-
-   // Append the signature FTLV to the leaf data.
-   leaf_data = append(leaf_data, signatureFtlv.encode()...)
-
    // Update the unsigned certificate's length and rawData.
-   unsignedCert.length = uint32(len(leaf_data)) + 16
-   unsignedCert.rawData = leaf_data
-
-   // Update the chain's length, certificate count, and insert the new certificate.
+   unsignedCert.length = uint32(leafData.Len()) + 16
+   unsignedCert.rawData = leafData.Bytes()
+   // Update the chain's length, certificate count, and insert the new
+   // certificate.
    c.length += unsignedCert.length
    c.certCount += 1
    c.certs = slices.Insert(c.certs, 0, unsignedCert)
    return nil
 }
+
+///
 
 // getCipherData prepares cipher data for the license acquisition challenge.
 func getCipherData(chain *Chain, key *xmlKey) ([]byte, error) {
@@ -465,7 +455,7 @@ func ParseLicense(device *LocalDevice, data []byte) (*ContentKey, error) {
    if err != nil {
       return nil, err
    }
-   if !bytes.Equal(license.eccKeyObject.Value, device.EncryptKey.PublicBytes()) {
+   if !bytes.Equal(license.eccKeyObject.Value, device.EncryptKey.Public()) {
       return nil, errors.New("license response is not for this device")
    }
    err = license.contentKeyObject.decrypt(

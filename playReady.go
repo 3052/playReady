@@ -13,6 +13,28 @@ import (
    "slices"
 )
 
+// device represents device capabilities.
+type device struct {
+   maxLicenseSize       uint32
+   maxHeaderSize        uint32
+   maxLicenseChainDepth uint32
+}
+
+// new initializes default device capabilities.
+func (d *device) New() {
+   d.maxLicenseSize = 10240
+   d.maxHeaderSize = 15360
+   d.maxLicenseChainDepth = 2
+}
+
+// encode encodes device capabilities into a byte slice.
+func (d *device) encode() []byte {
+   var data []byte
+   data = binary.BigEndian.AppendUint32(data, d.maxLicenseSize)
+   data = binary.BigEndian.AppendUint32(data, d.maxHeaderSize)
+   return binary.BigEndian.AppendUint32(data, d.maxLicenseChainDepth)
+}
+
 // aesECBHandler performs AES ECB encryption/decryption.
 // Encrypts if encrypt is true, decrypts otherwise.
 func aesECBHandler(data, key []byte, encrypt bool) ([]byte, error) {
@@ -304,28 +326,6 @@ type LocalDevice struct {
    CertificateChain Chain
    EncryptKey       EcKey
    SigningKey       EcKey
-}
-
-// device represents device capabilities. Renamed to avoid conflict.
-type device struct {
-   maxLicenseSize       uint32
-   maxHeaderSize        uint32
-   maxLicenseChainDepth uint32
-}
-
-// new initializes default device capabilities.
-func (d *device) New() {
-   d.maxLicenseSize = 10240
-   d.maxHeaderSize = 15360
-   d.maxLicenseChainDepth = 2
-}
-
-// encode encodes device capabilities into a byte slice.
-func (d *device) encode() []byte {
-   var data []byte
-   data = binary.BigEndian.AppendUint32(data, d.maxLicenseSize)
-   data = binary.BigEndian.AppendUint32(data, d.maxHeaderSize)
-   return binary.BigEndian.AppendUint32(data, d.maxLicenseChainDepth)
 }
 
 // manufacturerInfo contains a length-prefixed string. Renamed to avoid conflict.

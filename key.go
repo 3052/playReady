@@ -9,21 +9,7 @@ import (
    "math/big"
 )
 
-// LoadBytes loads an ECDSA private key from bytes.
-func (e *EcKey) unmarshal(data []byte) {
-   var public ecdsa.PublicKey
-   public.Curve = elliptic.P256()
-   public.X, public.Y = public.Curve.ScalarBaseMult(data)
-   var private ecdsa.PrivateKey
-   private.D = new(big.Int).SetBytes(data)
-   private.PublicKey = public
-   e[0] = &private
-}
-
-// PublicBytes returns the public key bytes.
-func (e *EcKey) PublicBytes() []byte {
-   return append(e[0].PublicKey.X.Bytes(), e[0].PublicKey.Y.Bytes()...)
-}
+type EcKey [1]*ecdsa.PrivateKey
 
 // New generates a new ECDSA private key.
 func (e *EcKey) New() error {
@@ -40,7 +26,21 @@ func (e EcKey) Private() []byte {
    return e[0].D.Bytes()
 }
 
-type EcKey [1]*ecdsa.PrivateKey
+// PublicBytes returns the public key bytes.
+func (e *EcKey) Public() []byte {
+   return append(e[0].PublicKey.X.Bytes(), e[0].PublicKey.Y.Bytes()...)
+}
+
+// LoadBytes loads an ECDSA private key from bytes.
+func (e *EcKey) unmarshal(data []byte) {
+   var public ecdsa.PublicKey
+   public.Curve = elliptic.P256()
+   public.X, public.Y = public.Curve.ScalarBaseMult(data)
+   var private ecdsa.PrivateKey
+   private.D = new(big.Int).SetBytes(data)
+   private.PublicKey = public
+   e[0] = &private
+}
 
 // xorKey performs XOR operation on two byte slices.
 func xorKey(a, b []byte) []byte {
@@ -178,13 +178,12 @@ type ContentKey struct {
    Key        [16]byte
 }
 
-type feature struct {
+type features struct {
    entries  uint32
    features []uint32
 }
 
-// decode decodes a byte slice into the feature structure.
-func (f *feature) decode(data []byte) int {
+func (f *features) decode(data []byte) int {
    f.entries = binary.BigEndian.Uint32(data)
    n := 4
    for range f.entries {
@@ -194,14 +193,12 @@ func (f *feature) decode(data []byte) int {
    return n
 }
 
-// new initializes a new feature with a given type.
-func (f *feature) New(Type int) {
+func (f *features) New(Type int) {
    f.entries = 1
    f.features = []uint32{uint32(Type)}
 }
 
-// encode encodes the feature structure into a byte slice.
-func (f *feature) encode() []byte {
+func (f *features) encode() []byte {
    var data []byte
    data = binary.BigEndian.AppendUint32(data, f.entries)
 
@@ -256,7 +253,7 @@ type key struct {
    length    uint16
    flags     uint32
    publicKey [64]byte // ECDSA P256 public key is 64 bytes (X and Y coordinates, 32 bytes each)
-   usage     feature  // Features indicating key usage
+   usage     features  // Features indicating key usage
 }
 
 // new initializes a new key with provided data and type.
