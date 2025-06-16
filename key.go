@@ -178,17 +178,49 @@ func (*ContentKey) magicConstantZero() ([]byte, error) {
    return hex.DecodeString("7ee9ed4af773224f00b8ea7efb027cbb")
 }
 
-///
-
 func (f *features) encode() []byte {
-   var data []byte
-   data = binary.BigEndian.AppendUint32(data, f.entries)
+   data := binary.BigEndian.AppendUint32(nil, f.entries)
 
    for i := range f.entries {
       data = binary.BigEndian.AppendUint32(data, f.features[i])
    }
 
    return data
+}
+
+// encode encodes the keyInfo structure into a byte slice.
+func (k *keyInfo) encode() []byte {
+   data := binary.BigEndian.AppendUint32(nil, k.entries)
+
+   for i := range k.entries {
+      data = append(data, k.keys[i].encode()...)
+   }
+
+   return data
+}
+
+///
+
+// Decode decodes a byte slice into an ECCKey structure.
+func (e *eccKey) decode(data []byte) {
+   e.Curve = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   e.Length = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   e.Value = data[:e.Length]
+}
+
+// decode decodes a byte slice into a ContentKey structure.
+func (c *ContentKey) decode(data []byte) {
+   c.KeyID.Decode(data[:])
+   data = data[16:]
+   c.KeyType = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   c.CipherType = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   c.Length = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   c.Value = data[:c.Length]
 }
 
 func (c *ContentKey) decrypt(key *ecdsa.PrivateKey, auxKeys *auxKeys) error {
@@ -249,38 +281,4 @@ func (c *ContentKey) scalable(key *ecdsa.PrivateKey, auxKeys *auxKeys) error {
    rgbKey = rgbKey[16:]
    copy(c.Key[:], rgbKey)
    return nil
-}
-
-// decode decodes a byte slice into a ContentKey structure.
-func (c *ContentKey) decode(data []byte) {
-   c.KeyID.Decode(data[:])
-   data = data[16:]
-   c.KeyType = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   c.CipherType = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   c.Length = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   c.Value = data[:c.Length]
-}
-
-// Decode decodes a byte slice into an ECCKey structure.
-func (e *eccKey) decode(data []byte) {
-   e.Curve = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   e.Length = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   e.Value = data[:e.Length]
-}
-
-// encode encodes the keyInfo structure into a byte slice.
-func (k *keyInfo) encode() []byte {
-   var data []byte
-   data = binary.BigEndian.AppendUint32(data, k.entries)
-
-   for i := range k.entries {
-      data = append(data, k.keys[i].encode()...)
-   }
-
-   return data
 }
