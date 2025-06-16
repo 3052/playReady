@@ -26,7 +26,7 @@ var tests = []struct {
       key:    "00000000000000000000000000000000",
       kid_pr: "AAAAEAAAAAAAAAAAAAAAAA==",
       kid_wv: "10000000000000000000000000000000",
-      url:    "https://test.playready.microsoft.com/service/rightsmanager.asmx?cfg=(persist:false,ck:AAAAAAAAAAAAAAAAAAAAAA==,ckt:aescbc)",
+      url:    "https://test.playready.microsoft.com/service/rightsmanager.asmx?cfg=ck:AAAAAAAAAAAAAAAAAAAAAA==,ckt:aescbc",
    },
 }
 

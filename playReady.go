@@ -12,78 +12,6 @@ import (
    "slices"
 )
 
-func (c *Chain) requestBody(signing EcKey, kid string) ([]byte, error) {
-   var key xmlKey
-   key.New()
-   cipherData, err := c.cipherData(&key)
-   if err != nil {
-      return nil, err
-   }
-   la := newLa(&key.PublicKey, cipherData, kid)
-   laData, err := la.Marshal()
-   if err != nil {
-      return nil, err
-   }
-   laDigest := sha256.Sum256(laData)
-   signedInfo := xml.SignedInfo{
-      XmlNs: "http://www.w3.org/2000/09/xmldsig#",
-      Reference: xml.Reference{
-         Uri:         "#SignedData",
-         DigestValue: laDigest[:],
-      },
-   }
-   signedData, err := signedInfo.Marshal()
-   if err != nil {
-      return nil, err
-   }
-   signedDigest := sha256.Sum256(signedData)
-   r, s, err := ecdsa.Sign(Fill('B'), signing[0], signedDigest[:])
-   if err != nil {
-      return nil, err
-   }
-   envelope := xml.Envelope{
-      Soap: "http://schemas.xmlsoap.org/soap/envelope/",
-      Body: xml.Body{
-         AcquireLicense: &xml.AcquireLicense{
-            XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols",
-            Challenge: xml.Challenge{
-               Challenge: xml.InnerChallenge{
-                  XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols/messages",
-                  La:    la,
-                  Signature: xml.Signature{
-                     SignedInfo:     signedInfo,
-                     SignatureValue: append(r.Bytes(), s.Bytes()...),
-                  },
-               },
-            },
-         },
-      },
-   }
-   return envelope.Marshal()
-}
-
-// device represents device capabilities.
-type device struct {
-   maxLicenseSize       uint32
-   maxHeaderSize        uint32
-   maxLicenseChainDepth uint32
-}
-
-// new initializes default device capabilities.
-func (d *device) New() {
-   d.maxLicenseSize = 10240
-   d.maxHeaderSize = 15360
-   d.maxLicenseChainDepth = 2
-}
-
-// encode encodes device capabilities into a byte slice.
-func (d *device) encode() []byte {
-   var data []byte
-   data = binary.BigEndian.AppendUint32(data, d.maxLicenseSize)
-   data = binary.BigEndian.AppendUint32(data, d.maxHeaderSize)
-   return binary.BigEndian.AppendUint32(data, d.maxLicenseChainDepth)
-}
-
 // aesECBHandler performs AES ECB encryption/decryption.
 // Encrypts if encrypt is true, decrypts otherwise.
 func aesECBHandler(data, key []byte, encrypt bool) ([]byte, error) {
@@ -159,6 +87,80 @@ func newLa(m *ecdsa.PublicKey, cipherData []byte, kid string) xml.La {
       },
    }
 }
+
+func (c *Chain) requestBody(signing EcKey, kid string) ([]byte, error) {
+   var key xmlKey
+   key.New()
+   cipherData, err := c.cipherData(&key)
+   if err != nil {
+      return nil, err
+   }
+   la := newLa(&key.PublicKey, cipherData, kid)
+   laData, err := la.Marshal()
+   if err != nil {
+      return nil, err
+   }
+   laDigest := sha256.Sum256(laData)
+   signedInfo := xml.SignedInfo{
+      XmlNs: "http://www.w3.org/2000/09/xmldsig#",
+      Reference: xml.Reference{
+         Uri:         "#SignedData",
+         DigestValue: laDigest[:],
+      },
+   }
+   signedData, err := signedInfo.Marshal()
+   if err != nil {
+      return nil, err
+   }
+   signedDigest := sha256.Sum256(signedData)
+   r, s, err := ecdsa.Sign(Fill('B'), signing[0], signedDigest[:])
+   if err != nil {
+      return nil, err
+   }
+   envelope := xml.Envelope{
+      Soap: "http://schemas.xmlsoap.org/soap/envelope/",
+      Body: xml.Body{
+         AcquireLicense: &xml.AcquireLicense{
+            XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols",
+            Challenge: xml.Challenge{
+               Challenge: xml.InnerChallenge{
+                  XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols/messages",
+                  La:    la,
+                  Signature: xml.Signature{
+                     SignedInfo:     signedInfo,
+                     SignatureValue: append(r.Bytes(), s.Bytes()...),
+                  },
+               },
+            },
+         },
+      },
+   }
+   return envelope.Marshal()
+}
+
+// device represents device capabilities.
+type device struct {
+   maxLicenseSize       uint32
+   maxHeaderSize        uint32
+   maxLicenseChainDepth uint32
+}
+
+// new initializes default device capabilities.
+func (d *device) New() {
+   d.maxLicenseSize = 10240
+   d.maxHeaderSize = 15360
+   d.maxLicenseChainDepth = 2
+}
+
+// encode encodes device capabilities into a byte slice.
+func (d *device) encode() []byte {
+   var data []byte
+   data = binary.BigEndian.AppendUint32(data, d.maxLicenseSize)
+   data = binary.BigEndian.AppendUint32(data, d.maxHeaderSize)
+   return binary.BigEndian.AppendUint32(data, d.maxLicenseChainDepth)
+}
+
+///
 
 func (f Fill) Read(data []byte) (int, error) {
    for index := range data {
