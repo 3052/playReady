@@ -8,6 +8,34 @@ import (
    "github.com/deatil/go-cryptobin/cryptobin/crypto"
 )
 
+// UUID returns the GUID as a big-endian UUID byte slice.
+func (g *GUID) UUID() []byte {
+   data := binary.BigEndian.AppendUint32(nil, g.Data1)
+   data = binary.BigEndian.AppendUint16(data, g.Data2)
+   data = binary.BigEndian.AppendUint16(data, g.Data3)
+   return binary.BigEndian.AppendUint64(data, g.Data4)
+}
+
+// GUID returns the GUID as a mixed-endian GUID byte slice (standard PlayReady
+// format).
+func (g *GUID) GUID() []byte {
+   data := binary.LittleEndian.AppendUint32(nil, g.Data1)
+   data = binary.LittleEndian.AppendUint16(data, g.Data2)
+   data = binary.LittleEndian.AppendUint16(data, g.Data3)
+   return binary.BigEndian.AppendUint64(data, g.Data4)
+}
+
+// Decode decodes a byte slice into a GUID structure.
+func (g *GUID) Decode(data []byte) {
+   g.Data1 = binary.LittleEndian.Uint32(data)
+   data = data[4:]
+   g.Data2 = binary.LittleEndian.Uint16(data)
+   data = data[2:]
+   g.Data3 = binary.LittleEndian.Uint16(data)
+   data = data[2:]
+   g.Data4 = binary.BigEndian.Uint64(data)
+}
+
 type GUID struct {
    Data1 uint32 // little endian
    Data2 uint16 // little endian
@@ -193,33 +221,6 @@ func (d *device) encode() []byte {
    data := binary.BigEndian.AppendUint32(nil, d.maxLicenseSize)
    data = binary.BigEndian.AppendUint32(data, d.maxHeaderSize)
    return binary.BigEndian.AppendUint32(data, d.maxLicenseChainDepth)
-}
-
-// UUID returns the GUID as a big-endian UUID byte slice.
-func (g *GUID) UUID() []byte {
-   data := binary.BigEndian.AppendUint32(nil, g.Data1)
-   data = binary.BigEndian.AppendUint16(data, g.Data2)
-   data = binary.BigEndian.AppendUint16(data, g.Data3)
-   return binary.BigEndian.AppendUint64(data, g.Data4)
-}
-
-// GUID returns the GUID as a mixed-endian GUID byte slice (standard PlayReady format).
-func (g *GUID) GUID() []byte {
-   data := binary.LittleEndian.AppendUint32(nil, g.Data1)
-   data = binary.LittleEndian.AppendUint16(data, g.Data2)
-   data = binary.LittleEndian.AppendUint16(data, g.Data3)
-   return binary.BigEndian.AppendUint64(data, g.Data4)
-}
-
-// Decode decodes a byte slice into a GUID structure.
-func (g *GUID) Decode(data []byte) {
-   g.Data1 = binary.LittleEndian.Uint32(data)
-   data = data[4:]
-   g.Data2 = binary.LittleEndian.Uint16(data)
-   data = data[2:]
-   g.Data3 = binary.LittleEndian.Uint16(data)
-   data = data[2:]
-   g.Data4 = binary.BigEndian.Uint64(data)
 }
 
 // Decode decodes a byte slice into an AuxKey structure.

@@ -30,13 +30,13 @@ func (k *keyData) New(data []byte, Type int) {
 }
 
 type keyData struct {
-   keyType   uint16
-   length    uint16
-   flags     uint32
+   keyType uint16
+   length  uint16
+   flags   uint32
    // ECDSA P256 public key is 64 bytes (X and Y coordinates, 32 bytes each)
    publicKey [64]byte
    // Features indicating key usage
-   usage     features
+   usage features
 }
 
 // encode encodes the key structure into a byte slice.
