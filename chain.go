@@ -14,123 +14,6 @@ import (
    "slices"
 )
 
-func (l *license) decode(data []byte) error {
-   l.RawData = data
-   n := copy(l.Magic[:], data)
-   data = data[n:]
-   l.Offset = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   l.Version = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   n = copy(l.RightsID[:], data)
-   data = data[n:]
-   l.OuterContainer.decode(data)
-   var n1 int
-   for n1 < int(l.OuterContainer.Length)-16 {
-      var value ftlv
-      n1 += value.decode(l.OuterContainer.Value[n1:])
-      switch xmrType(value.Type) {
-      case globalPolicyContainerEntryType: // 2
-         // Rakuten
-      case playbackPolicyContainerEntryType: // 4
-         // Rakuten
-      case keyMaterialContainerEntryType: // 9
-         var n2 int
-         for n2 < int(value.Length)-16 {
-            var value1 ftlv
-            n2 += value1.decode(value.Value[n2:])
-            switch xmrType(value1.Type) {
-            case contentKeyEntryType: // 10
-               l.contentKey = &ContentKey{}
-               l.contentKey.decode(value1.Value)
-            case deviceKeyEntryType: // 42
-               l.eccKey = &eccKey{}
-               l.eccKey.decode(value1.Value)
-            case auxKeyEntryType: // 81
-               l.auxKeyObject = &auxKeys{}
-               l.auxKeyObject.decode(value1.Value)
-            default:
-               return errors.New("FTLV.type")
-            }
-         }
-      case signatureEntryType: // 11
-         l.signatureObject = &signature{}
-         l.signatureObject.decode(value.Value)
-         l.signatureObject.Length = uint16(value.Length)
-      default:
-         return errors.New("FTLV.type")
-      }
-   }
-   return nil
-}
-
-func (l *license) decrypt(encrypt EcKey, data []byte) error {
-   var envelope xml.EnvelopeResponse
-   err := envelope.Unmarshal(data)
-   if err != nil {
-      return err
-   }
-   err = l.decode(envelope.
-      Body.
-      AcquireLicenseResponse.
-      AcquireLicenseResult.
-      Response.
-      LicenseResponse.
-      Licenses.
-      License,
-   )
-   if err != nil {
-      return err
-   }
-   if !bytes.Equal(l.eccKey.Value, encrypt.Public()) {
-      return errors.New("license response is not for this device")
-   }
-   err = l.contentKey.decrypt(encrypt[0], l.auxKeyObject)
-   if err != nil {
-      return err
-   }
-   return l.verify(l.contentKey.Integrity.GUID())
-}
-
-// decode decodes a byte slice into the Cert structure.
-func (c *certificate) decode(data []byte) (int, error) {
-   n := copy(c.magic[:], data)
-   if string(c.magic[:]) != "CERT" {
-      return 0, errors.New("failed to find cert magic")
-   }
-   c.version = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   c.length = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   c.lengthToSignature = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   c.rawData = data[n:][:c.length-16]
-   n += len(c.rawData)
-   var n1 int
-   for n1 < len(c.rawData) {
-      var value ftlv
-      n1 += value.decode(c.rawData[n1:])
-      switch value.Type {
-      case objTypeBasic:
-         c.certificateInfo = &certificateInfo{}
-         c.certificateInfo.decode(value.Value)
-      case objTypeFeature:
-         c.features = &features{}
-         c.features.decode(value.Value)
-      case objTypeKey:
-         c.keyInfo = &keyInfo{}
-         c.keyInfo.decode(value.Value)
-      case objTypeManufacturer:
-         c.manufacturerInfo = &manufacturer{}
-         c.manufacturerInfo.decode(value.Value)
-      case objTypeSignature:
-         c.signatureData = &ecdsaSignature{}
-         c.signatureData.decode(value.Value)
-      }
-   }
-   return n, nil
-}
-
 // CreateLeaf creates a new leaf certificate and adds it to the chain.
 func (c *Chain) CreateLeaf(modelKey, signingKey, encryptKey *EcKey) error {
    // Verify that the provided modelKey matches the public key in the chain's
@@ -308,6 +191,125 @@ type Chain struct {
    certCount uint32
    certs     []certificate
 }
+
+// decode decodes a byte slice into the Cert structure.
+func (c *certificate) decode(data []byte) (int, error) {
+   n := copy(c.magic[:], data)
+   if string(c.magic[:]) != "CERT" {
+      return 0, errors.New("failed to find cert magic")
+   }
+   c.version = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   c.length = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   c.lengthToSignature = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   c.rawData = data[n:][:c.length-16]
+   n += len(c.rawData)
+   var n1 int
+   for n1 < len(c.rawData) {
+      var value ftlv
+      n1 += value.decode(c.rawData[n1:])
+      switch value.Type {
+      case objTypeBasic:
+         c.certificateInfo = &certificateInfo{}
+         c.certificateInfo.decode(value.Value)
+      case objTypeFeature:
+         c.features = &features{}
+         c.features.decode(value.Value)
+      case objTypeKey:
+         c.keyInfo = &keyInfo{}
+         c.keyInfo.decode(value.Value)
+      case objTypeManufacturer:
+         c.manufacturerInfo = &manufacturer{}
+         c.manufacturerInfo.decode(value.Value)
+      case objTypeSignature:
+         c.signatureData = &ecdsaSignature{}
+         c.signatureData.decode(value.Value)
+      }
+   }
+   return n, nil
+}
+
+func (l *license) decode(data []byte) error {
+   l.RawData = data
+   n := copy(l.Magic[:], data)
+   data = data[n:]
+   l.Offset = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   l.Version = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   n = copy(l.RightsID[:], data)
+   data = data[n:]
+   l.OuterContainer.decode(data)
+   var n1 int
+   for n1 < int(l.OuterContainer.Length)-16 {
+      var value ftlv
+      n1 += value.decode(l.OuterContainer.Value[n1:])
+      switch xmrType(value.Type) {
+      case globalPolicyContainerEntryType: // 2
+         // Rakuten
+      case playbackPolicyContainerEntryType: // 4
+         // Rakuten
+      case keyMaterialContainerEntryType: // 9
+         var n2 int
+         for n2 < int(value.Length)-16 {
+            var value1 ftlv
+            n2 += value1.decode(value.Value[n2:])
+            switch xmrType(value1.Type) {
+            case contentKeyEntryType: // 10
+               l.contentKey = &ContentKey{}
+               l.contentKey.decode(value1.Value)
+            case deviceKeyEntryType: // 42
+               l.eccKey = &eccKey{}
+               l.eccKey.decode(value1.Value)
+            case auxKeyEntryType: // 81
+               l.auxKeyObject = &auxKeys{}
+               l.auxKeyObject.decode(value1.Value)
+            default:
+               return errors.New("FTLV.type")
+            }
+         }
+      case signatureEntryType: // 11
+         l.signatureObject = &signature{}
+         l.signatureObject.decode(value.Value)
+         l.signatureObject.Length = uint16(value.Length)
+      default:
+         return errors.New("FTLV.type")
+      }
+   }
+   return nil
+}
+
+func (l *license) decrypt(encrypt EcKey, data []byte) error {
+   var envelope xml.EnvelopeResponse
+   err := envelope.Unmarshal(data)
+   if err != nil {
+      return err
+   }
+   err = l.decode(envelope.
+      Body.
+      AcquireLicenseResponse.
+      AcquireLicenseResult.
+      Response.
+      LicenseResponse.
+      Licenses.
+      License,
+   )
+   if err != nil {
+      return err
+   }
+   if !bytes.Equal(l.eccKey.Value, encrypt.Public()) {
+      return errors.New("license response is not for this device")
+   }
+   err = l.contentKey.decrypt(encrypt[0], l.auxKeyObject)
+   if err != nil {
+      return err
+   }
+   return l.verify(l.contentKey.Integrity.GUID())
+}
+
+///
 
 // verify verifies the signature of the certificate using the provided public
 // key.

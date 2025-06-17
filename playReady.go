@@ -246,7 +246,6 @@ func (f *ftlv) New(flags, Type int, value []byte) {
    f.Value = value
 }
 
-// ecdsaSignature represents an ECDSA signature structure within a certificate.
 type ecdsaSignature struct {
    signatureType   uint16
    signatureLength uint16
@@ -272,7 +271,6 @@ func (s *signature) decode(data []byte) {
    s.Data = data
 }
 
-// New initializes a new ecdsaSignature with provided signature data and signing key.
 func (s *ecdsaSignature) New(signatureData, signingKey []byte) {
    s.signatureType = 1
    s.signatureLength = uint16(len(signatureData))
@@ -281,7 +279,6 @@ func (s *ecdsaSignature) New(signatureData, signingKey []byte) {
    s.IssuerKey = signingKey
 }
 
-// Encode encodes the ecdsaSignature into a byte slice.
 func (s *ecdsaSignature) encode() []byte {
    data := binary.BigEndian.AppendUint16(nil, s.signatureType)
    data = binary.BigEndian.AppendUint16(data, s.signatureLength)
@@ -293,8 +290,6 @@ func (s *ecdsaSignature) encode() []byte {
    return append(data, s.IssuerKey...)
 }
 
-///
-
 // Decode decodes a byte slice into an FTLV structure.
 func (f *ftlv) decode(data []byte) int {
    f.Flags = binary.BigEndian.Uint16(data)
@@ -304,33 +299,8 @@ func (f *ftlv) decode(data []byte) int {
    f.Length = binary.BigEndian.Uint32(data[n:])
    n += 4
    f.Value = data[n:][:f.Length-8]
-   n += int(f.Length) - 8
+   n += len(f.Value)
    return n
-}
-
-// Decode decodes a byte slice into an AuxKeys structure.
-func (a *auxKeys) decode(data []byte) {
-   a.Count = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   for range a.Count {
-      var key auxKey
-      n := key.decode(data)
-      a.Keys = append(a.Keys, key)
-      data = data[n:]
-   }
-}
-
-// Decode decodes a byte slice into the ecdsaSignature structure.
-func (s *ecdsaSignature) decode(data []byte) {
-   s.signatureType = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   s.signatureLength = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   s.SignatureData = data[:s.signatureLength]
-   data = data[s.signatureLength:]
-   s.issuerLength = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   s.IssuerKey = data[:s.issuerLength/8] // Divide by 8 as issuerLength was multiplied by 8 during encode
 }
 
 // Constants for object types within the certificate structure.
@@ -354,27 +324,10 @@ const (
    objTypeSecurityVersion2 = 0x0011
 )
 
-// manufacturerInfo contains a length-prefixed string. Renamed to avoid conflict.
-type manufacturerInfo struct {
-   length uint32
-   value  string
-}
-
 // encode encodes the manufacturerInfo structure into a byte slice.
 func (m *manufacturerInfo) encode() []byte {
    data := binary.BigEndian.AppendUint32(nil, m.length)
-   return append(data, []byte(m.value)...)
-}
-
-// decode decodes a byte slice into the manufacturerInfo structure.
-func (m *manufacturerInfo) decode(data []byte) int {
-   m.length = binary.BigEndian.Uint32(data)
-   n := 4
-   // Data is padded to a multiple of 4 bytes.
-   padded_length := (m.length + 3) &^ 3
-   m.value = string(data[n:][:padded_length])
-   n += int(padded_length)
-   return n
+   return append(data, m.value...)
 }
 
 // encode encodes the manufacturer structure into a byte slice.
@@ -394,4 +347,46 @@ func (m *manufacturer) decode(data []byte) {
    n = m.modelName.decode(data)
    data = data[n:]
    m.modelNumber.decode(data)
+}
+
+func (s *ecdsaSignature) decode(data []byte) {
+   s.signatureType = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   s.signatureLength = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   s.SignatureData = data[:s.signatureLength]
+   data = data[s.signatureLength:]
+   s.issuerLength = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   s.IssuerKey = data
+}
+
+// manufacturerInfo contains a length-prefixed string. Renamed to avoid conflict.
+type manufacturerInfo struct {
+   length uint32
+   value  string
+}
+
+// decode decodes a byte slice into the manufacturerInfo structure.
+func (m *manufacturerInfo) decode(data []byte) int {
+   m.length = binary.BigEndian.Uint32(data)
+   n := 4
+   // Data is padded to a multiple of 4 bytes.
+   padded_length := (m.length + 3) &^ 3
+   m.value = string(data[n:][:padded_length])
+   n += int(padded_length)
+   return n
+}
+
+// Decode decodes a byte slice into an AuxKeys structure.
+func (a *auxKeys) decode(data []byte) {
+   a.Count = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   a.Keys = make([]auxKey, a.Count)
+   for i := range a.Count {
+      var key auxKey
+      n := key.decode(data)
+      a.Keys[i] = key
+      data = data[n:]
+   }
 }
