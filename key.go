@@ -317,8 +317,6 @@ func (f *features) encode() []byte {
    return data
 }
 
-///
-
 func (c *ContentKey) scalable(key *ecdsa.PrivateKey, auxKeys *auxKeys) error {
    rootKeyInfo := c.Value[:144]
    rootKey := rootKeyInfo[128:]
@@ -345,13 +343,11 @@ func (c *ContentKey) scalable(key *ecdsa.PrivateKey, auxKeys *auxKeys) error {
    if err != nil {
       return err
    }
-   var zero [16]byte
-   upLinkXkey := xorKey(auxKeyCalc, zero[:])
    oSecondaryKey, err := aesECBHandler(rootKey, ck[:], true)
    if err != nil {
       return err
    }
-   rgbKey, err := aesECBHandler(leafKeys, upLinkXkey, true)
+   rgbKey, err := aesECBHandler(leafKeys, auxKeyCalc, true)
    if err != nil {
       return err
    }
@@ -359,7 +355,7 @@ func (c *ContentKey) scalable(key *ecdsa.PrivateKey, auxKeys *auxKeys) error {
    if err != nil {
       return err
    }
-   c.Integrity.Decode(rgbKey[:])
+   c.Integrity.Decode(rgbKey)
    rgbKey = rgbKey[16:]
    copy(c.Key[:], rgbKey)
    return nil

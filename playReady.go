@@ -8,6 +8,85 @@ import (
    "github.com/deatil/go-cryptobin/cryptobin/crypto"
 )
 
+type GUID struct {
+   Data1 uint32 // little endian
+   Data2 uint16 // little endian
+   Data3 uint16 // little endian
+   Data4 uint64 // big endian
+}
+
+type auxKeys struct {
+   Count uint16
+   Keys  []auxKey
+}
+
+type auxKey struct {
+   Location uint32
+   Key      [16]byte
+}
+
+type ftlv struct {
+   Flags  uint16
+   Type   uint16
+   Length uint32
+   Value  []byte
+}
+
+type xmrType uint16
+
+const (
+   outerContainerEntryType                 xmrType = 1
+   globalPolicyContainerEntryType          xmrType = 2
+   playbackPolicyContainerEntryType        xmrType = 4
+   minimumOutputProtectionLevelsEntryType  xmrType = 5
+   explicitAnalogVideoProtectionEntryType  xmrType = 7
+   analogVideoOPLEntryType                 xmrType = 8
+   keyMaterialContainerEntryType           xmrType = 9
+   contentKeyEntryType                     xmrType = 10
+   signatureEntryType                      xmrType = 11
+   serialNumberEntryType                   xmrType = 12
+   rightsEntryType                         xmrType = 13
+   expirationEntryType                     xmrType = 18
+   issueDateEntryType                      xmrType = 19
+   meteringEntryType                       xmrType = 22
+   gracePeriodEntryType                    xmrType = 26
+   sourceIDEntryType                       xmrType = 34
+   restrictedSourceIDEntryType             xmrType = 40
+   domainIDEntryType                       xmrType = 41
+   deviceKeyEntryType                      xmrType = 42
+   policyMetadataEntryType                 xmrType = 44
+   optimizedContentKeyEntryType            xmrType = 45
+   explicitDigitalAudioProtectionEntryType xmrType = 46
+   expireAfterFirstUseEntryType            xmrType = 48
+   digitalAudioOPLEntryType                xmrType = 49
+   revocationInfoVersionEntryType          xmrType = 50
+   embeddingBehaviorEntryType              xmrType = 51
+   securityLevelEntryType                  xmrType = 52
+   moveEnablerEntryType                    xmrType = 55
+   uplinkKIDEntryType                      xmrType = 59
+   copyPoliciesContainerEntryType          xmrType = 60
+   copyCountEntryType                      xmrType = 61
+   removalDateEntryType                    xmrType = 80
+   auxKeyEntryType                         xmrType = 81
+   uplinkXEntryType                        xmrType = 82
+   realTimeExpirationEntryType             xmrType = 85
+   explicitDigitalVideoProtectionEntryType xmrType = 88
+   digitalVideoOPLEntryType                xmrType = 89
+   secureStopEntryType                     xmrType = 90
+   copyUnknownObjectEntryType              xmrType = 65533
+   globalPolicyUnknownObjectEntryType      xmrType = 65533
+   playbackUnknownObjectEntryType          xmrType = 65533
+   copyUnknownContainerEntryType           xmrType = 65534
+   unknownContainersEntryType              xmrType = 65534
+   playbackUnknownContainerEntryType       xmrType = 65534
+)
+
+type signature struct {
+   Type   uint16
+   Length uint16
+   Data   []byte
+}
+
 func (f Fill) Read(data []byte) (int, error) {
    for index := range data {
       data[index] = byte(f)
@@ -111,8 +190,7 @@ func (d *device) New() {
 
 // encode encodes device capabilities into a byte slice.
 func (d *device) encode() []byte {
-   var data []byte
-   data = binary.BigEndian.AppendUint32(data, d.maxLicenseSize)
+   data := binary.BigEndian.AppendUint32(nil, d.maxLicenseSize)
    data = binary.BigEndian.AppendUint32(data, d.maxHeaderSize)
    return binary.BigEndian.AppendUint32(data, d.maxLicenseChainDepth)
 }
@@ -152,18 +230,6 @@ func (a *auxKey) decode(data []byte) int {
    return n
 }
 
-// Decode decodes a byte slice into an AuxKeys structure.
-func (a *auxKeys) decode(data []byte) {
-   a.Count = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   for range a.Count {
-      var key auxKey
-      n := key.decode(data)
-      a.Keys = append(a.Keys, key)
-      data = data[n:]
-   }
-}
-
 // Encode encodes an FTLV structure into a byte slice.
 func (f *ftlv) encode() []byte {
    data := binary.BigEndian.AppendUint16(nil, f.Flags)
@@ -172,25 +238,29 @@ func (f *ftlv) encode() []byte {
    return append(data, f.Value...)
 }
 
-// Decode decodes a byte slice into an FTLV structure.
-func (f *ftlv) decode(data []byte) int {
-   f.Flags = binary.BigEndian.Uint16(data)
-   n := 2
-   f.Type = binary.BigEndian.Uint16(data[n:])
-   n += 2
-   f.Length = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   f.Value = data[n:][:f.Length-8]
-   n += int(f.Length) - 8
-   return n
-}
-
 // New initializes an FTLV structure.
 func (f *ftlv) New(flags, Type int, value []byte) {
    f.Flags = uint16(flags)
    f.Type = uint16(Type)
    f.Length = uint32(len(value) + 8)
    f.Value = value
+}
+
+// ecdsaSignature represents an ECDSA signature structure within a certificate.
+type ecdsaSignature struct {
+   signatureType   uint16
+   signatureLength uint16
+   SignatureData   []byte // The actual signature bytes
+   issuerLength    uint32
+   IssuerKey       []byte // The public key of the issuer that signed this
+}
+
+// manufacturer represents manufacturer details. Renamed to avoid conflict.
+type manufacturer struct {
+   flags            uint32
+   manufacturerName manufacturerInfo
+   modelName        manufacturerInfo
+   modelNumber      manufacturerInfo
 }
 
 // decode decodes a byte slice into a Signature structure.
@@ -202,13 +272,13 @@ func (s *signature) decode(data []byte) {
    s.Data = data
 }
 
-// ecdsaSignature represents an ECDSA signature structure within a certificate.
-type ecdsaSignature struct {
-   signatureType   uint16
-   signatureLength uint16
-   SignatureData   []byte // The actual signature bytes
-   issuerLength    uint32
-   IssuerKey       []byte // The public key of the issuer that signed this
+// New initializes a new ecdsaSignature with provided signature data and signing key.
+func (s *ecdsaSignature) New(signatureData, signingKey []byte) {
+   s.signatureType = 1
+   s.signatureLength = uint16(len(signatureData))
+   s.SignatureData = signatureData
+   s.issuerLength = uint32(len(signingKey))
+   s.IssuerKey = signingKey
 }
 
 // Encode encodes the ecdsaSignature into a byte slice.
@@ -223,13 +293,31 @@ func (s *ecdsaSignature) encode() []byte {
    return append(data, s.IssuerKey...)
 }
 
-// New initializes a new ecdsaSignature with provided signature data and signing key.
-func (s *ecdsaSignature) New(signatureData, signingKey []byte) {
-   s.signatureType = 1
-   s.signatureLength = uint16(len(signatureData))
-   s.SignatureData = signatureData
-   s.issuerLength = uint32(len(signingKey))
-   s.IssuerKey = signingKey
+///
+
+// Decode decodes a byte slice into an FTLV structure.
+func (f *ftlv) decode(data []byte) int {
+   f.Flags = binary.BigEndian.Uint16(data)
+   n := 2
+   f.Type = binary.BigEndian.Uint16(data[n:])
+   n += 2
+   f.Length = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   f.Value = data[n:][:f.Length-8]
+   n += int(f.Length) - 8
+   return n
+}
+
+// Decode decodes a byte slice into an AuxKeys structure.
+func (a *auxKeys) decode(data []byte) {
+   a.Count = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   for range a.Count {
+      var key auxKey
+      n := key.decode(data)
+      a.Keys = append(a.Keys, key)
+      data = data[n:]
+   }
 }
 
 // Decode decodes a byte slice into the ecdsaSignature structure.
@@ -289,14 +377,6 @@ func (m *manufacturerInfo) decode(data []byte) int {
    return n
 }
 
-// manufacturer represents manufacturer details. Renamed to avoid conflict.
-type manufacturer struct {
-   flags            uint32
-   manufacturerName manufacturerInfo
-   modelName        manufacturerInfo
-   modelNumber      manufacturerInfo
-}
-
 // encode encodes the manufacturer structure into a byte slice.
 func (m *manufacturer) encode() []byte {
    data := binary.BigEndian.AppendUint32(nil, m.flags)
@@ -314,83 +394,4 @@ func (m *manufacturer) decode(data []byte) {
    n = m.modelName.decode(data)
    data = data[n:]
    m.modelNumber.decode(data)
-}
-
-type GUID struct {
-   Data1 uint32 // little endian
-   Data2 uint16 // little endian
-   Data3 uint16 // little endian
-   Data4 uint64 // big endian
-}
-
-type auxKeys struct {
-   Count uint16
-   Keys  []auxKey
-}
-
-type auxKey struct {
-   Location uint32
-   Key      [16]byte
-}
-
-type ftlv struct {
-   Flags  uint16
-   Type   uint16
-   Length uint32
-   Value  []byte
-}
-
-type xmrType uint16
-
-const (
-   outerContainerEntryType                 xmrType = 1
-   globalPolicyContainerEntryType          xmrType = 2
-   playbackPolicyContainerEntryType        xmrType = 4
-   minimumOutputProtectionLevelsEntryType  xmrType = 5
-   explicitAnalogVideoProtectionEntryType  xmrType = 7
-   analogVideoOPLEntryType                 xmrType = 8
-   keyMaterialContainerEntryType           xmrType = 9
-   contentKeyEntryType                     xmrType = 10
-   signatureEntryType                      xmrType = 11
-   serialNumberEntryType                   xmrType = 12
-   rightsEntryType                         xmrType = 13
-   expirationEntryType                     xmrType = 18
-   issueDateEntryType                      xmrType = 19
-   meteringEntryType                       xmrType = 22
-   gracePeriodEntryType                    xmrType = 26
-   sourceIDEntryType                       xmrType = 34
-   restrictedSourceIDEntryType             xmrType = 40
-   domainIDEntryType                       xmrType = 41
-   deviceKeyEntryType                      xmrType = 42
-   policyMetadataEntryType                 xmrType = 44
-   optimizedContentKeyEntryType            xmrType = 45
-   explicitDigitalAudioProtectionEntryType xmrType = 46
-   expireAfterFirstUseEntryType            xmrType = 48
-   digitalAudioOPLEntryType                xmrType = 49
-   revocationInfoVersionEntryType          xmrType = 50
-   embeddingBehaviorEntryType              xmrType = 51
-   securityLevelEntryType                  xmrType = 52
-   moveEnablerEntryType                    xmrType = 55
-   uplinkKIDEntryType                      xmrType = 59
-   copyPoliciesContainerEntryType          xmrType = 60
-   copyCountEntryType                      xmrType = 61
-   removalDateEntryType                    xmrType = 80
-   auxKeyEntryType                         xmrType = 81
-   uplinkXEntryType                        xmrType = 82
-   realTimeExpirationEntryType             xmrType = 85
-   explicitDigitalVideoProtectionEntryType xmrType = 88
-   digitalVideoOPLEntryType                xmrType = 89
-   secureStopEntryType                     xmrType = 90
-   copyUnknownObjectEntryType              xmrType = 65533
-   globalPolicyUnknownObjectEntryType      xmrType = 65533
-   playbackUnknownObjectEntryType          xmrType = 65533
-   copyUnknownContainerEntryType           xmrType = 65534
-   unknownContainersEntryType              xmrType = 65534
-   playbackUnknownContainerEntryType       xmrType = 65534
-)
-
-type signature struct {
-   Type   uint16
-   Length uint16
-   Data   []byte
 }
