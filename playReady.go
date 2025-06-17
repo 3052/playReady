@@ -8,6 +8,15 @@ import (
    "github.com/deatil/go-cryptobin/cryptobin/crypto"
 )
 
+func (f Fill) Read(data []byte) (int, error) {
+   for index := range data {
+      data[index] = byte(f)
+   }
+   return len(data), nil
+}
+
+type Fill byte
+
 func (c *Chain) requestBody(signing EcKey, kid string) ([]byte, error) {
    var key xmlKey
    key.New()
@@ -106,15 +115,6 @@ func (d *device) encode() []byte {
    data = binary.BigEndian.AppendUint32(data, d.maxLicenseSize)
    data = binary.BigEndian.AppendUint32(data, d.maxHeaderSize)
    return binary.BigEndian.AppendUint32(data, d.maxLicenseChainDepth)
-}
-
-///
-
-func (f Fill) Read(data []byte) (int, error) {
-   for index := range data {
-      data[index] = byte(f)
-   }
-   return len(data), nil
 }
 
 // UUID returns the GUID as a big-endian UUID byte slice.
@@ -315,8 +315,6 @@ func (m *manufacturer) decode(data []byte) {
    data = data[n:]
    m.modelNumber.decode(data)
 }
-
-type Fill byte
 
 type GUID struct {
    Data1 uint32 // little endian
