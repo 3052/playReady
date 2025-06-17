@@ -5,9 +5,32 @@ import (
    "crypto/elliptic"
    "encoding/binary"
    "encoding/hex"
-   "errors"
    "math/big"
 )
+
+// they downgrade certs from the cert digest (hash of the signing key)
+func (f Fill) key() (*EcKey, error) {
+   key, err := ecdsa.GenerateKey(elliptic.P256(), f)
+   if err != nil {
+      return nil, err
+   }
+   return &EcKey{key}, nil
+}
+
+func (e *EcKey) decode(data []byte) {
+   var public ecdsa.PublicKey
+   public.Curve = elliptic.P256()
+   public.X, public.Y = public.Curve.ScalarBaseMult(data)
+   var private ecdsa.PrivateKey
+   private.D = new(big.Int).SetBytes(data)
+   private.PublicKey = public
+   e[0] = &private
+}
+
+type xmlKey struct {
+   PublicKey ecdsa.PublicKey
+   X         [32]byte
+}
 
 func (x *xmlKey) New() {
    x.PublicKey.X, x.PublicKey.Y = elliptic.P256().ScalarBaseMult([]byte{1})
@@ -22,11 +45,6 @@ func (x *xmlKey) aesKey() []byte {
    return x.X[16:]
 }
 
-type xmlKey struct {
-   PublicKey ecdsa.PublicKey
-   X         [32]byte
-}
-
 type ContentKey struct {
    KeyID      GUID
    KeyType    uint16
@@ -35,16 +53,6 @@ type ContentKey struct {
    Value      []byte
    Integrity  GUID
    Key        [16]byte
-}
-
-func (e *EcKey) decode(data []byte) {
-   var public ecdsa.PublicKey
-   public.Curve = elliptic.P256()
-   public.X, public.Y = public.Curve.ScalarBaseMult(data)
-   var private ecdsa.PrivateKey
-   private.D = new(big.Int).SetBytes(data)
-   private.PublicKey = public
-   e[0] = &private
 }
 
 type EcKey [1]*ecdsa.PrivateKey
@@ -57,15 +65,6 @@ func (e EcKey) Private() []byte {
 // PublicBytes returns the public key bytes.
 func (e *EcKey) Public() []byte {
    return append(e[0].PublicKey.X.Bytes(), e[0].PublicKey.Y.Bytes()...)
-}
-
-// they downgrade certs from the cert digest (hash of the signing key)
-func (f Fill) key() (*EcKey, error) {
-   key, err := ecdsa.GenerateKey(elliptic.P256(), f)
-   if err != nil {
-      return nil, err
-   }
-   return &EcKey{key}, nil
 }
 
 type eccKey struct {
@@ -129,8 +128,10 @@ type keyData struct {
    keyType   uint16
    length    uint16
    flags     uint32
-   publicKey [64]byte // ECDSA P256 public key is 64 bytes (X and Y coordinates, 32 bytes each)
-   usage     features // Features indicating key usage
+   // ECDSA P256 public key is 64 bytes (X and Y coordinates, 32 bytes each)
+   publicKey [64]byte
+   // Features indicating key usage
+   usage     features
 }
 
 // new initializes a new key with provided data and type.
@@ -216,66 +217,4 @@ func (c *ContentKey) decode(data []byte) {
    c.Length = binary.BigEndian.Uint16(data)
    data = data[2:]
    c.Value = data
-}
-
-///
-
-func (c *ContentKey) decrypt(key *ecdsa.PrivateKey, auxKeys *auxKeys) error {
-   switch c.CipherType {
-   case 3:
-      decrypted := elGamalDecrypt(c.Value, key)
-      c.Integrity.Decode(decrypted)
-      decrypted = decrypted[16:]
-      copy(c.Key[:], decrypted)
-      return nil
-   case 6:
-      return c.scalable(key, auxKeys)
-   }
-   return errors.New("cannot decrypt key")
-}
-
-func (c *ContentKey) scalable(key *ecdsa.PrivateKey, auxKeys *auxKeys) error {
-   rootKeyInfo := c.Value[:144]
-   rootKey := rootKeyInfo[128:]
-   leafKeys := c.Value[144:]
-   decrypted := elGamalDecrypt(rootKeyInfo[:128], key)
-   var (
-      ci [16]byte
-      ck [16]byte
-   )
-   for i := range 16 {
-      ci[i] = decrypted[i*2]
-      ck[i] = decrypted[i*2+1]
-   }
-   magicConstantZero, err := c.magicConstantZero()
-   if err != nil {
-      return err
-   }
-   rgbUplinkXkey := xorKey(ck[:], magicConstantZero)
-   contentKeyPrime, err := aesECBHandler(rgbUplinkXkey, ck[:], true)
-   if err != nil {
-      return err
-   }
-   auxKeyCalc, err := aesECBHandler(auxKeys.Keys[0].Key[:], contentKeyPrime, true)
-   if err != nil {
-      return err
-   }
-   var zero [16]byte
-   upLinkXkey := xorKey(auxKeyCalc, zero[:])
-   oSecondaryKey, err := aesECBHandler(rootKey, ck[:], true)
-   if err != nil {
-      return err
-   }
-   rgbKey, err := aesECBHandler(leafKeys, upLinkXkey, true)
-   if err != nil {
-      return err
-   }
-   rgbKey, err = aesECBHandler(rgbKey, oSecondaryKey, true)
-   if err != nil {
-      return err
-   }
-   c.Integrity.Decode(rgbKey[:])
-   rgbKey = rgbKey[16:]
-   copy(c.Key[:], rgbKey)
-   return nil
 }
