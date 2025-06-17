@@ -8,39 +8,52 @@ import (
    "github.com/deatil/go-cryptobin/cryptobin/crypto"
 )
 
-// UUID returns the GUID as a big-endian UUID byte slice.
-func (g *GUID) UUID() []byte {
-   data := binary.BigEndian.AppendUint32(nil, g.Data1)
-   data = binary.BigEndian.AppendUint16(data, g.Data2)
-   data = binary.BigEndian.AppendUint16(data, g.Data3)
-   return binary.BigEndian.AppendUint64(data, g.Data4)
+// MsGUIDBytesToRFC4122Bytes converts a Microsoft GUID byte array to an RFC
+// 4122 UUID byte array.
+func MsGUIDBytesToRFC4122Bytes(msBytes MsGUIDBytes) RFC4122Bytes {
+   var rfcBytes RFC4122Bytes
+   // Data1 (4 bytes): MS is little-endian, RFC is big-endian
+   rfcBytes[0] = msBytes[3]
+   rfcBytes[1] = msBytes[2]
+   rfcBytes[2] = msBytes[1]
+   rfcBytes[3] = msBytes[0]
+   // Data2 (2 bytes): MS is little-endian, RFC is big-endian
+   rfcBytes[4] = msBytes[5]
+   rfcBytes[5] = msBytes[4]
+   // Data3 (2 bytes): MS is little-endian, RFC is big-endian
+   rfcBytes[6] = msBytes[7]
+   rfcBytes[7] = msBytes[6]
+   // Data4 (8 bytes): Both are big-endian, copy directly
+   copy(rfcBytes[8:], msBytes[8:])
+   return rfcBytes
 }
 
-// GUID returns the GUID as a mixed-endian GUID byte slice (standard PlayReady
-// format).
-func (g *GUID) GUID() []byte {
-   data := binary.LittleEndian.AppendUint32(nil, g.Data1)
-   data = binary.LittleEndian.AppendUint16(data, g.Data2)
-   data = binary.LittleEndian.AppendUint16(data, g.Data3)
-   return binary.BigEndian.AppendUint64(data, g.Data4)
-}
+// RFC4122Bytes is a type alias for a 16-byte array representing an RFC 4122
+// UUID.
+type RFC4122Bytes [16]byte
 
-// Decode decodes a byte slice into a GUID structure.
-func (g *GUID) Decode(data []byte) {
-   g.Data1 = binary.LittleEndian.Uint32(data)
-   data = data[4:]
-   g.Data2 = binary.LittleEndian.Uint16(data)
-   data = data[2:]
-   g.Data3 = binary.LittleEndian.Uint16(data)
-   data = data[2:]
-   g.Data4 = binary.BigEndian.Uint64(data)
-}
+// MsGUIDBytes is a type alias for a 16-byte array representing a Microsoft
+// GUID.
+type MsGUIDBytes [16]byte
 
-type GUID struct {
-   Data1 uint32 // little endian
-   Data2 uint16 // little endian
-   Data3 uint16 // little endian
-   Data4 uint64 // big endian
+// RFC4122BytesToMsGUIDBytes converts an RFC 4122 UUID byte array to a
+// Microsoft GUID byte array.
+func RFC4122BytesToMsGUIDBytes(rfcBytes RFC4122Bytes) MsGUIDBytes {
+   var msBytes MsGUIDBytes
+   // Data1 (4 bytes): RFC is big-endian, MS is little-endian
+   msBytes[0] = rfcBytes[3]
+   msBytes[1] = rfcBytes[2]
+   msBytes[2] = rfcBytes[1]
+   msBytes[3] = rfcBytes[0]
+   // Data2 (2 bytes): RFC is big-endian, MS is little-endian
+   msBytes[4] = rfcBytes[5]
+   msBytes[5] = rfcBytes[4]
+   // Data3 (2 bytes): RFC is big-endian, MS is little-endian
+   msBytes[6] = rfcBytes[7]
+   msBytes[7] = rfcBytes[6]
+   // Data4 (8 bytes): Both are big-endian, copy directly
+   copy(msBytes[8:], rfcBytes[8:])
+   return msBytes
 }
 
 type auxKeys struct {

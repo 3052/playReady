@@ -10,6 +10,61 @@ import (
    "testing"
 )
 
+func TestKey(t *testing.T) {
+   data, err := os.ReadFile(SL2000.dir + "chain.txt")
+   if err != nil {
+      t.Fatal(err)
+   }
+   var certificate Chain
+   err = certificate.Decode(data)
+   if err != nil {
+      t.Fatal(err)
+   }
+   data, err = os.ReadFile(SL2000.dir + "signing_key.txt")
+   if err != nil {
+      t.Fatal(err)
+   }
+   var signingKey EcKey
+   signingKey.decode(data)
+   data, err = os.ReadFile(SL2000.dir + "encrypt_key.txt")
+   if err != nil {
+      t.Fatal(err)
+   }
+   var encryptKey EcKey
+   encryptKey.decode(data)
+   for _, test := range tests {
+      log.Print(test.url)
+      data, err = certificate.requestBody(signingKey, test.kid_pr)
+      if err != nil {
+         t.Fatal(err)
+      }
+      func() {
+         resp, err := http.Post(test.url, "text/xml", bytes.NewReader(data))
+         if err != nil {
+            t.Fatal(err)
+         }
+         defer resp.Body.Close()
+         data, err = io.ReadAll(resp.Body)
+         if err != nil {
+            t.Fatal(err)
+         }
+      }()
+      var license1 license
+      err = license1.decrypt(encryptKey, data)
+      if err != nil {
+         t.Fatal(err)
+      }
+      content := license1.contentKey
+      key_id := MsGUIDBytesToRFC4122Bytes(content.KeyID)
+      if hex.EncodeToString(key_id[:]) != test.kid_wv {
+         t.Fatal(".KeyID")
+      }
+      if hex.EncodeToString(content.Key[:]) != test.key {
+         t.Fatal(".Key")
+      }
+   }
+}
+
 var tests = []struct {
    key    string
    kid_pr string
@@ -85,58 +140,4 @@ func TestChain(t *testing.T) {
 func write_file(name string, data []byte) error {
    log.Println("WriteFile", name)
    return os.WriteFile(name, data, os.ModePerm)
-}
-
-func TestKey(t *testing.T) {
-   data, err := os.ReadFile(SL2000.dir + "chain.txt")
-   if err != nil {
-      t.Fatal(err)
-   }
-   var certificate Chain
-   err = certificate.Decode(data)
-   if err != nil {
-      t.Fatal(err)
-   }
-   data, err = os.ReadFile(SL2000.dir + "signing_key.txt")
-   if err != nil {
-      t.Fatal(err)
-   }
-   var signingKey EcKey
-   signingKey.decode(data)
-   data, err = os.ReadFile(SL2000.dir + "encrypt_key.txt")
-   if err != nil {
-      t.Fatal(err)
-   }
-   var encryptKey EcKey
-   encryptKey.decode(data)
-   for _, test := range tests {
-      log.Print(test.url)
-      data, err = certificate.requestBody(signingKey, test.kid_pr)
-      if err != nil {
-         t.Fatal(err)
-      }
-      func() {
-         resp, err := http.Post(test.url, "text/xml", bytes.NewReader(data))
-         if err != nil {
-            t.Fatal(err)
-         }
-         defer resp.Body.Close()
-         data, err = io.ReadAll(resp.Body)
-         if err != nil {
-            t.Fatal(err)
-         }
-      }()
-      var license1 license
-      err = license1.decrypt(encryptKey, data)
-      if err != nil {
-         t.Fatal(err)
-      }
-      content := license1.contentKey
-      if hex.EncodeToString(content.KeyID.UUID()) != test.kid_wv {
-         t.Fatal(".KeyID")
-      }
-      if hex.EncodeToString(content.Key[:]) != test.key {
-         t.Fatal(".Key")
-      }
-   }
 }

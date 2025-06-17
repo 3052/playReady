@@ -39,7 +39,7 @@ func (l *license) decrypt(encrypt EcKey, data []byte) error {
    if err != nil {
       return err
    }
-   return l.verify(l.contentKey.Integrity.GUID())
+   return l.verify(l.contentKey.Integrity[:])
 }
 
 func (l *license) verify(contentIntegrity []byte) error {
