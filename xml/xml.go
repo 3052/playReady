@@ -6,6 +6,21 @@ import (
    "errors"
 )
 
+func (b Bytes) MarshalText() ([]byte, error) {
+   return base64.StdEncoding.AppendEncode(nil, b), nil
+}
+
+func (b *Bytes) UnmarshalText(data []byte) error {
+   var err error
+   *b, err = base64.StdEncoding.AppendDecode(nil, data)
+   if err != nil {
+      return err
+   }
+   return nil
+}
+
+type Bytes []byte
+
 func (e *Envelope) Marshal() ([]byte, error) {
    return xml.Marshal(e)
 }
@@ -62,21 +77,6 @@ type Reference struct {
 type CipherData struct {
    CipherValue Bytes
 }
-
-func (b *Bytes) UnmarshalText(data []byte) error {
-   var err error
-   *b, err = base64.StdEncoding.AppendDecode(nil, data)
-   if err != nil {
-      return err
-   }
-   return nil
-}
-
-func (b Bytes) MarshalText() ([]byte, error) {
-   return base64.StdEncoding.AppendEncode(nil, b), nil
-}
-
-type Bytes []byte
 
 type CertificateChains struct {
    CertificateChain Bytes

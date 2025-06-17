@@ -2,6 +2,7 @@ package playReady
 
 import (
    "bytes"
+   "encoding/base64"
    "encoding/hex"
    "io"
    "log"
@@ -9,6 +10,23 @@ import (
    "os"
    "testing"
 )
+
+var tests = []struct {
+   key    string
+   kid_wv string
+   url    string
+}{
+   {
+      key:    "ab82952e8b567a2359393201e4dde4b4",
+      kid_wv: "318f7ece69afcfe3e96de31be6b77272",
+      url:    "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=bd497069-8a8f-40a8-b898-b5edf1327761",
+   },
+   {
+      key:    "00000000000000000000000000000000",
+      kid_wv: "10000000000000000000000000000000",
+      url:    "https://test.playready.microsoft.com/service/rightsmanager.asmx?cfg=ck:AAAAAAAAAAAAAAAAAAAAAA==,ckt:aescbc",
+   },
+}
 
 func TestKey(t *testing.T) {
    data, err := os.ReadFile(SL2000.dir + "chain.txt")
@@ -34,7 +52,14 @@ func TestKey(t *testing.T) {
    encryptKey.decode(data)
    for _, test := range tests {
       log.Print(test.url)
-      data, err = certificate.requestBody(signingKey, test.kid_pr)
+      kid, err := hex.DecodeString(test.kid_wv)
+      if err != nil {
+         t.Fatal(err)
+      }
+      UuidOrGuid(kid)
+      data, err = certificate.requestBody(
+         signingKey, base64.StdEncoding.EncodeToString(kid),
+      )
       if err != nil {
          t.Fatal(err)
       }
@@ -55,34 +80,14 @@ func TestKey(t *testing.T) {
          t.Fatal(err)
       }
       content := license1.contentKey
-      key_id := MsGUIDBytesToRFC4122Bytes(content.KeyID)
-      if hex.EncodeToString(key_id[:]) != test.kid_wv {
+      UuidOrGuid(content.KeyID[:])
+      if hex.EncodeToString(content.KeyID[:]) != test.kid_wv {
          t.Fatal(".KeyID")
       }
       if hex.EncodeToString(content.Key[:]) != test.key {
          t.Fatal(".Key")
       }
    }
-}
-
-var tests = []struct {
-   key    string
-   kid_pr string
-   kid_wv string
-   url    string
-}{
-   {
-      key:    "ab82952e8b567a2359393201e4dde4b4",
-      kid_pr: "zn6PMa9p48/pbeMb5rdycg==",
-      kid_wv: "318f7ece69afcfe3e96de31be6b77272",
-      url:    "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=bd497069-8a8f-40a8-b898-b5edf1327761",
-   },
-   {
-      key:    "00000000000000000000000000000000",
-      kid_pr: "AAAAEAAAAAAAAAAAAAAAAA==",
-      kid_wv: "10000000000000000000000000000000",
-      url:    "https://test.playready.microsoft.com/service/rightsmanager.asmx?cfg=ck:AAAAAAAAAAAAAAAAAAAAAA==,ckt:aescbc",
-   },
 }
 
 var SL2000 = struct {

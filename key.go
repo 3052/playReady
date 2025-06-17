@@ -25,7 +25,7 @@ func (c *ContentKey) decode(data []byte) {
 }
 
 type ContentKey struct {
-   KeyID      MsGUIDBytes
+   KeyID      [16]byte
    KeyType    uint16
    CipherType uint16
    Length     uint16

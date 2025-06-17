@@ -8,52 +8,15 @@ import (
    "github.com/deatil/go-cryptobin/cryptobin/crypto"
 )
 
-// MsGUIDBytesToRFC4122Bytes converts a Microsoft GUID byte array to an RFC
-// 4122 UUID byte array.
-func MsGUIDBytesToRFC4122Bytes(msBytes MsGUIDBytes) RFC4122Bytes {
-   var rfcBytes RFC4122Bytes
-   // Data1 (4 bytes): MS is little-endian, RFC is big-endian
-   rfcBytes[0] = msBytes[3]
-   rfcBytes[1] = msBytes[2]
-   rfcBytes[2] = msBytes[1]
-   rfcBytes[3] = msBytes[0]
-   // Data2 (2 bytes): MS is little-endian, RFC is big-endian
-   rfcBytes[4] = msBytes[5]
-   rfcBytes[5] = msBytes[4]
-   // Data3 (2 bytes): MS is little-endian, RFC is big-endian
-   rfcBytes[6] = msBytes[7]
-   rfcBytes[7] = msBytes[6]
-   // Data4 (8 bytes): Both are big-endian, copy directly
-   copy(rfcBytes[8:], msBytes[8:])
-   return rfcBytes
-}
-
-// RFC4122Bytes is a type alias for a 16-byte array representing an RFC 4122
-// UUID.
-type RFC4122Bytes [16]byte
-
-// MsGUIDBytes is a type alias for a 16-byte array representing a Microsoft
-// GUID.
-type MsGUIDBytes [16]byte
-
-// RFC4122BytesToMsGUIDBytes converts an RFC 4122 UUID byte array to a
-// Microsoft GUID byte array.
-func RFC4122BytesToMsGUIDBytes(rfcBytes RFC4122Bytes) MsGUIDBytes {
-   var msBytes MsGUIDBytes
-   // Data1 (4 bytes): RFC is big-endian, MS is little-endian
-   msBytes[0] = rfcBytes[3]
-   msBytes[1] = rfcBytes[2]
-   msBytes[2] = rfcBytes[1]
-   msBytes[3] = rfcBytes[0]
-   // Data2 (2 bytes): RFC is big-endian, MS is little-endian
-   msBytes[4] = rfcBytes[5]
-   msBytes[5] = rfcBytes[4]
-   // Data3 (2 bytes): RFC is big-endian, MS is little-endian
-   msBytes[6] = rfcBytes[7]
-   msBytes[7] = rfcBytes[6]
-   // Data4 (8 bytes): Both are big-endian, copy directly
-   copy(msBytes[8:], rfcBytes[8:])
-   return msBytes
+func UuidOrGuid(data []byte) {
+   // Data1 (first 4 bytes) - swap endianness in place
+   data[0], data[3] = data[3], data[0]
+   data[1], data[2] = data[2], data[1]
+   // Data2 (next 2 bytes) - swap endianness in place
+   data[4], data[5] = data[5], data[4]
+   // Data3 (next 2 bytes) - swap endianness in place
+   data[6], data[7] = data[7], data[6]
+   // Data4 (last 8 bytes) - no change needed, so no operation here
 }
 
 type auxKeys struct {
