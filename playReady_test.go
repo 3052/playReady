@@ -20,7 +20,7 @@ var tests = []struct {
       key:    "ab82952e8b567a2359393201e4dde4b4",
       kid_pr: "zn6PMa9p48/pbeMb5rdycg==",
       kid_wv: "318f7ece69afcfe3e96de31be6b77272",
-      url:    "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=a22b8191-d6f7-459d-b4ad-6fca3caccf75",
+      url:    "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=83367e50-27a5-40d5-9e47-85d68a3b3bd7",
    },
    {
       key:    "00000000000000000000000000000000",

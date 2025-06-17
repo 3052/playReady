@@ -259,19 +259,9 @@ type eccKey struct {
    Value  []byte
 }
 
-type features struct {
-   entries  uint32
-   features []uint32
-}
-
 func (f *features) New(Type int) {
    f.entries = 1
    f.features = []uint32{uint32(Type)}
-}
-
-type keyInfo struct {
-   entries uint32
-   keys    []keyData
 }
 
 // decode decodes a byte slice into the keyInfo structure.
@@ -300,28 +290,34 @@ func (k *keyData) decode(data []byte) int {
    return n
 }
 
-///
+type keyInfo struct {
+   entries uint32
+   keys    []keyData
+}
 
 // encode encodes the keyInfo structure into a byte slice.
 func (k *keyInfo) encode() []byte {
    data := binary.BigEndian.AppendUint32(nil, k.entries)
-
-   for i := range k.entries {
-      data = append(data, k.keys[i].encode()...)
+   for _, key := range k.keys {
+      data = append(data, key.encode()...)
    }
-
    return data
+}
+
+type features struct {
+   entries  uint32
+   features []uint32
 }
 
 func (f *features) encode() []byte {
    data := binary.BigEndian.AppendUint32(nil, f.entries)
-
-   for i := range f.entries {
-      data = binary.BigEndian.AppendUint32(data, f.features[i])
+   for _, feature := range f.features {
+      data = binary.BigEndian.AppendUint32(data, feature)
    }
-
    return data
 }
+
+///
 
 func (c *ContentKey) scalable(key *ecdsa.PrivateKey, auxKeys *auxKeys) error {
    rootKeyInfo := c.Value[:144]
