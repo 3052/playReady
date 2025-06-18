@@ -332,8 +332,6 @@ type license struct {
    auxKeyObject   *auxKeys
 }
 
-///
-
 // CreateLeaf creates a new leaf certificate and adds it to the chain.
 func (c *Chain) CreateLeaf(modelKey, signingKey, encryptKey *EcKey) error {
    // Verify that the provided modelKey matches the public key in the chain's
