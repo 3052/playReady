@@ -11,6 +11,15 @@ import (
    "slices"
 )
 
+// they downgrade certs from the cert digest (hash of the signing key)
+func (f Fill) key() (*EcKey, error) {
+   key, err := ecdsa.GenerateKey(elliptic.P256(), f)
+   if err != nil {
+      return nil, err
+   }
+   return &EcKey{key}, nil
+}
+
 func newLa(m *ecdsa.PublicKey, cipherData, kid []byte) xml.La {
    return xml.La{
       XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/protocols",
@@ -246,15 +255,6 @@ func elGamalDecrypt(ciphertext []byte, x *ecdsa.PrivateKey) []byte {
    // Recover message point: M = C2 - s
    mX, mY := g.Add(c2X, c2Y, sX, sY)
    return append(mX.Bytes(), mY.Bytes()...)
-}
-
-// they downgrade certs from the cert digest (hash of the signing key)
-func (f Fill) key() (*EcKey, error) {
-   key, err := ecdsa.GenerateKey(elliptic.P256(), f)
-   if err != nil {
-      return nil, err
-   }
-   return &EcKey{key}, nil
 }
 
 func (e *EcKey) decode(data []byte) {
