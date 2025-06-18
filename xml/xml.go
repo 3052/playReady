@@ -6,6 +6,11 @@ import (
    "errors"
 )
 
+type WrmHeaderData struct { // Renamed from DATA
+   ProtectInfo ProtectInfo `xml:"PROTECTINFO"`
+   Kid         Bytes       `xml:"KID"`
+}
+
 func (b Bytes) MarshalText() ([]byte, error) {
    return base64.StdEncoding.AppendEncode(nil, b), nil
 }
@@ -178,9 +183,4 @@ type WrmHeader struct {
    XmlNs   string        `xml:"xmlns,attr"`
    Version string        `xml:"version,attr"`
    Data    WrmHeaderData `xml:"DATA"`
-}
-
-type WrmHeaderData struct { // Renamed from DATA
-   ProtectInfo ProtectInfo `xml:"PROTECTINFO"`
-   Kid         string      `xml:"KID"`
 }
