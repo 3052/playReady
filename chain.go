@@ -14,6 +14,111 @@ import (
    "slices"
 )
 
+func (c *Chain) CreateLeaf(modelKey, signEncryptKey *EcKey) error {
+   if !bytes.Equal(c.certs[0].keyInfo.keys[0].publicKey[:], modelKey.Public()) {
+      return errors.New("zgpriv not for cert")
+   }
+   // Verify the existing chain's validity.
+   if !c.verify() {
+      return errors.New("cert is not valid")
+   }
+   var leafData bytes.Buffer
+   {
+      digest := sha256.Sum256(signEncryptKey.Public())
+      // Initialize certificate information.
+      var data certificateInfo
+      data.New(c.certs[0].certificateInfo.securityLevel, digest[:])
+      var value ftlv
+      value.New(1, 1, data.encode())
+      leafData.Write(value.encode())
+   }
+   {
+      // Create a new device and its FTLV.
+      var data device
+      data.New()
+      var value ftlv
+      value.New(1, 4, data.encode())
+      leafData.Write(value.encode())
+   }
+   {
+      // SCALABLE with SL2000, SUPPORTS_PR3_FEATURES
+      data := features{
+         entries:  1,
+         features: []uint32{0xD},
+      }
+      // Create FTLV for features.
+      var value ftlv
+      value.New(1, 5, data.encode())
+      leafData.Write(value.encode())
+   }
+   {
+      var data keyInfo
+      data.New(signEncryptKey.Public())
+      var value ftlv
+      value.New(1, 6, data.encode())
+      leafData.Write(value.encode())
+   }
+   {
+      // Create FTLV for manufacturer information, copying from the existing
+      // chain's first cert.
+      var value ftlv
+      value.New(0, 7, c.certs[0].manufacturerInfo.encode())
+      leafData.Write(value.encode())
+   }
+   // Create an unsigned certificate object.
+   var unsignedCert certificate
+   unsignedCert.newNoSig(leafData.Bytes())
+   {
+      digest := sha256.Sum256(unsignedCert.encode())
+      r, s, err := ecdsa.Sign(Fill('A'), modelKey[0], digest[:])
+      if err != nil {
+         return err
+      }
+      sign := append(r.Bytes(), s.Bytes()...)
+      var data ecdsaSignature
+      data.New(sign, modelKey.Public())
+      var value ftlv
+      value.New(1, 8, data.encode())
+      leafData.Write(value.encode())
+   }
+   // Update the unsigned certificate's length and rawData.
+   unsignedCert.length = uint32(leafData.Len()) + 16
+   unsignedCert.rawData = leafData.Bytes()
+   // Update the chain's length, certificate count, and insert the new
+   // certificate.
+   c.length += unsignedCert.length
+   c.certCount += 1
+   c.certs = slices.Insert(c.certs, 0, unsignedCert)
+   return nil
+}
+
+func (l *license) decrypt(encrypt EcKey, data []byte) error {
+   var envelope xml.EnvelopeResponse
+   err := envelope.Unmarshal(data)
+   if err != nil {
+      return err
+   }
+   err = l.decode(envelope.
+      Body.
+      AcquireLicenseResponse.
+      AcquireLicenseResult.
+      Response.
+      LicenseResponse.
+      Licenses.
+      License,
+   )
+   if err != nil {
+      return err
+   }
+   if !bytes.Equal(l.eccKey.Value, encrypt.Public()) {
+      return errors.New("license response is not for this device")
+   }
+   err = l.contentKey.decrypt(encrypt[0], l.auxKeyObject)
+   if err != nil {
+      return err
+   }
+   return l.verify(l.contentKey.Integrity[:])
+}
 func (c *Chain) cipherData(key *xmlKey) ([]byte, error) {
    data := xml.Data{
       CertificateChains: xml.CertificateChains{
@@ -173,9 +278,6 @@ func (l *license) decode(data []byte) error {
    return nil
 }
 
-///
-
-
 // decode decodes a byte slice into the Cert structure.
 func (c *certificate) decode(data []byte) (int, error) {
    n := copy(c.magic[:], data)
@@ -330,122 +432,4 @@ type license struct {
    eccKey         *eccKey
    signature      *signature
    auxKeyObject   *auxKeys
-}
-
-// CreateLeaf creates a new leaf certificate and adds it to the chain.
-func (c *Chain) CreateLeaf(modelKey, signingKey, encryptKey *EcKey) error {
-   // Verify that the provided modelKey matches the public key in the chain's
-   // first certificate.
-   if !bytes.Equal(c.certs[0].keyInfo.keys[0].publicKey[:], modelKey.Public()) {
-      return errors.New("zgpriv not for cert")
-   }
-   // Verify the existing chain's validity.
-   if !c.verify() {
-      return errors.New("cert is not valid")
-   }
-   // Assemble raw data for the unsigned certificate.
-   var leafData bytes.Buffer
-   {
-      // Calculate digest for the signing key.
-      digest := sha256.Sum256(signingKey.Public())
-      // Initialize certificate information.
-      var info certificateInfo
-      info.New(c.certs[0].certificateInfo.securityLevel, digest[:])
-      // Create FTLV (Fixed Tag Length Value) for certificate info.
-      var value ftlv
-      value.New(1, 1, info.encode())
-      leafData.Write(value.encode())
-   }
-   {
-      // Create a new device and its FTLV.
-      var device1 device
-      device1.New()
-      var value ftlv
-      value.New(1, 4, device1.encode())
-      leafData.Write(value.encode())
-   }
-   {
-      // SCALABLE with SL2000, SUPPORTS_PR3_FEATURES
-      feature := features{
-         entries:  1,
-         features: []uint32{0xD},
-      }
-      // Create FTLV for features.
-      var value ftlv
-      value.New(1, 5, feature.encode())
-      leafData.Write(value.encode())
-   }
-   {
-      // Initialize key information for signing and encryption keys.
-      var key keyInfo
-      key.New(signingKey.Public(), encryptKey.Public())
-      // Create FTLV for key information.
-      var value ftlv
-      value.New(1, 6, key.encode())
-      leafData.Write(value.encode())
-   }
-   {
-      // Create FTLV for manufacturer information, copying from the existing
-      // chain's first cert.
-      var value ftlv
-      value.New(0, 7, c.certs[0].manufacturerInfo.encode())
-      leafData.Write(value.encode())
-   }
-   // Create an unsigned certificate object.
-   var unsignedCert certificate
-   unsignedCert.newNoSig(leafData.Bytes())
-   {
-      // Sign the unsigned certificate's data.
-      digest := sha256.Sum256(unsignedCert.encode())
-      r, s, err := ecdsa.Sign(Fill('A'), modelKey[0], digest[:])
-      if err != nil {
-         return err
-      }
-      sign := append(r.Bytes(), s.Bytes()...)
-      // Initialize the signature data for the new certificate.
-      var signatureData ecdsaSignature
-      signatureData.New(sign, modelKey.Public())
-      // Create FTLV for the signature.
-      var value ftlv
-      value.New(1, 8, signatureData.encode())
-      // Append the signature FTLV to the leaf data.
-      leafData.Write(value.encode())
-   }
-   // Update the unsigned certificate's length and rawData.
-   unsignedCert.length = uint32(leafData.Len()) + 16
-   unsignedCert.rawData = leafData.Bytes()
-   // Update the chain's length, certificate count, and insert the new
-   // certificate.
-   c.length += unsignedCert.length
-   c.certCount += 1
-   c.certs = slices.Insert(c.certs, 0, unsignedCert)
-   return nil
-}
-
-func (l *license) decrypt(encrypt EcKey, data []byte) error {
-   var envelope xml.EnvelopeResponse
-   err := envelope.Unmarshal(data)
-   if err != nil {
-      return err
-   }
-   err = l.decode(envelope.
-      Body.
-      AcquireLicenseResponse.
-      AcquireLicenseResult.
-      Response.
-      LicenseResponse.
-      Licenses.
-      License,
-   )
-   if err != nil {
-      return err
-   }
-   if !bytes.Equal(l.eccKey.Value, encrypt.Public()) {
-      return errors.New("license response is not for this device")
-   }
-   err = l.contentKey.decrypt(encrypt[0], l.auxKeyObject)
-   if err != nil {
-      return err
-   }
-   return l.verify(l.contentKey.Integrity[:])
 }

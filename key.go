@@ -11,6 +11,13 @@ import (
    "slices"
 )
 
+func (k *keyInfo) New(signEncryptKey []byte) {
+   k.entries = 2
+   k.keys = make([]keyData, 2)
+   k.keys[0].New(signEncryptKey, 1)
+   k.keys[1].New(signEncryptKey, 2)
+}
+
 // they downgrade certs from the cert digest (hash of the signing key)
 func (f Fill) key() (*EcKey, error) {
    key, err := ecdsa.GenerateKey(elliptic.P256(), f)
@@ -183,14 +190,6 @@ func (k *keyData) encode() []byte {
    data = binary.BigEndian.AppendUint32(data, k.flags)
    data = append(data, k.publicKey[:]...)
    return append(data, k.usage.encode()...)
-}
-
-// new initializes a new keyInfo with signing and encryption keys.
-func (k *keyInfo) New(signingKey, encryptKey []byte) {
-   k.entries = 2
-   k.keys = make([]keyData, 2)
-   k.keys[0].New(signingKey, 1) // Type 1 for signing key
-   k.keys[1].New(encryptKey, 2) // Type 2 for encryption key
 }
 
 // xorKey performs XOR operation on two byte slices.
