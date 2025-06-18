@@ -8,7 +8,29 @@ import (
    "github.com/deatil/go-cryptobin/cryptobin/crypto"
 )
 
-func (c *Chain) requestBody(signing EcKey, kid []byte) ([]byte, error) {
+type certificateSignature struct {
+   signatureType   uint16
+   signatureLength uint16
+   SignatureData   []byte // The actual signature bytes
+   issuerLength    uint32
+   IssuerKey       []byte // The public key of the issuer that signed this
+}
+
+func (l *licenseSignature) decode(data []byte) {
+   l.Type = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   l.Length = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   l.Data = data
+}
+
+type licenseSignature struct {
+   Type   uint16
+   Length uint16
+   Data   []byte
+}
+
+func (c *Chain) requestBody(signEncrypt EcKey, kid []byte) ([]byte, error) {
    var key xmlKey
    key.New()
    cipherData, err := c.cipherData(&key)
@@ -33,7 +55,7 @@ func (c *Chain) requestBody(signing EcKey, kid []byte) ([]byte, error) {
       return nil, err
    }
    signedDigest := sha256.Sum256(signedData)
-   r, s, err := ecdsa.Sign(Fill('B'), signing[0], signedDigest[:])
+   r, s, err := ecdsa.Sign(Fill('B'), signEncrypt[0], signedDigest[:])
    if err != nil {
       return nil, err
    }
@@ -135,12 +157,6 @@ const (
    playbackUnknownContainerEntryType       xmrType = 65534
 )
 
-type signature struct {
-   Type   uint16
-   Length uint16
-   Data   []byte
-}
-
 func (f Fill) Read(data []byte) (int, error) {
    for index := range data {
       data[index] = byte(f)
@@ -223,14 +239,6 @@ func (f *ftlv) New(flags, Type int, value []byte) {
    f.Value = value
 }
 
-type ecdsaSignature struct {
-   signatureType   uint16
-   signatureLength uint16
-   SignatureData   []byte // The actual signature bytes
-   issuerLength    uint32
-   IssuerKey       []byte // The public key of the issuer that signed this
-}
-
 // manufacturer represents manufacturer details. Renamed to avoid conflict.
 type manufacturer struct {
    flags            uint32
@@ -239,32 +247,23 @@ type manufacturer struct {
    modelNumber      manufacturerInfo
 }
 
-// decode decodes a byte slice into a Signature structure.
-func (s *signature) decode(data []byte) {
-   s.Type = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   s.Length = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   s.Data = data
+func (c *certificateSignature) New(signature, signEncryptKey []byte) {
+   c.signatureType = 1
+   c.signatureLength = uint16(len(signature))
+   c.SignatureData = signature
+   c.issuerLength = uint32(len(signEncryptKey))
+   c.IssuerKey = signEncryptKey
 }
 
-func (s *ecdsaSignature) New(signatureData, signingKey []byte) {
-   s.signatureType = 1
-   s.signatureLength = uint16(len(signatureData))
-   s.SignatureData = signatureData
-   s.issuerLength = uint32(len(signingKey))
-   s.IssuerKey = signingKey
-}
-
-func (s *ecdsaSignature) encode() []byte {
-   data := binary.BigEndian.AppendUint16(nil, s.signatureType)
-   data = binary.BigEndian.AppendUint16(data, s.signatureLength)
-   data = append(data, s.SignatureData...)
+func (c *certificateSignature) encode() []byte {
+   data := binary.BigEndian.AppendUint16(nil, c.signatureType)
+   data = binary.BigEndian.AppendUint16(data, c.signatureLength)
+   data = append(data, c.SignatureData...)
    // The original code multiplied issuerLength by 8, implying a bit length,
    // but the IssuerKey length is in bytes. Assuming this multiplication
    // is specific to how it was serialized for a purpose external to this data structure itself.
-   data = binary.BigEndian.AppendUint32(data, s.issuerLength*8)
-   return append(data, s.IssuerKey...)
+   data = binary.BigEndian.AppendUint32(data, c.issuerLength*8)
+   return append(data, c.IssuerKey...)
 }
 
 // Decode decodes a byte slice into an FTLV structure.
@@ -326,16 +325,16 @@ func (m *manufacturer) decode(data []byte) {
    m.modelNumber.decode(data)
 }
 
-func (s *ecdsaSignature) decode(data []byte) {
-   s.signatureType = binary.BigEndian.Uint16(data)
+func (c *certificateSignature) decode(data []byte) {
+   c.signatureType = binary.BigEndian.Uint16(data)
    data = data[2:]
-   s.signatureLength = binary.BigEndian.Uint16(data)
+   c.signatureLength = binary.BigEndian.Uint16(data)
    data = data[2:]
-   s.SignatureData = data[:s.signatureLength]
-   data = data[s.signatureLength:]
-   s.issuerLength = binary.BigEndian.Uint32(data)
+   c.SignatureData = data[:c.signatureLength]
+   data = data[c.signatureLength:]
+   c.issuerLength = binary.BigEndian.Uint32(data)
    data = data[4:]
-   s.IssuerKey = data
+   c.IssuerKey = data
 }
 
 // manufacturerInfo contains a length-prefixed string. Renamed to avoid conflict.

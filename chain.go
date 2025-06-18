@@ -65,34 +65,31 @@ func (c *Chain) CreateLeaf(modelKey, signEncryptKey *EcKey) error {
       value.New(0, 7, c.certs[0].manufacturerInfo.encode())
       leafData.Write(value.encode())
    }
-   // Create an unsigned certificate object.
-   var unsignedCert certificate
-   unsignedCert.newNoSig(leafData.Bytes())
+   var unsigned certificate
+   unsigned.newNoSig(leafData.Bytes())
    {
-      digest := sha256.Sum256(unsignedCert.encode())
+      digest := sha256.Sum256(unsigned.encode())
       r, s, err := ecdsa.Sign(Fill('A'), modelKey[0], digest[:])
       if err != nil {
          return err
       }
-      sign := append(r.Bytes(), s.Bytes()...)
-      var data ecdsaSignature
-      data.New(sign, modelKey.Public())
+      var data certificateSignature
+      data.New(append(r.Bytes(), s.Bytes()...), modelKey.Public())
       var value ftlv
       value.New(1, 8, data.encode())
       leafData.Write(value.encode())
    }
-   // Update the unsigned certificate's length and rawData.
-   unsignedCert.length = uint32(leafData.Len()) + 16
-   unsignedCert.rawData = leafData.Bytes()
+   unsigned.length = uint32(leafData.Len()) + 16
+   unsigned.rawData = leafData.Bytes()
    // Update the chain's length, certificate count, and insert the new
    // certificate.
-   c.length += unsignedCert.length
+   c.length += unsigned.length
    c.certCount += 1
-   c.certs = slices.Insert(c.certs, 0, unsignedCert)
+   c.certs = slices.Insert(c.certs, 0, unsigned)
    return nil
 }
 
-func (l *license) decrypt(encrypt EcKey, data []byte) error {
+func (l *license) decrypt(signEncrypt EcKey, data []byte) error {
    var envelope xml.EnvelopeResponse
    err := envelope.Unmarshal(data)
    if err != nil {
@@ -110,10 +107,10 @@ func (l *license) decrypt(encrypt EcKey, data []byte) error {
    if err != nil {
       return err
    }
-   if !bytes.Equal(l.eccKey.Value, encrypt.Public()) {
+   if !bytes.Equal(l.eccKey.Value, signEncrypt.Public()) {
       return errors.New("license response is not for this device")
    }
-   err = l.contentKey.decrypt(encrypt[0], l.auxKeyObject)
+   err = l.contentKey.decrypt(signEncrypt[0], l.auxKeyObject)
    if err != nil {
       return err
    }
@@ -154,8 +151,9 @@ func (c *Chain) Encode() []byte {
 
 // verify verifies the entire certificate chain.
 func (c *Chain) verify() bool {
-   // Start verification with the issuer key of the last certificate in the chain.
-   modelBase := c.certs[len(c.certs)-1].signatureData.IssuerKey
+   // Start verification with the issuer key of the last certificate in the
+   // chain.
+   modelBase := c.certs[len(c.certs)-1].signature.IssuerKey
    for i := len(c.certs) - 1; i >= 0; i-- {
       // Verify each certificate using the public key of its issuer.
       valid := c.certs[i].verify(modelBase[:])
@@ -268,7 +266,7 @@ func (l *license) decode(data []byte) error {
             }
          }
       case signatureEntryType: // 11
-         l.signature = &signature{}
+         l.signature = &licenseSignature{}
          l.signature.decode(value.Value)
          l.signature.Length = uint16(value.Length)
       default:
@@ -310,18 +308,15 @@ func (c *certificate) decode(data []byte) (int, error) {
          c.manufacturerInfo = &manufacturer{}
          c.manufacturerInfo.decode(value.Value)
       case objTypeSignature:
-         c.signatureData = &ecdsaSignature{}
-         c.signatureData.decode(value.Value)
+         c.signature = &certificateSignature{}
+         c.signature.decode(value.Value)
       }
    }
    return n, nil
 }
 
-// verify verifies the signature of the certificate using the provided public
-// key.
 func (c *certificate) verify(pubKey []byte) bool {
-   // Check if the issuer key in the signature matches the provided public key.
-   if !bytes.Equal(c.signatureData.IssuerKey, pubKey) {
+   if !bytes.Equal(c.signature.IssuerKey, pubKey) {
       return false
    }
    // Reconstruct the ECDSA public key from the byte slice.
@@ -330,15 +325,12 @@ func (c *certificate) verify(pubKey []byte) bool {
       X:     new(big.Int).SetBytes(pubKey[:32]),
       Y:     new(big.Int).SetBytes(pubKey[32:]),
    }
-   // Get the data that was signed (up to lengthToSignature).
    data := c.encode()
    data = data[:c.lengthToSignature]
    signatureDigest := sha256.Sum256(data)
-   // Extract R and S components from the signature data.
-   sign := c.signatureData.SignatureData
-   r := new(big.Int).SetBytes(sign[:32])
-   s := new(big.Int).SetBytes(sign[32:])
-   // Verify the signature.
+   signature := c.signature.SignatureData
+   r := new(big.Int).SetBytes(signature[:32])
+   s := new(big.Int).SetBytes(signature[32:])
    return ecdsa.Verify(&publicKey, signatureDigest[:], r, s)
 }
 
@@ -352,10 +344,9 @@ type certificate struct {
    features          *features
    keyInfo           *keyInfo
    manufacturerInfo  *manufacturer
-   signatureData     *ecdsaSignature
+   signature         *certificateSignature
 }
 
-// newNoSig initializes a new Cert without signature data.
 func (c *certificate) newNoSig(data []byte) {
    copy(c.magic[:], "CERT")
    c.version = 1
@@ -430,6 +421,6 @@ type license struct {
    OuterContainer ftlv
    contentKey     *ContentKey
    eccKey         *eccKey
-   signature      *signature
+   signature      *licenseSignature
    auxKeyObject   *auxKeys
 }

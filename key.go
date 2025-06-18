@@ -359,4 +359,3 @@ func (f *features) encode() []byte {
    }
    return data
 }
-
