@@ -14,7 +14,57 @@ import (
    "slices"
 )
 
-func (c *Chain) CreateLeaf(modelKey, signEncryptKey *EcKey) error {
+func (c *Chain) RequestBody(signEncrypt EcKey, kid []byte) ([]byte, error) {
+   var key xmlKey
+   key.New()
+   cipherData, err := c.cipherData(&key)
+   if err != nil {
+      return nil, err
+   }
+   la := newLa(&key.PublicKey, cipherData, kid)
+   laData, err := la.Marshal()
+   if err != nil {
+      return nil, err
+   }
+   laDigest := sha256.Sum256(laData)
+   signedInfo := xml.SignedInfo{
+      XmlNs: "http://www.w3.org/2000/09/xmldsig#",
+      Reference: xml.Reference{
+         Uri:         "#SignedData",
+         DigestValue: laDigest[:],
+      },
+   }
+   signedData, err := signedInfo.Marshal()
+   if err != nil {
+      return nil, err
+   }
+   signedDigest := sha256.Sum256(signedData)
+   r, s, err := ecdsa.Sign(Fill('B'), signEncrypt[0], signedDigest[:])
+   if err != nil {
+      return nil, err
+   }
+   envelope := xml.Envelope{
+      Soap: "http://schemas.xmlsoap.org/soap/envelope/",
+      Body: xml.Body{
+         AcquireLicense: &xml.AcquireLicense{
+            XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols",
+            Challenge: xml.Challenge{
+               Challenge: xml.InnerChallenge{
+                  XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols/messages",
+                  La:    la,
+                  Signature: xml.Signature{
+                     SignedInfo:     signedInfo,
+                     SignatureValue: append(r.Bytes(), s.Bytes()...),
+                  },
+               },
+            },
+         },
+      },
+   }
+   return envelope.Marshal()
+}
+
+func (c *Chain) Leaf(modelKey, signEncryptKey *EcKey) error {
    if !bytes.Equal(c.certs[0].keyInfo.keys[0].publicKey[:], modelKey.Public()) {
       return errors.New("zgpriv not for cert")
    }
@@ -89,7 +139,7 @@ func (c *Chain) CreateLeaf(modelKey, signEncryptKey *EcKey) error {
    return nil
 }
 
-func (l *license) decrypt(signEncrypt EcKey, data []byte) error {
+func (l *License) Decrypt(signEncrypt EcKey, data []byte) error {
    var envelope xml.EnvelopeResponse
    err := envelope.Unmarshal(data)
    if err != nil {
@@ -110,11 +160,11 @@ func (l *license) decrypt(signEncrypt EcKey, data []byte) error {
    if !bytes.Equal(l.eccKey.Value, signEncrypt.Public()) {
       return errors.New("license response is not for this device")
    }
-   err = l.contentKey.decrypt(signEncrypt[0], l.auxKeyObject)
+   err = l.ContentKey.decrypt(signEncrypt[0], l.auxKeyObject)
    if err != nil {
       return err
    }
-   return l.verify(l.contentKey.Integrity[:])
+   return l.verify(l.ContentKey.Integrity[:])
 }
 func (c *Chain) cipherData(key *xmlKey) ([]byte, error) {
    data := xml.Data{
@@ -205,7 +255,7 @@ type Chain struct {
    certs     []certificate
 }
 
-func (l *license) verify(contentIntegrity []byte) error {
+func (l *License) verify(contentIntegrity []byte) error {
    data := l.encode()
    data = data[:len(data)-int(l.signature.Length)]
    block, err := aes.NewCipher(contentIntegrity)
@@ -219,7 +269,7 @@ func (l *license) verify(contentIntegrity []byte) error {
    return nil
 }
 
-func (l *license) encode() []byte {
+func (l *License) encode() []byte {
    data := l.Magic[:]
    data = binary.BigEndian.AppendUint16(data, l.Offset)
    data = binary.BigEndian.AppendUint16(data, l.Version)
@@ -227,7 +277,7 @@ func (l *license) encode() []byte {
    return append(data, l.OuterContainer.encode()...)
 }
 
-func (l *license) decode(data []byte) error {
+func (l *License) decode(data []byte) error {
    n := copy(l.Magic[:], data)
    data = data[n:]
    l.Offset = binary.BigEndian.Uint16(data)
@@ -253,8 +303,8 @@ func (l *license) decode(data []byte) error {
             n2 += value1.decode(value.Value[n2:])
             switch xmrType(value1.Type) {
             case contentKeyEntryType: // 10
-               l.contentKey = &ContentKey{}
-               l.contentKey.decode(value1.Value)
+               l.ContentKey = &ContentKey{}
+               l.ContentKey.decode(value1.Value)
             case deviceKeyEntryType: // 42
                l.eccKey = &eccKey{}
                l.eccKey.decode(value1.Value)
@@ -413,13 +463,13 @@ func (c *certificateInfo) decode(data []byte) {
    copy(c.clientId[:], data)
 }
 
-type license struct {
+type License struct {
    Magic          [4]byte
    Offset         uint16
    Version        uint16
    RightsID       [16]byte
    OuterContainer ftlv
-   contentKey     *ContentKey
+   ContentKey     *ContentKey
    eccKey         *eccKey
    signature      *licenseSignature
    auxKeyObject   *auxKeys

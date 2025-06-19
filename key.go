@@ -11,6 +11,16 @@ import (
    "slices"
 )
 
+func (e *EcKey) Decode(data []byte) {
+   var public ecdsa.PublicKey
+   public.Curve = elliptic.P256()
+   public.X, public.Y = public.Curve.ScalarBaseMult(data)
+   var private ecdsa.PrivateKey
+   private.D = new(big.Int).SetBytes(data)
+   private.PublicKey = public
+   e[0] = &private
+}
+
 func (k *keyInfo) New(signEncryptKey []byte) {
    k.entries = 2
    k.keys = make([]keyData, 2)
@@ -19,7 +29,7 @@ func (k *keyInfo) New(signEncryptKey []byte) {
 }
 
 // they downgrade certs from the cert digest (hash of the signing key)
-func (f Fill) key() (*EcKey, error) {
+func (f Fill) Key() (*EcKey, error) {
    key, err := ecdsa.GenerateKey(elliptic.P256(), f)
    if err != nil {
       return nil, err
@@ -254,16 +264,6 @@ func elGamalDecrypt(ciphertext []byte, x *ecdsa.PrivateKey) []byte {
    // Recover message point: M = C2 - s
    mX, mY := g.Add(c2X, c2Y, sX, sY)
    return append(mX.Bytes(), mY.Bytes()...)
-}
-
-func (e *EcKey) decode(data []byte) {
-   var public ecdsa.PublicKey
-   public.Curve = elliptic.P256()
-   public.X, public.Y = public.Curve.ScalarBaseMult(data)
-   var private ecdsa.PrivateKey
-   private.D = new(big.Int).SetBytes(data)
-   private.PublicKey = public
-   e[0] = &private
 }
 
 type xmlKey struct {

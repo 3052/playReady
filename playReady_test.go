@@ -3,6 +3,7 @@ package playReady
 import (
    "bytes"
    "encoding/hex"
+   "errors"
    "io"
    "log"
    "net/http"
@@ -62,12 +63,12 @@ func TestLeaf(t *testing.T) {
       t.Fatal(err)
    }
    var z1 EcKey
-   z1.decode(data)
-   signEncryptKey, err := Fill('s').key()
+   z1.Decode(data)
+   signEncryptKey, err := Fill('s').Key()
    if err != nil {
       t.Fatal(err)
    }
-   err = certificate.CreateLeaf(&z1, signEncryptKey)
+   err = certificate.Leaf(&z1, signEncryptKey)
    if err != nil {
       t.Fatal(err)
    }
@@ -96,7 +97,7 @@ func TestKey(t *testing.T) {
       t.Fatal(err)
    }
    var signEncryptKey EcKey
-   signEncryptKey.decode(data)
+   signEncryptKey.Decode(data)
    for _, test := range key_tests {
       log.Print(test.url)
       kid, err := hex.DecodeString(test.kid_wv)
@@ -104,30 +105,20 @@ func TestKey(t *testing.T) {
          t.Fatal(err)
       }
       UuidOrGuid(kid)
-      data, err = certificate.requestBody(signEncryptKey, kid)
+      data, err = certificate.RequestBody(signEncryptKey, kid)
       if err != nil {
          t.Fatal(err)
       }
-      func() {
-         resp, err := http.Post(test.url, "text/xml", bytes.NewReader(data))
-         if err != nil {
-            t.Fatal(err)
-         }
-         defer resp.Body.Close()
-         data, err = io.ReadAll(resp.Body)
-         if err != nil {
-            t.Fatal(err)
-         }
-         if resp.StatusCode != http.StatusOK {
-            t.Fatal(string(data))
-         }
-      }()
-      var license1 license
-      err = license1.decrypt(signEncryptKey, data)
+      data, err = post(test.url, data)
       if err != nil {
          t.Fatal(err)
       }
-      content := license1.contentKey
+      var license1 License
+      err = license1.Decrypt(signEncryptKey, data)
+      if err != nil {
+         t.Fatal(err)
+      }
+      content := license1.ContentKey
       UuidOrGuid(content.KeyID[:])
       if hex.EncodeToString(content.KeyID[:]) != test.kid_wv {
          t.Fatal(".KeyID")
@@ -136,4 +127,20 @@ func TestKey(t *testing.T) {
          t.Fatal(".Key")
       }
    }
+}
+
+func post(url string, body []byte) ([]byte, error) {
+   resp, err := http.Post(url, "text/xml", bytes.NewReader(body))
+   if err != nil {
+      return nil, err
+   }
+   defer resp.Body.Close()
+   body, err = io.ReadAll(resp.Body)
+   if err != nil {
+      return nil, err
+   }
+   if resp.StatusCode != http.StatusOK {
+      return nil, errors.New(string(body))
+   }
+   return body, nil
 }

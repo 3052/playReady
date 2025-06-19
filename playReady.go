@@ -1,9 +1,6 @@
 package playReady
 
 import (
-   "41.neocities.org/playReady/xml"
-   "crypto/ecdsa"
-   "crypto/sha256"
    "encoding/binary"
    "github.com/deatil/go-cryptobin/cryptobin/crypto"
 )
@@ -28,56 +25,6 @@ type licenseSignature struct {
    Type   uint16
    Length uint16
    Data   []byte
-}
-
-func (c *Chain) requestBody(signEncrypt EcKey, kid []byte) ([]byte, error) {
-   var key xmlKey
-   key.New()
-   cipherData, err := c.cipherData(&key)
-   if err != nil {
-      return nil, err
-   }
-   la := newLa(&key.PublicKey, cipherData, kid)
-   laData, err := la.Marshal()
-   if err != nil {
-      return nil, err
-   }
-   laDigest := sha256.Sum256(laData)
-   signedInfo := xml.SignedInfo{
-      XmlNs: "http://www.w3.org/2000/09/xmldsig#",
-      Reference: xml.Reference{
-         Uri:         "#SignedData",
-         DigestValue: laDigest[:],
-      },
-   }
-   signedData, err := signedInfo.Marshal()
-   if err != nil {
-      return nil, err
-   }
-   signedDigest := sha256.Sum256(signedData)
-   r, s, err := ecdsa.Sign(Fill('B'), signEncrypt[0], signedDigest[:])
-   if err != nil {
-      return nil, err
-   }
-   envelope := xml.Envelope{
-      Soap: "http://schemas.xmlsoap.org/soap/envelope/",
-      Body: xml.Body{
-         AcquireLicense: &xml.AcquireLicense{
-            XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols",
-            Challenge: xml.Challenge{
-               Challenge: xml.InnerChallenge{
-                  XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols/messages",
-                  La:    la,
-                  Signature: xml.Signature{
-                     SignedInfo:     signedInfo,
-                     SignatureValue: append(r.Bytes(), s.Bytes()...),
-                  },
-               },
-            },
-         },
-      },
-   }
-   return envelope.Marshal()
 }
 
 func UuidOrGuid(data []byte) {
