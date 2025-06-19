@@ -2,6 +2,7 @@ package playReady
 
 import (
    "41.neocities.org/playReady/xml"
+   "bytes"
    "crypto/ecdsa"
    "crypto/elliptic"
    "encoding/binary"
@@ -10,6 +11,34 @@ import (
    "math/big"
    "slices"
 )
+
+func (l *License) Decrypt(signEncrypt EcKey, data []byte) error {
+   var envelope xml.EnvelopeResponse
+   err := envelope.Unmarshal(data)
+   if err != nil {
+      return err
+   }
+   err = l.decode(envelope.
+      Body.
+      AcquireLicenseResponse.
+      AcquireLicenseResult.
+      Response.
+      LicenseResponse.
+      Licenses.
+      License,
+   )
+   if err != nil {
+      return err
+   }
+   if !bytes.Equal(l.eccKey.Value, signEncrypt.Public()) {
+      return errors.New("license response is not for this device")
+   }
+   err = l.ContentKey.decrypt(signEncrypt[0], l.auxKeyObject)
+   if err != nil {
+      return err
+   }
+   return l.verify(l.ContentKey.Integrity[:])
+}
 
 func (e *EcKey) Decode(data []byte) {
    var public ecdsa.PublicKey

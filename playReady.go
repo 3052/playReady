@@ -1,10 +1,143 @@
 package playReady
 
 import (
+   "bytes"
+   "crypto/aes"
    "encoding/binary"
+   "errors"
    "github.com/deatil/go-cryptobin/cryptobin/crypto"
+   "github.com/deatil/go-cryptobin/mac"
 )
 
+func (l *License) verify(contentIntegrity []byte) error {
+   data := l.encode()
+   data = data[:len(data)-int(l.signature.Length)]
+   block, err := aes.NewCipher(contentIntegrity)
+   if err != nil {
+      return err
+   }
+   data = mac.NewCMAC(block, aes.BlockSize).MAC(data)
+   if !bytes.Equal(data, l.signature.Data) {
+      return errors.New("failed to decrypt the keys")
+   }
+   return nil
+}
+
+func (l *License) encode() []byte {
+   data := l.Magic[:]
+   data = binary.BigEndian.AppendUint16(data, l.Offset)
+   data = binary.BigEndian.AppendUint16(data, l.Version)
+   data = append(data, l.RightsID[:]...)
+   return append(data, l.OuterContainer.encode()...)
+}
+
+func (l *License) decode(data []byte) error {
+   n := copy(l.Magic[:], data)
+   data = data[n:]
+   l.Offset = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   l.Version = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   n = copy(l.RightsID[:], data)
+   data = data[n:]
+   l.OuterContainer.decode(data)
+   var n1 int
+   for n1 < int(l.OuterContainer.Length)-16 {
+      var value ftlv
+      n1 += value.decode(l.OuterContainer.Value[n1:])
+      switch xmrType(value.Type) {
+      case globalPolicyContainerEntryType: // 2
+         // Rakuten
+      case playbackPolicyContainerEntryType: // 4
+         // Rakuten
+      case keyMaterialContainerEntryType: // 9
+         var n2 int
+         for n2 < int(value.Length)-16 {
+            var value1 ftlv
+            n2 += value1.decode(value.Value[n2:])
+            switch xmrType(value1.Type) {
+            case contentKeyEntryType: // 10
+               l.ContentKey = &ContentKey{}
+               l.ContentKey.decode(value1.Value)
+            case deviceKeyEntryType: // 42
+               l.eccKey = &eccKey{}
+               l.eccKey.decode(value1.Value)
+            case auxKeyEntryType: // 81
+               l.auxKeyObject = &auxKeys{}
+               l.auxKeyObject.decode(value1.Value)
+            default:
+               return errors.New("FTLV.type")
+            }
+         }
+      case signatureEntryType: // 11
+         l.signature = &licenseSignature{}
+         l.signature.decode(value.Value)
+         l.signature.Length = uint16(value.Length)
+      default:
+         return errors.New("FTLV.type")
+      }
+   }
+   return nil
+}
+
+type certificateInfo struct {
+   certificateId [16]byte
+   securityLevel uint32
+   flags         uint32
+   infoType      uint32
+   digest        [32]byte
+   expiry        uint32
+   // NOTE SOME SERVERS, FOR EXAMPLE
+   // rakuten.tv
+   // WILL LOCK LICENSE TO THE FIRST DEVICE, USING "ClientId" TO DETECT, SO BE
+   // CAREFUL USING A VALUE HERE
+   clientId [16]byte
+}
+
+func (c *certificateInfo) encode() []byte {
+   data := c.certificateId[:]
+   data = binary.BigEndian.AppendUint32(data, c.securityLevel)
+   data = binary.BigEndian.AppendUint32(data, c.flags)
+   data = binary.BigEndian.AppendUint32(data, c.infoType)
+   data = append(data, c.digest[:]...)
+   data = binary.BigEndian.AppendUint32(data, c.expiry)
+   return append(data, c.clientId[:]...)
+}
+
+func (c *certificateInfo) New(securityLevel uint32, digest []byte) {
+   c.securityLevel = securityLevel
+   c.infoType = 2 // Assuming infoType 2 is a standard type
+   copy(c.digest[:], digest)
+   c.expiry = 4294967295 // Max uint32, effectively never expires
+}
+
+func (c *certificateInfo) decode(data []byte) {
+   n := copy(c.certificateId[:], data)
+   data = data[n:]
+   c.securityLevel = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   c.flags = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   c.infoType = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   n = copy(c.digest[:], data)
+   data = data[n:]
+   c.expiry = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   copy(c.clientId[:], data)
+}
+
+type License struct {
+   Magic          [4]byte
+   Offset         uint16
+   Version        uint16
+   RightsID       [16]byte
+   OuterContainer ftlv
+   ContentKey     *ContentKey
+   eccKey         *eccKey
+   signature      *licenseSignature
+   auxKeyObject   *auxKeys
+}
 type certificateSignature struct {
    signatureType   uint16
    signatureLength uint16
