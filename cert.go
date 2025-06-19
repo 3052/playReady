@@ -5,6 +5,36 @@ import (
    "errors"
 )
 
+type certificateInfo struct {
+   certificateId [16]byte
+   securityLevel uint32
+   flags         uint32
+   infoType      uint32
+   digest        [32]byte
+   expiry        uint32
+   // NOTE SOME SERVERS, FOR EXAMPLE
+   // rakuten.tv
+   // WILL LOCK LICENSE TO THE FIRST DEVICE, USING "ClientId" TO DETECT, SO BE
+   // CAREFUL USING A VALUE HERE
+   clientId [16]byte
+}
+
+func (c *certificateInfo) decode(data []byte) {
+   n := copy(c.certificateId[:], data)
+   data = data[n:]
+   c.securityLevel = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   c.flags = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   c.infoType = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   n = copy(c.digest[:], data)
+   data = data[n:]
+   c.expiry = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   copy(c.clientId[:], data)
+}
+
 func (c *Certificate) decode(data []byte) (int, error) {
    n := copy(c.Magic[:], data)
    if string(c.Magic[:]) != "CERT" {
@@ -34,8 +64,8 @@ func (c *Certificate) decode(data []byte) (int, error) {
          c.keyInfo = &keyInfo{}
          c.keyInfo.decode(value.Value)
       case objTypeManufacturer: // 7
-         c.manufacturerInfo = &manufacturer{}
-         c.manufacturerInfo.decode(value.Value)
+         c.manufacturer = &manufacturer{}
+         c.manufacturer.decode(value.Value)
       case objTypeSignature: // 8
          c.signature = &certificateSignature{}
          c.signature.decode(value.Value)
@@ -44,6 +74,76 @@ func (c *Certificate) decode(data []byte) (int, error) {
       }
    }
    return n, nil
+}
+
+func (f *features) decode(data []byte) int {
+   f.entries = binary.BigEndian.Uint32(data)
+   n := 4
+   f.features = make([]uint32, f.entries)
+   for i := range f.entries {
+      f.features[i] = binary.BigEndian.Uint32(data[n:])
+      n += 4
+   }
+   return n
+}
+
+type features struct {
+   entries  uint32
+   features []uint32
+}
+
+type keyInfo struct {
+   entries uint32
+   keys    []keyData
+}
+
+func (k *keyInfo) decode(data []byte) {
+   k.entries = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   k.keys = make([]keyData, k.entries)
+   for i := range k.entries {
+      var key keyData
+      n := key.decode(data)
+      k.keys[i] = key
+      data = data[n:]
+   }
+}
+
+type manufacturer struct {
+   flags            uint32
+   manufacturerName manufacturerInfo
+   modelName        manufacturerInfo
+   modelNumber      manufacturerInfo
+}
+
+func (m *manufacturer) decode(data []byte) {
+   m.flags = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   n := m.manufacturerName.decode(data)
+   data = data[n:]
+   n = m.modelName.decode(data)
+   data = data[n:]
+   m.modelNumber.decode(data)
+}
+
+type certificateSignature struct {
+   signatureType   uint16
+   signatureLength uint16
+   SignatureData   []byte // The actual signature bytes
+   issuerLength    uint32
+   IssuerKey       []byte // The public key of the issuer that signed this
+}
+
+func (c *certificateSignature) decode(data []byte) {
+   c.signatureType = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   c.signatureLength = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   c.SignatureData = data[:c.signatureLength]
+   data = data[c.signatureLength:]
+   c.issuerLength = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   c.IssuerKey = data
 }
 
 type Certificate struct {
@@ -55,15 +155,6 @@ type Certificate struct {
    certificateInfo   *certificateInfo
    features          *features
    keyInfo           *keyInfo
-   manufacturerInfo  *manufacturer
+   manufacturer      *manufacturer
    signature         *certificateSignature
-}
-
-// encode encodes the Cert structure into a byte slice.
-func (c *Certificate) encode() []byte {
-   data := c.Magic[:]
-   data = binary.BigEndian.AppendUint32(data, c.Version)
-   data = binary.BigEndian.AppendUint32(data, c.Length)
-   data = binary.BigEndian.AppendUint32(data, c.LengthToSignature)
-   return append(data, c.rawData...)
 }

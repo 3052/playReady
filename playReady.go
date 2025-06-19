@@ -80,20 +80,6 @@ func (l *License) decode(data []byte) error {
    return nil
 }
 
-type certificateInfo struct {
-   certificateId [16]byte
-   securityLevel uint32
-   flags         uint32
-   infoType      uint32
-   digest        [32]byte
-   expiry        uint32
-   // NOTE SOME SERVERS, FOR EXAMPLE
-   // rakuten.tv
-   // WILL LOCK LICENSE TO THE FIRST DEVICE, USING "ClientId" TO DETECT, SO BE
-   // CAREFUL USING A VALUE HERE
-   clientId [16]byte
-}
-
 func (c *certificateInfo) encode() []byte {
    data := c.certificateId[:]
    data = binary.BigEndian.AppendUint32(data, c.securityLevel)
@@ -111,22 +97,6 @@ func (c *certificateInfo) New(securityLevel uint32, digest []byte) {
    c.expiry = 4294967295 // Max uint32, effectively never expires
 }
 
-func (c *certificateInfo) decode(data []byte) {
-   n := copy(c.certificateId[:], data)
-   data = data[n:]
-   c.securityLevel = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   c.flags = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   c.infoType = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   n = copy(c.digest[:], data)
-   data = data[n:]
-   c.expiry = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   copy(c.clientId[:], data)
-}
-
 type License struct {
    Magic          [4]byte
    Offset         uint16
@@ -137,13 +107,6 @@ type License struct {
    eccKey         *eccKey
    signature      *licenseSignature
    auxKeyObject   *auxKeys
-}
-type certificateSignature struct {
-   signatureType   uint16
-   signatureLength uint16
-   SignatureData   []byte // The actual signature bytes
-   issuerLength    uint32
-   IssuerKey       []byte // The public key of the issuer that signed this
 }
 
 func (l *licenseSignature) decode(data []byte) {
@@ -298,14 +261,6 @@ func (f *ftlv) New(flags, Type int, value []byte) {
    f.Value = value
 }
 
-// manufacturer represents manufacturer details. Renamed to avoid conflict.
-type manufacturer struct {
-   flags            uint32
-   manufacturerName manufacturerInfo
-   modelName        manufacturerInfo
-   modelNumber      manufacturerInfo
-}
-
 func (c *certificateSignature) New(signature, signEncryptKey []byte) {
    c.signatureType = 1
    c.signatureLength = uint16(len(signature))
@@ -358,29 +313,6 @@ const (
    objTypeSecurityVersion  = 0x0010
    objTypeSecurityVersion2 = 0x0011
 )
-
-// decode decodes a byte slice into the manufacturer structure.
-func (m *manufacturer) decode(data []byte) {
-   m.flags = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   n := m.manufacturerName.decode(data)
-   data = data[n:]
-   n = m.modelName.decode(data)
-   data = data[n:]
-   m.modelNumber.decode(data)
-}
-
-func (c *certificateSignature) decode(data []byte) {
-   c.signatureType = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   c.signatureLength = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   c.SignatureData = data[:c.signatureLength]
-   data = data[c.signatureLength:]
-   c.issuerLength = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   c.IssuerKey = data
-}
 
 // manufacturerInfo contains a length-prefixed string. Renamed to avoid conflict.
 type manufacturerInfo struct {

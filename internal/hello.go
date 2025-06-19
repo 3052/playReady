@@ -37,12 +37,12 @@ func main() {
    }
 }
 
-var microsoft = struct{
+var microsoft = struct {
    key    string
    kid_wv string
    url    string
 }{
-   key: "00000000000000000000000000000000",
+   key:    "00000000000000000000000000000000",
    kid_wv: "10000000000000000000000000000000",
    url:    "https://test.playready.microsoft.com/service/rightsmanager.asmx?cfg=ck:AAAAAAAAAAAAAAAAAAAAAA==,ckt:aescbc",
 }

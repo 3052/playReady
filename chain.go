@@ -12,6 +12,14 @@ import (
    "slices"
 )
 
+func (c *Certificate) encode() []byte {
+   data := c.Magic[:]
+   data = binary.BigEndian.AppendUint32(data, c.Version)
+   data = binary.BigEndian.AppendUint32(data, c.Length)
+   data = binary.BigEndian.AppendUint32(data, c.LengthToSignature)
+   return append(data, c.rawData...)
+}
+
 func (c *Certificate) verify(pubKey []byte) bool {
    if !bytes.Equal(c.signature.IssuerKey, pubKey) {
       return false

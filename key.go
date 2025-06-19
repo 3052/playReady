@@ -194,16 +194,6 @@ func (c *ContentKey) scalable(key *ecdsa.PrivateKey, auxKeys *auxKeys) error {
    return nil
 }
 
-func (f *features) decode(data []byte) int {
-   f.entries = binary.BigEndian.Uint32(data)
-   n := 4
-   for range f.entries {
-      f.features = append(f.features, binary.BigEndian.Uint32(data[n:]))
-      n += 4
-   }
-   return n
-}
-
 // new initializes a new key with provided data and type.
 func (k *keyData) New(data []byte, Type int) {
    k.keyType = 1  // Assuming type 1 is for ECDSA keys
@@ -336,19 +326,6 @@ func (f *features) New(Type int) {
    f.features = []uint32{uint32(Type)}
 }
 
-// decode decodes a byte slice into the keyInfo structure.
-func (k *keyInfo) decode(data []byte) {
-   k.entries = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   k.keys = make([]keyData, k.entries)
-   for i := range k.entries {
-      var key keyData
-      n := key.decode(data)
-      k.keys[i] = key
-      data = data[n:]
-   }
-}
-
 // decode decodes a byte slice into the key structure.
 func (k *keyData) decode(data []byte) int {
    k.keyType = binary.BigEndian.Uint16(data)
@@ -362,11 +339,6 @@ func (k *keyData) decode(data []byte) int {
    return n
 }
 
-type keyInfo struct {
-   entries uint32
-   keys    []keyData
-}
-
 // encode encodes the keyInfo structure into a byte slice.
 func (k *keyInfo) encode() []byte {
    data := binary.BigEndian.AppendUint32(nil, k.entries)
@@ -374,11 +346,6 @@ func (k *keyInfo) encode() []byte {
       data = append(data, key.encode()...)
    }
    return data
-}
-
-type features struct {
-   entries  uint32
-   features []uint32
 }
 
 func (f *features) encode() []byte {
