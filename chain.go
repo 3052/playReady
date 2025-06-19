@@ -4,11 +4,42 @@ import (
    "41.neocities.org/playReady/xml"
    "bytes"
    "crypto/ecdsa"
+   "crypto/elliptic"
    "crypto/sha256"
    "encoding/binary"
    "errors"
+   "math/big"
    "slices"
 )
+
+func (c *Certificate) verify(pubKey []byte) bool {
+   if !bytes.Equal(c.signature.IssuerKey, pubKey) {
+      return false
+   }
+   // Reconstruct the ECDSA public key from the byte slice.
+   publicKey := ecdsa.PublicKey{
+      Curve: elliptic.P256(), // Assuming P256 curve
+      X:     new(big.Int).SetBytes(pubKey[:32]),
+      Y:     new(big.Int).SetBytes(pubKey[32:]),
+   }
+   data := c.encode()
+   data = data[:c.LengthToSignature]
+   signatureDigest := sha256.Sum256(data)
+   signature := c.signature.SignatureData
+   r := new(big.Int).SetBytes(signature[:32])
+   s := new(big.Int).SetBytes(signature[32:])
+   return ecdsa.Verify(&publicKey, signatureDigest[:], r, s)
+}
+
+func (c *Certificate) newNoSig(data []byte) {
+   copy(c.Magic[:], "CERT")
+   c.Version = 1
+   // length = length of raw data + header size (16) + signature size (144)
+   c.Length = uint32(len(data)) + 16 + 144
+   // lengthToSignature = length of raw data + header size (16)
+   c.LengthToSignature = uint32(len(data)) + 16
+   c.rawData = data
+}
 
 func (c *Chain) cipherData(key *xmlKey) ([]byte, error) {
    data := xml.Data{
@@ -160,14 +191,6 @@ func (c *Chain) Leaf(modelKey, signEncryptKey *EcKey) error {
       leafData.Write(value.encode())
    }
    {
-      // Create a new device and its FTLV.
-      var data device
-      data.New()
-      var value ftlv
-      value.New(1, 4, data.encode())
-      leafData.Write(value.encode())
-   }
-   {
       // SCALABLE with SL2000, SUPPORTS_PR3_FEATURES
       data := features{
          entries:  1,
@@ -183,13 +206,6 @@ func (c *Chain) Leaf(modelKey, signEncryptKey *EcKey) error {
       data.New(signEncryptKey.Public())
       var value ftlv
       value.New(1, 6, data.encode())
-      leafData.Write(value.encode())
-   }
-   {
-      // Create FTLV for manufacturer information, copying from the existing
-      // chain's first cert.
-      var value ftlv
-      value.New(0, 7, c.Certs[0].manufacturerInfo.encode())
       leafData.Write(value.encode())
    }
    var unsigned Certificate

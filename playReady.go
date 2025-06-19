@@ -274,27 +274,6 @@ func aesCBCHandler(data, key, iv []byte, encrypt bool) ([]byte, error) {
    }
 }
 
-// device represents device capabilities.
-type device struct {
-   maxLicenseSize       uint32
-   maxHeaderSize        uint32
-   maxLicenseChainDepth uint32
-}
-
-// new initializes default device capabilities.
-func (d *device) New() {
-   d.maxLicenseSize = 10240
-   d.maxHeaderSize = 15360
-   d.maxLicenseChainDepth = 2
-}
-
-// encode encodes device capabilities into a byte slice.
-func (d *device) encode() []byte {
-   data := binary.BigEndian.AppendUint32(nil, d.maxLicenseSize)
-   data = binary.BigEndian.AppendUint32(data, d.maxHeaderSize)
-   return binary.BigEndian.AppendUint32(data, d.maxLicenseChainDepth)
-}
-
 // Decode decodes a byte slice into an AuxKey structure.
 func (a *auxKey) decode(data []byte) int {
    a.Location = binary.BigEndian.Uint32(data)
@@ -379,20 +358,6 @@ const (
    objTypeSecurityVersion  = 0x0010
    objTypeSecurityVersion2 = 0x0011
 )
-
-// encode encodes the manufacturerInfo structure into a byte slice.
-func (m *manufacturerInfo) encode() []byte {
-   data := binary.BigEndian.AppendUint32(nil, m.length)
-   return append(data, m.value...)
-}
-
-// encode encodes the manufacturer structure into a byte slice.
-func (m *manufacturer) encode() []byte {
-   data := binary.BigEndian.AppendUint32(nil, m.flags)
-   data = append(data, m.manufacturerName.encode()...)
-   data = append(data, m.modelName.encode()...)
-   return append(data, m.modelNumber.encode()...)
-}
 
 // decode decodes a byte slice into the manufacturer structure.
 func (m *manufacturer) decode(data []byte) {
