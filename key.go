@@ -202,16 +202,6 @@ func (k *keyData) New(data []byte, Type int) {
    k.usage.New(Type)
 }
 
-type keyData struct {
-   keyType uint16
-   length  uint16
-   flags   uint32
-   // ECDSA P256 public key is 64 bytes (X and Y coordinates, 32 bytes each)
-   publicKey [64]byte
-   // Features indicating key usage
-   usage features
-}
-
 // encode encodes the key structure into a byte slice.
 func (k *keyData) encode() []byte {
    data := binary.BigEndian.AppendUint16(nil, k.keyType)
@@ -324,19 +314,6 @@ type eccKey struct {
 func (f *features) New(Type int) {
    f.entries = 1
    f.features = []uint32{uint32(Type)}
-}
-
-// decode decodes a byte slice into the key structure.
-func (k *keyData) decode(data []byte) int {
-   k.keyType = binary.BigEndian.Uint16(data)
-   n := 2
-   k.length = binary.BigEndian.Uint16(data[n:])
-   n += 2
-   k.flags = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   n += copy(k.publicKey[:], data[n:])
-   n += k.usage.decode(data[n:])
-   return n
 }
 
 // encode encodes the keyInfo structure into a byte slice.

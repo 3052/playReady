@@ -5,6 +5,139 @@ import (
    "errors"
 )
 
+type Certificate struct {
+   Magic             [4]byte
+   Version           uint32
+   Length            uint32
+   LengthToSignature uint32
+   rawData           []byte
+   certificateInfo   *certificateInfo
+   
+   keyInfo           *keyInfo
+   manufacturer      *manufacturer
+   signature         *certificateSignature
+}
+
+func (c *Certificate) decode(data []byte) (int, error) {
+   n := copy(c.Magic[:], data)
+   if string(c.Magic[:]) != "CERT" {
+      return 0, errors.New("failed to find cert magic")
+   }
+   c.Version = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   c.Length = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   c.LengthToSignature = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   c.rawData = data[n:][:c.Length-16]
+   n += len(c.rawData)
+   var n1 int
+   for n1 < len(c.rawData) {
+      var value ftlv
+      n1 += value.decode(c.rawData[n1:])
+      switch value.Type {
+      case objTypeBasic: // 1
+         c.certificateInfo = &certificateInfo{}
+         c.certificateInfo.decode(value.Value)
+      case objTypeDevice: // 4
+      case objTypeFeature: // 5
+      case objTypeKey: // 6
+         c.keyInfo = &keyInfo{}
+         c.keyInfo.decode(value.Value)
+      case objTypeManufacturer: // 7
+         c.manufacturer = &manufacturer{}
+         c.manufacturer.decode(value.Value)
+      case objTypeSignature: // 8
+         c.signature = &certificateSignature{}
+         c.signature.decode(value.Value)
+      default:
+         return 0, errors.New("FTLV.decode")
+      }
+   }
+   return n, nil
+}
+
+type keyData struct {
+   keyType uint16
+   length  uint16
+   flags   uint32
+   // ECDSA P256 public key is 64 bytes (X and Y coordinates, 32 bytes each)
+   publicKey [64]byte
+   // Features indicating key usage
+   usage features
+}
+
+// decode decodes a byte slice into the key structure.
+func (k *keyData) decode(data []byte) int {
+   k.keyType = binary.BigEndian.Uint16(data)
+   n := 2
+   k.length = binary.BigEndian.Uint16(data[n:])
+   n += 2
+   k.flags = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   n += copy(k.publicKey[:], data[n:])
+   n += k.usage.decode(data[n:])
+   return n
+}
+
+// Constants for object types within the certificate structure.
+const (
+   objTypeBasic            = 0x0001
+   objTypeDomain           = 0x0002
+   objTypePc               = 0x0003
+   objTypeDevice           = 0x0004
+   objTypeFeature          = 0x0005
+   objTypeKey              = 0x0006
+   objTypeManufacturer     = 0x0007
+   objTypeSignature        = 0x0008
+   objTypeSilverlight      = 0x0009
+   objTypeMetering         = 0x000A
+   objTypeExtDataSignKey   = 0x000B
+   objTypeExtDataContainer = 0x000C
+   objTypeExtDataSignature = 0x000D
+   objTypeExtDataHwid      = 0x000E
+   objTypeServer           = 0x000F
+   objTypeSecurityVersion  = 0x0010
+   objTypeSecurityVersion2 = 0x0011
+)
+
+type ftlv struct {
+   Flags  uint16
+   Type   uint16
+   Length uint32
+   Value  []byte
+}
+
+// Decode decodes a byte slice into an FTLV structure.
+func (f *ftlv) decode(data []byte) int {
+   f.Flags = binary.BigEndian.Uint16(data)
+   n := 2
+   f.Type = binary.BigEndian.Uint16(data[n:])
+   n += 2
+   f.Length = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   f.Value = data[n:][:f.Length-8]
+   n += len(f.Value)
+   return n
+}
+
+// manufacturerInfo contains a length-prefixed string. Renamed to avoid conflict.
+type manufacturerInfo struct {
+   length uint32
+   value  string
+}
+
+// decode decodes a byte slice into the manufacturerInfo structure.
+func (m *manufacturerInfo) decode(data []byte) int {
+   m.length = binary.BigEndian.Uint32(data)
+   n := 4
+   // Data is padded to a multiple of 4 bytes.
+   padded_length := (m.length + 3) &^ 3
+   m.value = string(data[n:][:padded_length])
+   n += int(padded_length)
+   return n
+}
+
 type certificateInfo struct {
    certificateId [16]byte
    securityLevel uint32
@@ -33,47 +166,6 @@ func (c *certificateInfo) decode(data []byte) {
    c.expiry = binary.BigEndian.Uint32(data)
    data = data[4:]
    copy(c.clientId[:], data)
-}
-
-func (c *Certificate) decode(data []byte) (int, error) {
-   n := copy(c.Magic[:], data)
-   if string(c.Magic[:]) != "CERT" {
-      return 0, errors.New("failed to find cert magic")
-   }
-   c.Version = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   c.Length = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   c.LengthToSignature = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   c.rawData = data[n:][:c.Length-16]
-   n += len(c.rawData)
-   var n1 int
-   for n1 < len(c.rawData) {
-      var value ftlv
-      n1 += value.decode(c.rawData[n1:])
-      switch value.Type {
-      case objTypeBasic: // 1
-         c.certificateInfo = &certificateInfo{}
-         c.certificateInfo.decode(value.Value)
-      case objTypeDevice: // 4
-      case objTypeFeature: // 5
-         c.features = &features{}
-         c.features.decode(value.Value)
-      case objTypeKey: // 6
-         c.keyInfo = &keyInfo{}
-         c.keyInfo.decode(value.Value)
-      case objTypeManufacturer: // 7
-         c.manufacturer = &manufacturer{}
-         c.manufacturer.decode(value.Value)
-      case objTypeSignature: // 8
-         c.signature = &certificateSignature{}
-         c.signature.decode(value.Value)
-      default:
-         return 0, errors.New("FTLV.decode")
-      }
-   }
-   return n, nil
 }
 
 func (f *features) decode(data []byte) int {
@@ -144,17 +236,4 @@ func (c *certificateSignature) decode(data []byte) {
    c.issuerLength = binary.BigEndian.Uint32(data)
    data = data[4:]
    c.IssuerKey = data
-}
-
-type Certificate struct {
-   Magic             [4]byte
-   Version           uint32
-   Length            uint32
-   LengthToSignature uint32
-   rawData           []byte
-   certificateInfo   *certificateInfo
-   features          *features
-   keyInfo           *keyInfo
-   manufacturer      *manufacturer
-   signature         *certificateSignature
 }

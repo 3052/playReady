@@ -144,13 +144,6 @@ type auxKey struct {
    Key      [16]byte
 }
 
-type ftlv struct {
-   Flags  uint16
-   Type   uint16
-   Length uint32
-   Value  []byte
-}
-
 type xmrType uint16
 
 const (
@@ -278,57 +271,6 @@ func (c *certificateSignature) encode() []byte {
    // is specific to how it was serialized for a purpose external to this data structure itself.
    data = binary.BigEndian.AppendUint32(data, c.issuerLength*8)
    return append(data, c.IssuerKey...)
-}
-
-// Decode decodes a byte slice into an FTLV structure.
-func (f *ftlv) decode(data []byte) int {
-   f.Flags = binary.BigEndian.Uint16(data)
-   n := 2
-   f.Type = binary.BigEndian.Uint16(data[n:])
-   n += 2
-   f.Length = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   f.Value = data[n:][:f.Length-8]
-   n += len(f.Value)
-   return n
-}
-
-// Constants for object types within the certificate structure.
-const (
-   objTypeBasic            = 0x0001
-   objTypeDomain           = 0x0002
-   objTypePc               = 0x0003
-   objTypeDevice           = 0x0004
-   objTypeFeature          = 0x0005
-   objTypeKey              = 0x0006
-   objTypeManufacturer     = 0x0007
-   objTypeSignature        = 0x0008
-   objTypeSilverlight      = 0x0009
-   objTypeMetering         = 0x000A
-   objTypeExtDataSignKey   = 0x000B
-   objTypeExtDataContainer = 0x000C
-   objTypeExtDataSignature = 0x000D
-   objTypeExtDataHwid      = 0x000E
-   objTypeServer           = 0x000F
-   objTypeSecurityVersion  = 0x0010
-   objTypeSecurityVersion2 = 0x0011
-)
-
-// manufacturerInfo contains a length-prefixed string. Renamed to avoid conflict.
-type manufacturerInfo struct {
-   length uint32
-   value  string
-}
-
-// decode decodes a byte slice into the manufacturerInfo structure.
-func (m *manufacturerInfo) decode(data []byte) int {
-   m.length = binary.BigEndian.Uint32(data)
-   n := 4
-   // Data is padded to a multiple of 4 bytes.
-   padded_length := (m.length + 3) &^ 3
-   m.value = string(data[n:][:padded_length])
-   n += int(padded_length)
-   return n
 }
 
 // Decode decodes a byte slice into an AuxKeys structure.
