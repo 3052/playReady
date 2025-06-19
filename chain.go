@@ -182,7 +182,7 @@ func (c *Chain) RequestBody(signEncrypt EcKey, kid []byte) ([]byte, error) {
 }
 
 func (c *Chain) Leaf(modelKey, signEncryptKey *EcKey) error {
-   if !bytes.Equal(c.Certs[0].keyInfo.keys[0].publicKey[:], modelKey.Public()) {
+   if !bytes.Equal(c.Certs[0].keyInfo.keys[0].publicKey[:], modelKey.public()) {
       return errors.New("zgpriv not for cert")
    }
    // Verify the existing chain's validity.
@@ -191,7 +191,7 @@ func (c *Chain) Leaf(modelKey, signEncryptKey *EcKey) error {
    }
    var leafData bytes.Buffer
    {
-      digest := sha256.Sum256(signEncryptKey.Public())
+      digest := sha256.Sum256(signEncryptKey.public())
       var data certificateInfo
       data.New(c.Certs[0].certificateInfo.securityLevel, digest[:])
       var value ftlv
@@ -211,7 +211,7 @@ func (c *Chain) Leaf(modelKey, signEncryptKey *EcKey) error {
    }
    {
       var data keyInfo
-      data.New(signEncryptKey.Public())
+      data.New(signEncryptKey.public())
       var value ftlv
       value.New(1, 6, data.encode())
       leafData.Write(value.encode())
@@ -225,7 +225,7 @@ func (c *Chain) Leaf(modelKey, signEncryptKey *EcKey) error {
          return err
       }
       var data certificateSignature
-      data.New(append(r.Bytes(), s.Bytes()...), modelKey.Public())
+      data.New(append(r.Bytes(), s.Bytes()...), modelKey.public())
       var value ftlv
       value.New(1, 8, data.encode())
       leafData.Write(value.encode())

@@ -30,7 +30,7 @@ func (l *License) Decrypt(signEncrypt EcKey, data []byte) error {
    if err != nil {
       return err
    }
-   if !bytes.Equal(l.eccKey.Value, signEncrypt.Public()) {
+   if !bytes.Equal(l.eccKey.Value, signEncrypt.public()) {
       return errors.New("license response is not for this device")
    }
    err = l.ContentKey.decrypt(signEncrypt[0], l.auxKeyObject)
@@ -311,7 +311,7 @@ func (e EcKey) Private() []byte {
 }
 
 // PublicBytes returns the public key bytes.
-func (e *EcKey) Public() []byte {
+func (e *EcKey) public() []byte {
    return append(e[0].PublicKey.X.Bytes(), e[0].PublicKey.Y.Bytes()...)
 }
 
