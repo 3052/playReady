@@ -67,14 +67,6 @@ func (f *ftlv) size() int {
    return n
 }
 
-func (c *certificateSignature) New(signature, modelKey []byte) {
-   c.signatureType = 1
-   c.signatureLength = uint16(len(signature))
-   c.SignatureData = signature
-   c.issuerLength = uint32(len(modelKey)) * 8
-   c.IssuerKey = modelKey
-}
-
 func (f *ftlv) New(flags, Type int, value []byte) {
    f.Flags = uint16(flags)
    f.Type = uint16(Type)
@@ -87,15 +79,6 @@ func (c *certificateInfo) New(securityLevel uint32, digest []byte) {
    c.infoType = 2 // Assuming infoType 2 is a standard type
    copy(c.digest[:], digest)
    c.expiry = 4294967295 // Max uint32, effectively never expires
-}
-
-func (c *certificateSignature) encode() []byte {
-   data := binary.BigEndian.AppendUint16(nil, c.signatureType)
-   data = binary.BigEndian.AppendUint16(data, c.signatureLength)
-   data = append(data, c.SignatureData...)
-   data = binary.BigEndian.AppendUint32(data, c.issuerLength)
-   data = append(data, c.IssuerKey...)
-   return data
 }
 
 func (f *ftlv) encode() []byte {

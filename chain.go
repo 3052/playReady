@@ -61,6 +61,23 @@ func (c *Chain) Leaf(modelKey, signEncryptKey *EcKey) error {
    return nil
 }
 
+func (c *certificateSignature) New(signature, modelKey []byte) {
+   c.signatureType = 1
+   c.signatureLength = uint16(len(signature))
+   c.signature = signature
+   c.issuerLength = uint32(len(modelKey)) * 8
+   c.IssuerKey = modelKey
+}
+
+func (c *certificateSignature) encode() []byte {
+   data := binary.BigEndian.AppendUint16(nil, c.signatureType)
+   data = binary.BigEndian.AppendUint16(data, c.signatureLength)
+   data = append(data, c.signature...)
+   data = binary.BigEndian.AppendUint32(data, c.issuerLength)
+   data = append(data, c.IssuerKey...)
+   return data
+}
+
 func (c *certificateSignature) size() int {
    n := binary.Size(c.signatureType)
    n += binary.Size(c.signatureLength)
@@ -74,10 +91,10 @@ type certificateSignature struct {
    signatureType   uint16
    signatureLength uint16
    // The actual signature bytes
-   SignatureData   []byte
-   issuerLength    uint32
+   signature    []byte
+   issuerLength uint32
    // The public key of the issuer that signed this certificate
-   IssuerKey       []byte
+   IssuerKey []byte
 }
 
 func (c *Certificate) encode() []byte {
@@ -220,7 +237,7 @@ func (c *Certificate) verify(pubKey []byte) bool {
    data := c.encode()
    data = data[:c.LengthToSignature]
    signatureDigest := sha256.Sum256(data)
-   signature := c.signature.SignatureData
+   signature := c.signature.signature
    r := new(big.Int).SetBytes(signature[:32])
    s := new(big.Int).SetBytes(signature[32:])
    return ecdsa.Verify(&publicKey, signatureDigest[:], r, s)
@@ -258,11 +275,12 @@ type Chain struct {
    CertCount uint32
    Certs     []Certificate
 }
+
 type Certificate struct {
-   Magic             [4]byte // bytes 0 - 3
-   Version           uint32  // bytes 4 - 7
-   Length            uint32  // bytes 8 - 11
-   LengthToSignature uint32  // bytes 12 - 15
+   Magic             [4]byte               // bytes 0 - 3
+   Version           uint32                // bytes 4 - 7
+   Length            uint32                // bytes 8 - 11
+   LengthToSignature uint32                // bytes 12 - 15
    certificateInfo   *certificateInfo      // type 1
    feature           *ftlv                 // type 5
    keyInfo           *keyInfo              // type 6
@@ -341,78 +359,6 @@ func (c *Certificate) decode(data []byte) (int, error) {
    return n, nil // Return total bytes consumed and nil for no error
 }
 
-// decode decodes a byte slice into the keyData structure.
-// It returns the number of bytes consumed.
-func (k *keyData) decode(data []byte) int {
-   k.keyType = binary.BigEndian.Uint16(data)
-   n := 2
-   k.length = binary.BigEndian.Uint16(data[n:])
-   n += 2
-   k.flags = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   n += copy(k.publicKey[:], data[n:])
-   n += k.usage.decode(data[n:])
-   return n
-}
-
-// Constants for object types within the certificate structure.
-const (
-   objTypeBasic            = 0x0001
-   objTypeDomain           = 0x0002
-   objTypePc               = 0x0003
-   objTypeDevice           = 0x0004
-   objTypeFeature          = 0x0005
-   objTypeKey              = 0x0006
-   objTypeManufacturer     = 0x0007
-   objTypeSignature        = 0x0008
-   objTypeSilverlight      = 0x0009
-   objTypeMetering         = 0x000A
-   objTypeExtDataSignKey   = 0x000B
-   objTypeExtDataContainer = 0x000C
-   objTypeExtDataSignature = 0x000D
-   objTypeExtDataHwid      = 0x000E
-   objTypeServer           = 0x000F
-   objTypeSecurityVersion  = 0x0010
-   objTypeSecurityVersion2 = 0x0011
-)
-
-// decode decodes a byte slice into an FTLV structure.
-// It returns the number of bytes consumed.
-func (f *ftlv) decode(data []byte) int {
-   f.Flags = binary.BigEndian.Uint16(data)
-   n := 2
-   f.Type = binary.BigEndian.Uint16(data[n:])
-   n += 2
-   f.Length = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   // The Value slice should contain Length-8 bytes (total length minus Flags, Type, Length fields).
-   // Ensure not to panic if remaining data is less than expected FTLV Value
-   // length. Go's slicing will handle `data[n:][:f.Length-8]` gracefully if
-   // `f.Length-8` is larger than `len(data[n:])`, taking the minimum
-   // available. However, if f.Length is less than 8, f.Length-8 would be
-   // negative, causing a panic. A robust implementation would check
-   // f.Length >= 8 before slicing. For this request, we assume valid f.Length
-   // values as per the original code's implied behavior.
-   valueLen := int(f.Length - 8)
-   if valueLen < 0 {
-      // Handle malformed FTLV where Length is too small to contain header.
-      // This should ideally be an error, but per the original function's structure,
-      // we'll try to process and return bytes consumed.
-      // For now, we'll just set valueLen to 0 to avoid panic if Length is less than 8.
-      valueLen = 0
-   }
-   if valueLen > len(data[n:]) {
-      // If the reported length is greater than available data, take all
-      // available data.
-      f.Value = data[n:]
-   } else {
-      f.Value = data[n:][:valueLen]
-   }
-
-   n += len(f.Value)
-   return n
-}
-
 // decode decodes a byte slice into the certificateInfo structure.
 func (c *certificateInfo) decode(data []byte) {
    n := copy(c.certificateId[:], data)
@@ -470,7 +416,7 @@ func (c *certificateSignature) decode(data []byte) {
    data = data[2:]
    c.signatureLength = binary.BigEndian.Uint16(data) // 0x40 (64) 4 bytes total
    data = data[2:]
-   c.SignatureData = data[:c.signatureLength] // 70 bytes total
+   c.signature = data[:c.signatureLength] // 70 bytes total
    data = data[c.signatureLength:]
    c.issuerLength = binary.BigEndian.Uint32(data)
    data = data[4:]
