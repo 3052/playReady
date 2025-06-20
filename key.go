@@ -272,25 +272,37 @@ func (c *ContentKey) decrypt(key *ecdsa.PrivateKey, aux *auxKeys) error {
    return errors.New("cannot decrypt key")
 }
 
-///
-
-// decode decodes a byte slice into a ContentKey structure.
-func (c *ContentKey) decode(data []byte) {
-   n := copy(c.KeyID[:], data)
-   data = data[n:]
-   c.KeyType = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   c.CipherType = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   c.Length = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   c.Value = data
+func (l *License) Decrypt(signEncrypt EcKey, data []byte) error {
+   var envelope xml.EnvelopeResponse
+   err := envelope.Unmarshal(data)
+   if err != nil {
+      return err
+   }
+   err = l.decode(envelope.
+      Body.
+      AcquireLicenseResponse.
+      AcquireLicenseResult.
+      Response.
+      LicenseResponse.
+      Licenses.
+      License,
+   )
+   if err != nil {
+      return err
+   }
+   if !bytes.Equal(l.eccKey.Value, signEncrypt.public()) {
+      return errors.New("license response is not for this device")
+   }
+   err = l.ContentKey.decrypt(signEncrypt[0], l.auxKey)
+   if err != nil {
+      return err
+   }
+   return l.verify(l.ContentKey.Integrity[:])
 }
 
 func (c *ContentKey) scalable(key *ecdsa.PrivateKey, auxKeys *auxKeys) error {
-   rootKeyInfo := c.Value[:144]
+   rootKeyInfo, leafKeys := c.Value[:144], c.Value[144:]
    rootKey := rootKeyInfo[128:]
-   leafKeys := c.Value[144:]
    decrypted := elGamalDecrypt(rootKeyInfo[:128], key)
    var (
       ci [16]byte
@@ -340,30 +352,15 @@ func (e *eccKey) decode(data []byte) {
    e.Value = data
 }
 
-func (l *License) Decrypt(signEncrypt EcKey, data []byte) error {
-   var envelope xml.EnvelopeResponse
-   err := envelope.Unmarshal(data)
-   if err != nil {
-      return err
-   }
-   err = l.decode(envelope.
-      Body.
-      AcquireLicenseResponse.
-      AcquireLicenseResult.
-      Response.
-      LicenseResponse.
-      Licenses.
-      License,
-   )
-   if err != nil {
-      return err
-   }
-   if !bytes.Equal(l.eccKey.Value, signEncrypt.public()) {
-      return errors.New("license response is not for this device")
-   }
-   err = l.ContentKey.decrypt(signEncrypt[0], l.auxKeyObject)
-   if err != nil {
-      return err
-   }
-   return l.verify(l.ContentKey.Integrity[:])
+// decode decodes a byte slice into a ContentKey structure.
+func (c *ContentKey) decode(data []byte) {
+   n := copy(c.KeyID[:], data)
+   data = data[n:]
+   c.KeyType = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   c.CipherType = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   c.Length = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   c.Value = data
 }

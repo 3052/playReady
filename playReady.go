@@ -10,6 +10,43 @@ import (
    "github.com/deatil/go-cryptobin/mac"
 )
 
+func (f Fill) Read(data []byte) (int, error) {
+   for index := range data {
+      data[index] = byte(f)
+   }
+   return len(data), nil
+}
+
+type Fill byte
+
+// aesECBHandler performs AES ECB encryption/decryption.
+// Encrypts if encrypt is true, decrypts otherwise.
+func aesECBHandler(data, key []byte, encrypt bool) ([]byte, error) {
+   if encrypt {
+      bin := crypto.FromBytes(data).WithKey(key).
+         Aes().ECB().NoPadding().Encrypt()
+      return bin.ToBytes(), bin.Error()
+   } else {
+      bin := crypto.FromBytes(data).WithKey(key).
+         Aes().ECB().NoPadding().Decrypt()
+      return bin.ToBytes(), bin.Error()
+   }
+}
+
+// aesCBCHandler performs AES CBC encryption/decryption with PKCS7 padding.
+// Encrypts if encrypt is true, decrypts otherwise.
+func aesCBCHandler(data, key, iv []byte, encrypt bool) ([]byte, error) {
+   if encrypt {
+      bin := crypto.FromBytes(data).WithKey(key).WithIv(iv).
+         Aes().CBC().PKCS7Padding().Encrypt()
+      return bin.ToBytes(), bin.Error()
+   } else {
+      bin := crypto.FromBytes(data).WithKey(key).WithIv(iv).
+         Aes().CBC().PKCS7Padding().Decrypt()
+      return bin.ToBytes(), bin.Error()
+   }
+}
+
 // decode decodes a byte slice into the features structure.
 // It returns the number of bytes consumed.
 func (f *features) decode(data []byte) int {
@@ -58,14 +95,6 @@ func (k *keyData) size() int {
    return n
 }
 
-func (k *keyInfo) size() int {
-   n := 4 // entries
-   for _, key := range k.keys {
-      n += key.size()
-   }
-   return n
-}
-
 type certificateInfo struct {
    certificateId [16]byte
    securityLevel uint32
@@ -92,6 +121,14 @@ type keyData struct {
 type keyInfo struct {
    entries uint32    // Number of key entries
    keys    []keyData // Slice of keyData structures
+}
+
+func (k *keyInfo) size() int {
+   n := 4 // entries
+   for _, key := range k.keys {
+      n += key.size()
+   }
+   return n
 }
 
 func sign(key *ecdsa.PrivateKey, hash []byte) ([]byte, error) {
@@ -126,83 +163,12 @@ func (c *certificateInfo) encode() []byte {
    return append(data, c.clientId[:]...)
 }
 
-func (l *License) verify(contentIntegrity []byte) error {
-   data := l.encode()
-   data = data[:len(data)-int(l.signature.Length)]
-   block, err := aes.NewCipher(contentIntegrity)
-   if err != nil {
-      return err
-   }
-   data = mac.NewCMAC(block, aes.BlockSize).MAC(data)
-   if !bytes.Equal(data, l.signature.Data) {
-      return errors.New("failed to decrypt the keys")
-   }
-   return nil
-}
-
 func (l *License) encode() []byte {
    data := l.Magic[:]
    data = binary.BigEndian.AppendUint16(data, l.Offset)
    data = binary.BigEndian.AppendUint16(data, l.Version)
    data = append(data, l.RightsID[:]...)
    return append(data, l.OuterContainer.encode()...)
-}
-
-func (l *License) decode(data []byte) error {
-   n := copy(l.Magic[:], data)
-   data = data[n:]
-   l.Offset = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   l.Version = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   n = copy(l.RightsID[:], data)
-   data = data[n:]
-   l.OuterContainer.decode(data)
-   var n1 int
-   for n1 < int(l.OuterContainer.Length)-16 {
-      var value ftlv
-      n3, err := value.decode(l.OuterContainer.Value[n1:])
-      if err != nil {
-         return err
-      }
-      n1 += n3
-      switch xmrType(value.Type) {
-      case globalPolicyContainerEntryType: // 2
-         // Rakuten
-      case playbackPolicyContainerEntryType: // 4
-         // Rakuten
-      case keyMaterialContainerEntryType: // 9
-         var n2 int
-         for n2 < int(value.Length)-16 {
-            var value1 ftlv
-            n4, err := value1.decode(value.Value[n2:])
-            if err != nil {
-               return err
-            }
-            n2 += n4
-            switch xmrType(value1.Type) {
-            case contentKeyEntryType: // 10
-               l.ContentKey = &ContentKey{}
-               l.ContentKey.decode(value1.Value)
-            case deviceKeyEntryType: // 42
-               l.eccKey = &eccKey{}
-               l.eccKey.decode(value1.Value)
-            case auxKeyEntryType: // 81
-               l.auxKeyObject = &auxKeys{}
-               l.auxKeyObject.decode(value1.Value)
-            default:
-               return errors.New("FTLV.type")
-            }
-         }
-      case signatureEntryType: // 11
-         l.signature = &licenseSignature{}
-         l.signature.decode(value.Value)
-         l.signature.Length = uint16(value.Length)
-      default:
-         return errors.New("FTLV.type")
-      }
-   }
-   return nil
 }
 
 type License struct {
@@ -214,15 +180,15 @@ type License struct {
    ContentKey     *ContentKey
    eccKey         *eccKey
    signature      *licenseSignature
-   auxKeyObject   *auxKeys
+   auxKey         *auxKeys
 }
 
-func (l *licenseSignature) decode(data []byte) {
-   l.Type = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   l.Length = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   l.Data = data
+// Decode decodes a byte slice into an AuxKey structure.
+func (a *auxKey) decode(data []byte) int {
+   a.Location = binary.BigEndian.Uint32(data)
+   n := 4
+   n += copy(a.Key[:], data[n:])
+   return n
 }
 
 type licenseSignature struct {
@@ -301,49 +267,12 @@ const (
    playbackUnknownContainerEntryType       xmrType = 65534
 )
 
-func (f Fill) Read(data []byte) (int, error) {
-   for index := range data {
-      data[index] = byte(f)
-   }
-   return len(data), nil
-}
-
-type Fill byte
-
-// aesECBHandler performs AES ECB encryption/decryption.
-// Encrypts if encrypt is true, decrypts otherwise.
-func aesECBHandler(data, key []byte, encrypt bool) ([]byte, error) {
-   if encrypt {
-      bin := crypto.FromBytes(data).WithKey(key).
-         Aes().ECB().NoPadding().Encrypt()
-      return bin.ToBytes(), bin.Error()
-   } else {
-      bin := crypto.FromBytes(data).WithKey(key).
-         Aes().ECB().NoPadding().Decrypt()
-      return bin.ToBytes(), bin.Error()
-   }
-}
-
-// aesCBCHandler performs AES CBC encryption/decryption with PKCS7 padding.
-// Encrypts if encrypt is true, decrypts otherwise.
-func aesCBCHandler(data, key, iv []byte, encrypt bool) ([]byte, error) {
-   if encrypt {
-      bin := crypto.FromBytes(data).WithKey(key).WithIv(iv).
-         Aes().CBC().PKCS7Padding().Encrypt()
-      return bin.ToBytes(), bin.Error()
-   } else {
-      bin := crypto.FromBytes(data).WithKey(key).WithIv(iv).
-         Aes().CBC().PKCS7Padding().Decrypt()
-      return bin.ToBytes(), bin.Error()
-   }
-}
-
-// Decode decodes a byte slice into an AuxKey structure.
-func (a *auxKey) decode(data []byte) int {
-   a.Location = binary.BigEndian.Uint32(data)
-   n := 4
-   n += copy(a.Key[:], data[n:])
-   return n
+func (l *licenseSignature) decode(data []byte) {
+   l.Type = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   l.Length = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   l.Data = data
 }
 
 // Decode decodes a byte slice into an AuxKeys structure.
@@ -357,4 +286,77 @@ func (a *auxKeys) decode(data []byte) {
       a.Keys[i] = key
       data = data[n:]
    }
+}
+
+func (l *License) verify(contentIntegrity []byte) error {
+   data := l.encode()
+   data = data[:len(data)-int(l.signature.Length)]
+   block, err := aes.NewCipher(contentIntegrity)
+   if err != nil {
+      return err
+   }
+   data = mac.NewCMAC(block, aes.BlockSize).MAC(data)
+   if !bytes.Equal(data, l.signature.Data) {
+      return errors.New("failed to decrypt the keys")
+   }
+   return nil
+}
+
+///
+
+func (l *License) decode(data []byte) error {
+   n := copy(l.Magic[:], data)
+   data = data[n:]
+   l.Offset = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   l.Version = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   n = copy(l.RightsID[:], data)
+   data = data[n:]
+   l.OuterContainer.decode(data)
+   var n1 int
+   for n1 < int(l.OuterContainer.Length)-16 {
+      var value ftlv
+      n3, err := value.decode(l.OuterContainer.Value[n1:])
+      if err != nil {
+         return err
+      }
+      n1 += n3
+      switch xmrType(value.Type) {
+      case globalPolicyContainerEntryType: // 2
+         // Rakuten
+      case playbackPolicyContainerEntryType: // 4
+         // Rakuten
+      case keyMaterialContainerEntryType: // 9
+         var n2 int
+         for n2 < int(value.Length)-16 {
+            var value1 ftlv
+            n4, err := value1.decode(value.Value[n2:])
+            if err != nil {
+               return err
+            }
+            n2 += n4
+            switch xmrType(value1.Type) {
+            case contentKeyEntryType: // 10
+               l.ContentKey = &ContentKey{}
+               l.ContentKey.decode(value1.Value)
+            case deviceKeyEntryType: // 42
+               l.eccKey = &eccKey{}
+               l.eccKey.decode(value1.Value)
+            case auxKeyEntryType: // 81
+               l.auxKey = &auxKeys{}
+               l.auxKey.decode(value1.Value)
+            default:
+               return errors.New("FTLV.type")
+            }
+         }
+      case signatureEntryType: // 11
+         l.signature = &licenseSignature{}
+         l.signature.decode(value.Value)
+         l.signature.Length = uint16(value.Length)
+      default:
+         return errors.New("FTLV.type")
+      }
+   }
+   return nil
 }
