@@ -9,64 +9,6 @@ import (
    "github.com/deatil/go-cryptobin/mac"
 )
 
-type ftlv struct {
-   Flags  uint16
-   Type   uint16
-   Length uint32
-   Value  []byte // The raw value bytes of the FTLV object
-}
-
-func (f *features) size() int {
-   n := binary.Size(f.entries)
-   for _, feature := range f.features {
-      n += binary.Size(feature)
-   }
-   return n
-}
-
-type features struct {
-   entries  uint32   // Number of feature entries
-   features []uint32 // Slice of feature IDs
-}
-
-func (k *keyData) size() int {
-   n := binary.Size(k.keyType)
-   n += binary.Size(k.length)
-   n += binary.Size(k.flags)
-   n += len(k.publicKey)
-   n += k.usage.size()
-   return n
-}
-
-type keyData struct {
-   keyType   uint16
-   length    uint16 // Total length of the keyData structure
-   flags     uint32
-   publicKey [64]byte // ECDSA P256 public key (X and Y coordinates)
-   usage     features // Features indicating key usage
-}
-
-func (k *keyInfo) size() int {
-   n := binary.Size(k.entries)
-   for _, key := range k.keys {
-      n += key.size()
-   }
-   return n
-}
-
-type keyInfo struct {
-   entries uint32    // Number of key entries
-   keys    []keyData // Slice of keyData structures
-}
-
-func (f *ftlv) size() int {
-   n := binary.Size(f.Flags)
-   n += binary.Size(f.Type)
-   n += binary.Size(f.Length)
-   n += len(f.Value)
-   return n
-}
-
 func (f *ftlv) New(flags, Type int, value []byte) {
    f.Flags = uint16(flags)
    f.Type = uint16(Type)
@@ -76,9 +18,9 @@ func (f *ftlv) New(flags, Type int, value []byte) {
 
 func (c *certificateInfo) New(securityLevel uint32, digest []byte) {
    c.securityLevel = securityLevel
-   c.infoType = 2 // Assuming infoType 2 is a standard type
+   c.infoType = 2 // required
    copy(c.digest[:], digest)
-   c.expiry = 4294967295 // Max uint32, effectively never expires
+   c.expiry = 4294967295 // required, Max uint32, effectively never expires
 }
 
 func (f *ftlv) encode() []byte {

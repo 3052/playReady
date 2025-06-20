@@ -21,7 +21,7 @@ func (c *Chain) Leaf(modelKey, signEncryptKey *EcKey) error {
    }
    var cert Certificate
    copy(cert.Magic[:], "CERT")
-   cert.Version = 1
+   cert.Version = 1 // required
    {
       sum := sha256.Sum256(signEncryptKey.public())
       var value certificateInfo
@@ -42,16 +42,13 @@ func (c *Chain) Leaf(modelKey, signEncryptKey *EcKey) error {
       cert.keyInfo = &value
    }
    {
-      var value certificateSignature
-      cert.LengthToSignature = uint32(cert.size())
-      cert.Length = cert.LengthToSignature
-      cert.Length += uint32(new(ftlv).size())
-      cert.Length += uint32(value.size())
+      cert.LengthToSignature, cert.Length = cert.size()
       sum := sha256.Sum256(cert.encode())
       r, s, err := ecdsa.Sign(Fill('A'), modelKey[0], sum[:])
       if err != nil {
          return err
       }
+      var value certificateSignature
       value.New(append(r.Bytes(), s.Bytes()...), modelKey.public())
       cert.signature = &value
    }
@@ -62,7 +59,7 @@ func (c *Chain) Leaf(modelKey, signEncryptKey *EcKey) error {
 }
 
 func (c *certificateSignature) New(signature, modelKey []byte) {
-   c.signatureType = 1
+   c.signatureType = 1 // required
    c.signatureLength = uint16(len(signature))
    c.signature = signature
    c.issuerLength = uint32(len(modelKey)) * 8
@@ -76,15 +73,6 @@ func (c *certificateSignature) encode() []byte {
    data = binary.BigEndian.AppendUint32(data, c.issuerLength)
    data = append(data, c.IssuerKey...)
    return data
-}
-
-func (c *certificateSignature) size() int {
-   n := binary.Size(c.signatureType)
-   n += binary.Size(c.signatureLength)
-   n += 64
-   n += binary.Size(c.issuerLength)
-   n += 64
-   return n
 }
 
 type certificateSignature struct {
@@ -276,40 +264,6 @@ type Chain struct {
    Certs     []Certificate
 }
 
-type Certificate struct {
-   Magic             [4]byte               // bytes 0 - 3
-   Version           uint32                // bytes 4 - 7
-   Length            uint32                // bytes 8 - 11
-   LengthToSignature uint32                // bytes 12 - 15
-   certificateInfo   *certificateInfo      // type 1
-   feature           *ftlv                 // type 5
-   keyInfo           *keyInfo              // type 6
-   manufacturer      *ftlv                 // type 7
-   signature         *certificateSignature // type 8
-}
-
-func (c *Certificate) size() int {
-   n := len(c.Magic)
-   n += binary.Size(c.Version)
-   n += binary.Size(c.Length)
-   n += binary.Size(c.LengthToSignature)
-   if c.certificateInfo != nil {
-      n += new(ftlv).size()
-      n += binary.Size(c.certificateInfo)
-   }
-   if c.feature != nil {
-      n += c.feature.size()
-   }
-   if c.keyInfo != nil {
-      n += new(ftlv).size()
-      n += c.keyInfo.size()
-   }
-   if c.manufacturer != nil {
-      n += c.manufacturer.size()
-   }
-   return n
-}
-
 // decode parses the byte slice into the Certificate structure. It returns the
 // number of bytes consumed and an error, if any.
 func (c *Certificate) decode(data []byte) (int, error) {
@@ -401,16 +355,6 @@ func (k *keyInfo) decode(data []byte) {
    }
 }
 
-type certificateInfo struct {
-   certificateId [16]byte
-   securityLevel uint32
-   flags         uint32
-   infoType      uint32
-   digest        [32]byte
-   expiry        uint32
-   clientId      [16]byte // Client ID (can be used for license binding)
-}
-
 func (c *certificateSignature) decode(data []byte) {
    c.signatureType = binary.BigEndian.Uint16(data) // 0x1 2 bytes total
    data = data[2:]
@@ -422,4 +366,117 @@ func (c *certificateSignature) decode(data []byte) {
    data = data[4:]
    // Ensure IssuerKey is sliced to its specific length
    c.IssuerKey = data[:c.issuerLength/8]
+}
+
+type ftlv struct {
+   Flags  uint16
+   Type   uint16
+   Length uint32
+   Value  []byte // The raw value bytes of the FTLV object
+}
+
+// this needs to return int
+func (f *ftlv) size() int {
+   n := 2 // Flags
+   n += 2 // Type
+   n += 4 // Length
+   n += len(f.Value)
+   return n
+}
+
+type certificateInfo struct {
+   certificateId [16]byte
+   securityLevel uint32
+   flags         uint32
+   infoType      uint32
+   digest        [32]byte
+   expiry        uint32
+   clientId      [16]byte // Client ID (can be used for license binding)
+}
+
+type features struct {
+   entries  uint32   // Number of feature entries
+   features []uint32 // Slice of feature IDs
+}
+
+func (f *features) size() int {
+   n := 4 // entries
+   n += 4 * len(f.features)
+   return n
+}
+
+type keyData struct {
+   keyType   uint16
+   length    uint16 // Total length of the keyData structure
+   flags     uint32
+   publicKey [64]byte // ECDSA P256 public key (X and Y coordinates)
+   usage     features // Features indicating key usage
+}
+
+type keyInfo struct {
+   entries uint32    // Number of key entries
+   keys    []keyData // Slice of keyData structures
+}
+
+func (k *keyData) size() int {
+   n := 2 // keyType
+   n += 2 // length
+   n += 4 // flags
+   n += len(k.publicKey)
+   n += k.usage.size()
+   return n
+}
+
+func (k *keyInfo) size() int {
+   n := 4 // entries
+   for _, key := range k.keys {
+      n += key.size()
+   }
+   return n
+}
+
+func (c *certificateSignature) size() int {
+   n := 2 // signatureType
+   n += 2  // signatureLength
+   n += 64 // signature
+   n += 4  // issuerLength
+   n += 64 // issuerKey
+   return n
+}
+
+type Certificate struct {
+   Magic             [4]byte               // bytes 0 - 3
+   Version           uint32                // bytes 4 - 7
+   Length            uint32                // bytes 8 - 11
+   LengthToSignature uint32                // bytes 12 - 15
+   certificateInfo   *certificateInfo      // type 1
+   feature           *ftlv                 // type 5
+   keyInfo           *keyInfo              // type 6
+   manufacturer      *ftlv                 // type 7
+   signature         *certificateSignature // type 8
+}
+
+func (c *Certificate) size() (uint32, uint32) {
+   n := len(c.Magic)
+   n += 4 // Version
+   n += 4 // Length
+   n += 4 // LengthToSignature
+   if c.certificateInfo != nil {
+      n += new(ftlv).size()
+      n += binary.Size(c.certificateInfo)
+   }
+   if c.feature != nil {
+      n += c.feature.size()
+   }
+   if c.keyInfo != nil {
+      n += new(ftlv).size()
+      n += c.keyInfo.size()
+   }
+   if c.manufacturer != nil {
+      n += c.manufacturer.size()
+   }
+   n1 := n
+   n1 += new(ftlv).size()
+   n1 += c.signature.size()
+   return uint32(n), uint32(n1)
 }

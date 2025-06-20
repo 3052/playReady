@@ -88,14 +88,13 @@ func (f *ftlv) decode(data []byte) int {
 
 // new initializes a new key with provided data and type.
 func (k *keyData) New(data []byte, Type uint32) {
-   k.keyType = 1  // Assuming type 1 is for ECDSA keys
-   k.length = 512 // Assuming key length in bits
+   k.length = 512 // required
    copy(k.publicKey[:], data)
    k.usage.New(Type)
 }
 
 func (f *features) New(Type uint32) {
-   f.entries = 1
+   f.entries = 1 // required
    f.features = []uint32{Type}
 }
 
@@ -146,7 +145,7 @@ func (e *EcKey) Decode(data []byte) {
 }
 
 func (k *keyInfo) New(signEncryptKey []byte) {
-   k.entries = 2
+   k.entries = 2 // required
    k.keys = make([]keyData, 2)
    k.keys[0].New(signEncryptKey, 1)
    k.keys[1].New(signEncryptKey, 2)
