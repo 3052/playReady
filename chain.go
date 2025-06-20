@@ -12,62 +12,6 @@ import (
    "slices"
 )
 
-// decode decodes a byte slice into the features structure.
-// It returns the number of bytes consumed.
-func (f *features) decode(data []byte) int {
-   f.entries = binary.BigEndian.Uint32(data)
-   n := 4
-   f.features = make([]uint32, f.entries)
-   for i := range f.entries { // Correctly iterate up to f.entries
-      f.features[i] = binary.BigEndian.Uint32(data[n:])
-      n += 4
-   }
-   return n
-}
-
-func (k *keyInfo) decode(data []byte) {
-   k.entries = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   k.keys = make([]keyData, k.entries)
-   for i := range k.entries { // Correctly iterate up to k.entries
-      var key keyData
-      n := key.decode(data) // Decode each keyData object
-      k.keys[i] = key
-      data = data[n:] // Advance data slice for the next key
-   }
-}
-
-func (f *ftlv) size() int {
-   n := 2 // Flags
-   n += 2 // Type
-   n += 4 // Length
-   n += len(f.Value)
-   return n
-}
-
-func (f *features) size() int {
-   n := 4 // entries
-   n += 4 * len(f.features)
-   return n
-}
-
-func (k *keyData) size() int {
-   n := 2 // keyType
-   n += 2 // length
-   n += 4 // flags
-   n += len(k.publicKey)
-   n += k.usage.size()
-   return n
-}
-
-func (k *keyInfo) size() int {
-   n := 4 // entries
-   for _, key := range k.keys {
-      n += key.size()
-   }
-   return n
-}
-
 func (c *Certificate) size() (uint32, uint32) {
    n := len(c.Magic)
    n += 4 // Version
@@ -418,41 +362,35 @@ func (c *certificateInfo) decode(data []byte) {
    copy(c.clientId[:], data)
 }
 
-///
+type ftlv struct {
+   Flags  uint16
+   Type   uint16
+   Length uint32
+   Value  []byte // The raw value bytes of the FTLV object
+}
 
-func (f *ftlv) decode(data []byte) int {
+func (f *ftlv) verify(data []byte) bool {
+   if f.Length >= 8 {
+      if int(f.Length) <= len(data) {
+         return true
+      }
+   }
+   return false
+}
+
+func (f *ftlv) decode(data []byte) (int, error) {
    f.Flags = binary.BigEndian.Uint16(data)
    n := 2
    f.Type = binary.BigEndian.Uint16(data[n:])
    n += 2
    f.Length = binary.BigEndian.Uint32(data[n:])
+   if !f.verify(data) {
+      return 0, errors.New("FTLV length invalid")
+   }
    n += 4
-   // The Value slice should contain Length-8 bytes (total length minus Flags, Type, Length fields).
-   // Ensure not to panic if remaining data is less than expected FTLV Value
-   // length. Go's slicing will handle `data[n:][:f.Length-8]` gracefully if
-   // `f.Length-8` is larger than `len(data[n:])`, taking the minimum
-   // available. However, if f.Length is less than 8, f.Length-8 would be
-   // negative, causing a panic. A robust implementation would check
-   // f.Length >= 8 before slicing. For this request, we assume valid f.Length
-   // values as per the original code's implied behavior.
-   valueLen := int(f.Length - 8)
-   if valueLen < 0 {
-      // Handle malformed FTLV where Length is too small to contain header.
-      // This should ideally be an error, but per the original function's structure,
-      // we'll try to process and return bytes consumed.
-      // For now, we'll just set valueLen to 0 to avoid panic if Length is less than 8.
-      valueLen = 0
-   }
-   if valueLen > len(data[n:]) {
-      // If the reported length is greater than available data, take all
-      // available data.
-      f.Value = data[n:]
-   } else {
-      f.Value = data[n:][:valueLen]
-   }
-
+   f.Value = data[n:f.Length]
    n += len(f.Value)
-   return n
+   return n, nil
 }
 
 func (c *Certificate) decode(data []byte) (int, error) {
@@ -470,11 +408,9 @@ func (c *Certificate) decode(data []byte) (int, error) {
    n += 4
    for n < int(c.Length) {
       var value ftlv
-      bytesReadFromFtlv := value.decode(data[n:])
-      if bytesReadFromFtlv == 0 {
-         if len(data[n:]) >= 1 {
-            return 0, errors.New("FTLV.decode read 0 bytes but more rawData was available, potential malformed FTLV")
-         }
+      bytesReadFromFtlv, err := value.decode(data[n:])
+      if err != nil {
+         return 0, err
       }
       switch value.Type {
       case objTypeBasic: // 0x0001

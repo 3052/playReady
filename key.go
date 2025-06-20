@@ -33,6 +33,13 @@ const (
    objTypeSecurityVersion2 = 0x0011
 )
 
+func (f *features) New(Type uint32) {
+   f.entries = 1 // required
+   f.features = []uint32{Type}
+}
+
+///
+
 // decode decodes a byte slice into the keyData structure. It returns the
 // number of bytes consumed.
 func (k *keyData) decode(data []byte) int {
@@ -52,11 +59,6 @@ func (k *keyData) New(data []byte, Type uint32) {
    k.length = 512 // required
    copy(k.publicKey[:], data)
    k.usage.New(Type)
-}
-
-func (f *features) New(Type uint32) {
-   f.entries = 1 // required
-   f.features = []uint32{Type}
 }
 
 func (k *keyInfo) encode() []byte {

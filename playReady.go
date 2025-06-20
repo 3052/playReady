@@ -10,11 +10,60 @@ import (
    "github.com/deatil/go-cryptobin/mac"
 )
 
-type ftlv struct {
-   Flags  uint16
-   Type   uint16
-   Length uint32
-   Value  []byte // The raw value bytes of the FTLV object
+// decode decodes a byte slice into the features structure.
+// It returns the number of bytes consumed.
+func (f *features) decode(data []byte) int {
+   f.entries = binary.BigEndian.Uint32(data)
+   n := 4
+   f.features = make([]uint32, f.entries)
+   for i := range f.entries { // Correctly iterate up to f.entries
+      f.features[i] = binary.BigEndian.Uint32(data[n:])
+      n += 4
+   }
+   return n
+}
+
+func (k *keyInfo) decode(data []byte) {
+   k.entries = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   k.keys = make([]keyData, k.entries)
+   for i := range k.entries { // Correctly iterate up to k.entries
+      var key keyData
+      n := key.decode(data) // Decode each keyData object
+      k.keys[i] = key
+      data = data[n:] // Advance data slice for the next key
+   }
+}
+
+func (f *ftlv) size() int {
+   n := 2 // Flags
+   n += 2 // Type
+   n += 4 // Length
+   n += len(f.Value)
+   return n
+}
+
+func (f *features) size() int {
+   n := 4 // entries
+   n += 4 * len(f.features)
+   return n
+}
+
+func (k *keyData) size() int {
+   n := 2 // keyType
+   n += 2 // length
+   n += 4 // flags
+   n += len(k.publicKey)
+   n += k.usage.size()
+   return n
+}
+
+func (k *keyInfo) size() int {
+   n := 4 // entries
+   for _, key := range k.keys {
+      n += key.size()
+   }
+   return n
 }
 
 type certificateInfo struct {
@@ -112,7 +161,11 @@ func (l *License) decode(data []byte) error {
    var n1 int
    for n1 < int(l.OuterContainer.Length)-16 {
       var value ftlv
-      n1 += value.decode(l.OuterContainer.Value[n1:])
+      n3, err := value.decode(l.OuterContainer.Value[n1:])
+      if err != nil {
+         return err
+      }
+      n1 += n3
       switch xmrType(value.Type) {
       case globalPolicyContainerEntryType: // 2
          // Rakuten
@@ -122,7 +175,11 @@ func (l *License) decode(data []byte) error {
          var n2 int
          for n2 < int(value.Length)-16 {
             var value1 ftlv
-            n2 += value1.decode(value.Value[n2:])
+            n4, err := value1.decode(value.Value[n2:])
+            if err != nil {
+               return err
+            }
+            n2 += n4
             switch xmrType(value1.Type) {
             case contentKeyEntryType: // 10
                l.ContentKey = &ContentKey{}
