@@ -8,10 +8,10 @@ import (
 )
 
 type License struct {
-   Magic    [4]byte
-   Offset   uint16
-   Version  uint16
-   RightsID [16]byte
+   Magic      [4]byte
+   Offset     uint16
+   Version    uint16
+   RightsID   [16]byte
    ContentKey *ContentKey
    eccKey     *eccKey
    signature  *licenseSignature
