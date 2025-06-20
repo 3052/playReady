@@ -78,30 +78,12 @@ func (c *certificateSignature) size() int {
    return n
 }
 
-func (c *certificateSignature) New(signature, modelKey []byte) error {
-   c.signatureType = 1 // required
-   c.signatureLength = 64
-   if len(signature) != 64 {
-      return errors.New("signature length invalid")
-   }
-   c.signature = signature
-   c.issuerLength = 512
-   if len(modelKey) != 64 {
-      return errors.New("model key length invalid")
-   }
-   c.IssuerKey = modelKey
-   return nil
-}
-
-///
-
 func (c *certificateSignature) encode() []byte {
    data := binary.BigEndian.AppendUint16(nil, c.signatureType)
    data = binary.BigEndian.AppendUint16(data, c.signatureLength)
    data = append(data, c.signature...)
    data = binary.BigEndian.AppendUint32(data, c.issuerLength)
-   data = append(data, c.IssuerKey...)
-   return data
+   return append(data, c.IssuerKey...)
 }
 
 func (c *Certificate) encode() []byte {
@@ -181,56 +163,6 @@ func (c *Chain) Decode(data []byte) error {
    return nil
 }
 
-func (c *Chain) RequestBody(signEncrypt EcKey, kid []byte) ([]byte, error) {
-   var key xmlKey
-   key.New()
-   cipherData, err := c.cipherData(&key)
-   if err != nil {
-      return nil, err
-   }
-   la := newLa(&key.PublicKey, cipherData, kid)
-   laData, err := la.Marshal()
-   if err != nil {
-      return nil, err
-   }
-   laDigest := sha256.Sum256(laData)
-   signedInfo := xml.SignedInfo{
-      XmlNs: "http://www.w3.org/2000/09/xmldsig#",
-      Reference: xml.Reference{
-         Uri:         "#SignedData",
-         DigestValue: laDigest[:],
-      },
-   }
-   signedData, err := signedInfo.Marshal()
-   if err != nil {
-      return nil, err
-   }
-   signedDigest := sha256.Sum256(signedData)
-   r, s, err := ecdsa.Sign(Fill('B'), signEncrypt[0], signedDigest[:])
-   if err != nil {
-      return nil, err
-   }
-   envelope := xml.Envelope{
-      Soap: "http://schemas.xmlsoap.org/soap/envelope/",
-      Body: xml.Body{
-         AcquireLicense: &xml.AcquireLicense{
-            XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols",
-            Challenge: xml.Challenge{
-               Challenge: xml.InnerChallenge{
-                  XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols/messages",
-                  La:    la,
-                  Signature: xml.Signature{
-                     SignedInfo:     signedInfo,
-                     SignatureValue: append(r.Bytes(), s.Bytes()...),
-                  },
-               },
-            },
-         },
-      },
-   }
-   return envelope.Marshal()
-}
-
 func (c *Certificate) verify(pubKey []byte) bool {
    if !bytes.Equal(c.signature.IssuerKey, pubKey) {
       return false
@@ -262,6 +194,15 @@ func (c *Chain) verify() bool {
    return true
 }
 
+type Chain struct {
+   Magic     [4]byte
+   Version   uint32
+   Length    uint32
+   Flags     uint32
+   CertCount uint32
+   Certs     []Certificate
+}
+
 func (c *Chain) Encode() []byte {
    data := c.Magic[:]
    data = binary.BigEndian.AppendUint32(data, c.Version)
@@ -272,64 +213,6 @@ func (c *Chain) Encode() []byte {
       data = append(data, cert.encode()...)
    }
    return data
-}
-
-type Chain struct {
-   Magic     [4]byte
-   Version   uint32
-   Length    uint32
-   Flags     uint32
-   CertCount uint32
-   Certs     []Certificate
-}
-
-// decode parses the byte slice into the Certificate structure. It returns the
-// number of bytes consumed and an error, if any.
-func (c *Certificate) decode(data []byte) (int, error) {
-   // Copy the magic bytes and check for "CERT" signature.
-   n := copy(c.Magic[:], data)
-   if string(c.Magic[:]) != "CERT" {
-      return 0, errors.New("failed to find cert magic")
-   }
-   // Decode Version, Length, and LengthToSignature fields.
-   c.Version = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   c.Length = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   c.LengthToSignature = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   rawData := data[n:][:c.Length-16]
-   n += len(rawData) // Increment total bytes consumed by the rawData length
-   // Initialize the slice to store unhandled FTLV objects.
-   var n1 int // n1 tracks bytes consumed within rawData
-   for n1 < len(rawData) {
-      var value ftlv
-      // Decode the current FTLV object.
-      // ftlv.decode returns the number of bytes read for this FTLV object.
-      bytesReadFromFtlv := value.decode(rawData[n1:])
-      if bytesReadFromFtlv == 0 && len(rawData[n1:]) > 0 {
-         return n, errors.New("FTLV.decode read 0 bytes but more rawData was available, potential malformed FTLV")
-      }
-      switch value.Type {
-      case objTypeBasic: // 0x0001
-         c.certificateInfo = &certificateInfo{}
-         c.certificateInfo.decode(value.Value)
-      case objTypeFeature: // 0x0005
-         c.feature = &value
-      case objTypeKey: // 0x0006
-         c.keyInfo = &keyInfo{}
-         c.keyInfo.decode(value.Value)
-      case objTypeManufacturer: // 0x0007
-         c.manufacturer = &value
-      case objTypeSignature: // 0x0008
-         c.signature = &certificateSignature{}
-         c.signature.decode(value.Value)
-      default:
-         return 0, errors.New("FTLV.Type")
-      }
-      n1 += bytesReadFromFtlv // Move to the next FTLV object in rawData
-   }
-   return n, nil // Return total bytes consumed and nil for no error
 }
 
 // decode decodes a byte slice into the certificateInfo structure.
@@ -374,20 +257,6 @@ func (k *keyInfo) decode(data []byte) {
    }
 }
 
-func (c *certificateSignature) decode(data []byte) {
-   c.signatureType = binary.BigEndian.Uint16(data) // 0x1 2 bytes total
-   data = data[2:]
-   c.signatureLength = binary.BigEndian.Uint16(data) // 0x40 (64) 4 bytes total
-   data = data[2:]
-   c.signature = data[:c.signatureLength] // 70 bytes total
-   data = data[c.signatureLength:]
-   c.issuerLength = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   // Ensure IssuerKey is sliced to its specific length
-   c.IssuerKey = data[:c.issuerLength/8]
-}
-
-// this needs to return int
 func (f *ftlv) size() int {
    n := 2 // Flags
    n += 2 // Type
@@ -443,6 +312,87 @@ func (c *Certificate) size() (uint32, uint32) {
    n1 += c.signature.size()
    return uint32(n), uint32(n1)
 }
+
+func (c *Chain) RequestBody(signEncrypt EcKey, kid []byte) ([]byte, error) {
+   var key xmlKey
+   key.New()
+   cipherData, err := c.cipherData(&key)
+   if err != nil {
+      return nil, err
+   }
+   la := newLa(&key.PublicKey, cipherData, kid)
+   laData, err := la.Marshal()
+   if err != nil {
+      return nil, err
+   }
+   laDigest := sha256.Sum256(laData)
+   signedInfo := xml.SignedInfo{
+      XmlNs: "http://www.w3.org/2000/09/xmldsig#",
+      Reference: xml.Reference{
+         Uri:         "#SignedData",
+         DigestValue: laDigest[:],
+      },
+   }
+   signedData, err := signedInfo.Marshal()
+   if err != nil {
+      return nil, err
+   }
+   signedDigest := sha256.Sum256(signedData)
+   signature, err := sign(signEncrypt[0], signedDigest[:])
+   if err != nil {
+      return nil, err
+   }
+   envelope := xml.Envelope{
+      Soap: "http://schemas.xmlsoap.org/soap/envelope/",
+      Body: xml.Body{
+         AcquireLicense: &xml.AcquireLicense{
+            XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols",
+            Challenge: xml.Challenge{
+               Challenge: xml.InnerChallenge{
+                  XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols/messages",
+                  La:    la,
+                  Signature: xml.Signature{
+                     SignedInfo:     signedInfo,
+                     SignatureValue: signature,
+                  },
+               },
+            },
+         },
+      },
+   }
+   return envelope.Marshal()
+}
+
+func (c *certificateSignature) New(signature, modelKey []byte) error {
+   c.signatureType = 1 // required
+   c.signatureLength = 64
+   if len(signature) != 64 {
+      return errors.New("signature length invalid")
+   }
+   c.signature = signature
+   c.issuerLength = 512
+   if len(modelKey) != 64 {
+      return errors.New("model key length invalid")
+   }
+   c.IssuerKey = modelKey
+   return nil
+}
+
+///
+
+func (c *certificateSignature) decode(data []byte) {
+   c.signatureType = binary.BigEndian.Uint16(data) // 0x1 2 bytes total
+   data = data[2:]
+   c.signatureLength = binary.BigEndian.Uint16(data) // 0x40 (64) 4 bytes total
+   data = data[2:]
+   c.signature = data[:c.signatureLength] // 70 bytes total
+   data = data[c.signatureLength:]
+   c.issuerLength = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   // Ensure IssuerKey is sliced to its specific length
+   c.IssuerKey = data[:c.issuerLength/8]
+}
+
 func (c *Chain) Leaf(modelKey, signEncryptKey *EcKey) error {
    if !bytes.Equal(c.Certs[0].keyInfo.keys[0].publicKey[:], modelKey.public()) {
       return errors.New("zgpriv not for cert")
@@ -475,12 +425,12 @@ func (c *Chain) Leaf(modelKey, signEncryptKey *EcKey) error {
    {
       cert.LengthToSignature, cert.Length = cert.size()
       sum := sha256.Sum256(cert.encode())
-      r, s, err := ecdsa.Sign(Fill('A'), modelKey[0], sum[:])
+      signature, err := sign(modelKey[0], sum[:])
       if err != nil {
          return err
       }
       var value certificateSignature
-      err = value.New(append(r.Bytes(), s.Bytes()...), modelKey.public())
+      err = value.New(signature, modelKey.public())
       if err != nil {
          return err
       }
@@ -491,3 +441,52 @@ func (c *Chain) Leaf(modelKey, signEncryptKey *EcKey) error {
    c.Length += cert.Length
    return nil
 }
+// decode parses the byte slice into the Certificate structure. It returns the
+// number of bytes consumed and an error, if any.
+func (c *Certificate) decode(data []byte) (int, error) {
+   // Copy the magic bytes and check for "CERT" signature.
+   n := copy(c.Magic[:], data)
+   if string(c.Magic[:]) != "CERT" {
+      return 0, errors.New("failed to find cert magic")
+   }
+   // Decode Version, Length, and LengthToSignature fields.
+   c.Version = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   c.Length = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   c.LengthToSignature = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   rawData := data[n:][:c.Length-16]
+   n += len(rawData) // Increment total bytes consumed by the rawData length
+   // Initialize the slice to store unhandled FTLV objects.
+   var n1 int // n1 tracks bytes consumed within rawData
+   for n1 < len(rawData) {
+      var value ftlv
+      // Decode the current FTLV object.
+      // ftlv.decode returns the number of bytes read for this FTLV object.
+      bytesReadFromFtlv := value.decode(rawData[n1:])
+      if bytesReadFromFtlv == 0 && len(rawData[n1:]) > 0 {
+         return n, errors.New("FTLV.decode read 0 bytes but more rawData was available, potential malformed FTLV")
+      }
+      switch value.Type {
+      case objTypeBasic: // 0x0001
+         c.certificateInfo = &certificateInfo{}
+         c.certificateInfo.decode(value.Value)
+      case objTypeFeature: // 0x0005
+         c.feature = &value
+      case objTypeKey: // 0x0006
+         c.keyInfo = &keyInfo{}
+         c.keyInfo.decode(value.Value)
+      case objTypeManufacturer: // 0x0007
+         c.manufacturer = &value
+      case objTypeSignature: // 0x0008
+         c.signature = &certificateSignature{}
+         c.signature.decode(value.Value)
+      default:
+         return 0, errors.New("FTLV.Type")
+      }
+      n1 += bytesReadFromFtlv // Move to the next FTLV object in rawData
+   }
+   return n, nil // Return total bytes consumed and nil for no error
+}
+

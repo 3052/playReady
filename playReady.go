@@ -3,11 +3,20 @@ package playReady
 import (
    "bytes"
    "crypto/aes"
+   "crypto/ecdsa"
    "encoding/binary"
    "errors"
    "github.com/deatil/go-cryptobin/cryptobin/crypto"
    "github.com/deatil/go-cryptobin/mac"
 )
+
+func sign(key *ecdsa.PrivateKey, hash []byte) ([]byte, error) {
+   r, s, err := ecdsa.Sign(Fill('!'), key, hash)
+   if err != nil {
+      return nil, err
+   }
+   return append(r.Bytes(), s.Bytes()...), nil
+}
 
 func (f *ftlv) New(flags, Type int, value []byte) {
    f.Flags = uint16(flags)
