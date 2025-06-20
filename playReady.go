@@ -7,6 +7,17 @@ import (
    "github.com/deatil/go-cryptobin/cryptobin/crypto"
 )
 
+type License struct {
+   Magic    [4]byte
+   Offset   uint16
+   Version  uint16
+   RightsID [16]byte
+   ContentKey *ContentKey
+   eccKey     *eccKey
+   signature  *licenseSignature
+   auxKeys    *auxKeys
+}
+
 func (l *License) decode(data []byte) error {
    n := copy(l.Magic[:], data)
    data = data[n:]
@@ -16,50 +27,49 @@ func (l *License) decode(data []byte) error {
    data = data[2:]
    n = copy(l.RightsID[:], data)
    data = data[n:]
-   _, err := l.OuterContainer.decode(data)
+   var outer ftlv
+   _, err := outer.decode(data)
    if err != nil {
       return err
    }
-   var n1 int
-   for n1 < int(l.OuterContainer.Length)-16 {
-      var value ftlv
-      n3, err := value.decode(l.OuterContainer.Value[n1:])
+   for len(outer.Value) >= 1 {
+      var inner ftlv
+      n, err = inner.decode(outer.Value)
       if err != nil {
          return err
       }
-      n1 += n3
-      switch xmrType(value.Type) {
+      outer.Value = outer.Value[n:]
+      switch xmrType(inner.Type) {
       case globalPolicyContainerEntryType: // 2
          // Rakuten
       case playbackPolicyContainerEntryType: // 4
          // Rakuten
       case keyMaterialContainerEntryType: // 9
-         var n2 int
-         for n2 < int(value.Length)-16 {
-            var value1 ftlv
-            n4, err := value1.decode(value.Value[n2:])
+         for len(inner.Value) >= 1 {
+            var key ftlv
+            n, err = key.decode(inner.Value)
             if err != nil {
                return err
             }
-            n2 += n4
-            switch xmrType(value1.Type) {
+            inner.Value = inner.Value[n:]
+            switch xmrType(key.Type) {
             case contentKeyEntryType: // 10
                l.ContentKey = &ContentKey{}
-               l.ContentKey.decode(value1.Value)
+               l.ContentKey.decode(key.Value)
             case deviceKeyEntryType: // 42
                l.eccKey = &eccKey{}
-               l.eccKey.decode(value1.Value)
+               l.eccKey.decode(key.Value)
             case auxKeyEntryType: // 81
                l.auxKeys = &auxKeys{}
-               l.auxKeys.decode(value1.Value)
+               l.auxKeys.decode(key.Value)
             default:
                return errors.New("FTLV.type")
             }
          }
       case signatureEntryType: // 11
          l.signature = &licenseSignature{}
-         l.signature.decode(value.Value)
-         l.signature.Length = uint16(value.Length)
+         l.signature.decode(inner.Value)
+         l.signature.Length = uint16(inner.Length)
       default:
          return errors.New("FTLV.type")
       }
@@ -323,16 +333,4 @@ func (a *auxKeys) decode(data []byte) {
       a.Keys[i] = key
       data = data[n:]
    }
-}
-
-type License struct {
-   Magic          [4]byte
-   Offset         uint16
-   Version        uint16
-   RightsID       [16]byte
-   OuterContainer ftlv
-   ContentKey     *ContentKey
-   eccKey         *eccKey
-   signature      *licenseSignature
-   auxKeys         *auxKeys
 }
