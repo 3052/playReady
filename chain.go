@@ -12,6 +12,205 @@ import (
    "slices"
 )
 
+func (f *ftlv) New(Type uint16, value []byte) {
+   f.Flags = 1
+   f.Type = Type
+   f.Length = uint32(len(value)) + 8
+   f.Value = value
+}
+
+func (c *Certificate) encode() []byte {
+   data := c.Magic[:]
+   data = binary.BigEndian.AppendUint32(data, c.Version)
+   data = binary.BigEndian.AppendUint32(data, c.Length)
+   data = binary.BigEndian.AppendUint32(data, c.LengthToSignature)
+   if c.certificateInfo != nil {
+      var value ftlv
+      value.New(1, c.certificateInfo.encode())
+      data = append(data, value.encode()...)
+   }
+   if c.feature != nil {
+      data = append(data, c.feature.encode()...)
+   }
+   if c.keyInfo != nil {
+      var value ftlv
+      value.New(6, c.keyInfo.encode())
+      data = append(data, value.encode()...)
+   }
+   if c.manufacturer != nil {
+      data = append(data, c.manufacturer.encode()...)
+   }
+   if c.signature != nil {
+      var value ftlv
+      value.New(8, c.signature.encode())
+      data = append(data, value.encode()...)
+   }
+   return data
+}
+
+func (c *Chain) Leaf(modelKey, signEncryptKey *EcKey) error {
+   if !bytes.Equal(c.Certs[0].keyInfo.keys[0].publicKey[:], modelKey.public()) {
+      return errors.New("zgpriv not for cert")
+   }
+   if !c.verify() {
+      return errors.New("cert is not valid")
+   }
+   var cert Certificate
+   copy(cert.Magic[:], "CERT")
+   cert.Version = 1 // required
+   {
+      sum := sha256.Sum256(signEncryptKey.public())
+      var value certificateInfo
+      value.New(c.Certs[0].certificateInfo.securityLevel, sum[:])
+      cert.certificateInfo = &value
+   }
+   {
+      // SCALABLE with SL2000, SUPPORTS_PR3_FEATURES
+      var data features
+      data.New(0xD)
+      var value ftlv
+      value.New(5, data.encode())
+      cert.feature = &value
+   }
+   {
+      var value keyInfo
+      value.New(signEncryptKey.public())
+      cert.keyInfo = &value
+   }
+   {
+      cert.LengthToSignature, cert.Length = cert.size()
+      sum := sha256.Sum256(cert.encode())
+      signature, err := sign(modelKey[0], sum[:])
+      if err != nil {
+         return err
+      }
+      var value certificateSignature
+      err = value.New(signature, modelKey.public())
+      if err != nil {
+         return err
+      }
+      cert.signature = &value
+   }
+   c.CertCount += 1
+   c.Certs = slices.Insert(c.Certs, 0, cert)
+   c.Length += cert.Length
+   return nil
+}
+
+func (c *certificateSignature) New(signature, modelKey []byte) error {
+   c.signatureType = 1 // required
+   c.signatureLength = 64
+   if len(signature) != 64 {
+      return errors.New("signature length invalid")
+   }
+   c.signature = signature
+   c.issuerLength = 512
+   if len(modelKey) != 64 {
+      return errors.New("model key length invalid")
+   }
+   c.IssuerKey = modelKey
+   return nil
+}
+
+func (c *certificateSignature) decode(data []byte) error {
+   c.signatureType = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   c.signatureLength = binary.BigEndian.Uint16(data)
+   if c.signatureLength != 64 {
+      return errors.New("signature length invalid")
+   }
+   data = data[2:]
+   c.signature = data[:c.signatureLength]
+   data = data[c.signatureLength:]
+   c.issuerLength = binary.BigEndian.Uint32(data)
+   if c.issuerLength != 512 {
+      return errors.New("issuer length invalid")
+   }
+   data = data[4:]
+   c.IssuerKey = data[:c.issuerLength/8]
+   return nil
+}
+
+func (f *ftlv) decode(data []byte) int {
+   f.Flags = binary.BigEndian.Uint16(data)
+   n := 2
+   f.Type = binary.BigEndian.Uint16(data[n:])
+   n += 2
+   f.Length = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   // The Value slice should contain Length-8 bytes (total length minus Flags, Type, Length fields).
+   // Ensure not to panic if remaining data is less than expected FTLV Value
+   // length. Go's slicing will handle `data[n:][:f.Length-8]` gracefully if
+   // `f.Length-8` is larger than `len(data[n:])`, taking the minimum
+   // available. However, if f.Length is less than 8, f.Length-8 would be
+   // negative, causing a panic. A robust implementation would check
+   // f.Length >= 8 before slicing. For this request, we assume valid f.Length
+   // values as per the original code's implied behavior.
+   valueLen := int(f.Length - 8)
+   if valueLen < 0 {
+      // Handle malformed FTLV where Length is too small to contain header.
+      // This should ideally be an error, but per the original function's structure,
+      // we'll try to process and return bytes consumed.
+      // For now, we'll just set valueLen to 0 to avoid panic if Length is less than 8.
+      valueLen = 0
+   }
+   if valueLen > len(data[n:]) {
+      // If the reported length is greater than available data, take all
+      // available data.
+      f.Value = data[n:]
+   } else {
+      f.Value = data[n:][:valueLen]
+   }
+
+   n += len(f.Value)
+   return n
+}
+
+func (c *Certificate) decode(data []byte) (int, error) {
+   // Copy the magic bytes and check for "CERT" signature.
+   n := copy(c.Magic[:], data)
+   if string(c.Magic[:]) != "CERT" {
+      return 0, errors.New("failed to find cert magic")
+   }
+   // Decode Version, Length, and LengthToSignature fields.
+   c.Version = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   c.Length = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   c.LengthToSignature = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   for n < int(c.Length) {
+      var value ftlv
+      bytesReadFromFtlv := value.decode(data[n:])
+      if bytesReadFromFtlv == 0 {
+         if len(data[n:]) >= 1 {
+            return 0, errors.New("FTLV.decode read 0 bytes but more rawData was available, potential malformed FTLV")
+         }
+      }
+      switch value.Type {
+      case objTypeBasic: // 0x0001
+         c.certificateInfo = &certificateInfo{}
+         c.certificateInfo.decode(value.Value)
+      case objTypeFeature: // 0x0005
+         c.feature = &value
+      case objTypeKey: // 0x0006
+         c.keyInfo = &keyInfo{}
+         c.keyInfo.decode(value.Value)
+      case objTypeManufacturer: // 0x0007
+         c.manufacturer = &value
+      case objTypeSignature: // 0x0008
+         c.signature = &certificateSignature{}
+         err := c.signature.decode(value.Value)
+         if err != nil {
+            return 0, err
+         }
+      default:
+         return 0, errors.New("FTLV.Type")
+      }
+      n += bytesReadFromFtlv // Move to the next FTLV object in rawData
+   }
+   return n, nil // Return total bytes consumed and nil for no error
+}
 type Certificate struct {
    Magic             [4]byte               // bytes 0 - 3
    Version           uint32                // bytes 4 - 7
@@ -51,34 +250,7 @@ func (c *certificateSignature) encode() []byte {
    return append(data, c.IssuerKey...)
 }
 
-func (c *Certificate) encode() []byte {
-   data := c.Magic[:]
-   data = binary.BigEndian.AppendUint32(data, c.Version)
-   data = binary.BigEndian.AppendUint32(data, c.Length)
-   data = binary.BigEndian.AppendUint32(data, c.LengthToSignature)
-   if c.certificateInfo != nil {
-      var value ftlv
-      value.New(1, 1, c.certificateInfo.encode())
-      data = append(data, value.encode()...)
-   }
-   if c.feature != nil {
-      data = append(data, c.feature.encode()...)
-   }
-   if c.keyInfo != nil {
-      var value ftlv
-      value.New(1, 6, c.keyInfo.encode())
-      data = append(data, value.encode()...)
-   }
-   if c.manufacturer != nil {
-      data = append(data, c.manufacturer.encode()...)
-   }
-   if c.signature != nil {
-      var value ftlv
-      value.New(1, 8, c.signature.encode())
-      data = append(data, value.encode()...)
-   }
-   return data
-}
+///
 
 func (c *Chain) cipherData(key *xmlKey) ([]byte, error) {
    data := xml.Data{
@@ -326,168 +498,4 @@ func (c *Chain) RequestBody(signEncrypt EcKey, kid []byte) ([]byte, error) {
       },
    }
    return envelope.Marshal()
-}
-
-func (c *Chain) Leaf(modelKey, signEncryptKey *EcKey) error {
-   if !bytes.Equal(c.Certs[0].keyInfo.keys[0].publicKey[:], modelKey.public()) {
-      return errors.New("zgpriv not for cert")
-   }
-   if !c.verify() {
-      return errors.New("cert is not valid")
-   }
-   var cert Certificate
-   copy(cert.Magic[:], "CERT")
-   cert.Version = 1 // required
-   {
-      sum := sha256.Sum256(signEncryptKey.public())
-      var value certificateInfo
-      value.New(c.Certs[0].certificateInfo.securityLevel, sum[:])
-      cert.certificateInfo = &value
-   }
-   {
-      // SCALABLE with SL2000, SUPPORTS_PR3_FEATURES
-      var data features
-      data.New(0xD)
-      var value ftlv
-      value.New(1, 5, data.encode())
-      cert.feature = &value
-   }
-   {
-      var value keyInfo
-      value.New(signEncryptKey.public())
-      cert.keyInfo = &value
-   }
-   {
-      cert.LengthToSignature, cert.Length = cert.size()
-      sum := sha256.Sum256(cert.encode())
-      signature, err := sign(modelKey[0], sum[:])
-      if err != nil {
-         return err
-      }
-      var value certificateSignature
-      err = value.New(signature, modelKey.public())
-      if err != nil {
-         return err
-      }
-      cert.signature = &value
-   }
-   c.CertCount += 1
-   c.Certs = slices.Insert(c.Certs, 0, cert)
-   c.Length += cert.Length
-   return nil
-}
-
-func (c *certificateSignature) New(signature, modelKey []byte) error {
-   c.signatureType = 1 // required
-   c.signatureLength = 64
-   if len(signature) != 64 {
-      return errors.New("signature length invalid")
-   }
-   c.signature = signature
-   c.issuerLength = 512
-   if len(modelKey) != 64 {
-      return errors.New("model key length invalid")
-   }
-   c.IssuerKey = modelKey
-   return nil
-}
-
-func (c *certificateSignature) decode(data []byte) error {
-   c.signatureType = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   c.signatureLength = binary.BigEndian.Uint16(data)
-   if c.signatureLength != 64 {
-      return errors.New("signature length invalid")
-   }
-   data = data[2:]
-   c.signature = data[:c.signatureLength]
-   data = data[c.signatureLength:]
-   c.issuerLength = binary.BigEndian.Uint32(data)
-   if c.issuerLength != 512 {
-      return errors.New("issuer length invalid")
-   }
-   data = data[4:]
-   c.IssuerKey = data[:c.issuerLength/8]
-   return nil
-}
-
-func (f *ftlv) decode(data []byte) int {
-   f.Flags = binary.BigEndian.Uint16(data)
-   n := 2
-   f.Type = binary.BigEndian.Uint16(data[n:])
-   n += 2
-   f.Length = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   // The Value slice should contain Length-8 bytes (total length minus Flags, Type, Length fields).
-   // Ensure not to panic if remaining data is less than expected FTLV Value
-   // length. Go's slicing will handle `data[n:][:f.Length-8]` gracefully if
-   // `f.Length-8` is larger than `len(data[n:])`, taking the minimum
-   // available. However, if f.Length is less than 8, f.Length-8 would be
-   // negative, causing a panic. A robust implementation would check
-   // f.Length >= 8 before slicing. For this request, we assume valid f.Length
-   // values as per the original code's implied behavior.
-   valueLen := int(f.Length - 8)
-   if valueLen < 0 {
-      // Handle malformed FTLV where Length is too small to contain header.
-      // This should ideally be an error, but per the original function's structure,
-      // we'll try to process and return bytes consumed.
-      // For now, we'll just set valueLen to 0 to avoid panic if Length is less than 8.
-      valueLen = 0
-   }
-   if valueLen > len(data[n:]) {
-      // If the reported length is greater than available data, take all
-      // available data.
-      f.Value = data[n:]
-   } else {
-      f.Value = data[n:][:valueLen]
-   }
-
-   n += len(f.Value)
-   return n
-}
-
-func (c *Certificate) decode(data []byte) (int, error) {
-   // Copy the magic bytes and check for "CERT" signature.
-   n := copy(c.Magic[:], data)
-   if string(c.Magic[:]) != "CERT" {
-      return 0, errors.New("failed to find cert magic")
-   }
-   // Decode Version, Length, and LengthToSignature fields.
-   c.Version = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   c.Length = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   c.LengthToSignature = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   for n < int(c.Length) {
-      var value ftlv
-      bytesReadFromFtlv := value.decode(data[n:])
-      if bytesReadFromFtlv == 0 {
-         if len(data[n:]) >= 1 {
-            return 0, errors.New("FTLV.decode read 0 bytes but more rawData was available, potential malformed FTLV")
-         }
-      }
-      switch value.Type {
-      case objTypeBasic: // 0x0001
-         c.certificateInfo = &certificateInfo{}
-         c.certificateInfo.decode(value.Value)
-      case objTypeFeature: // 0x0005
-         c.feature = &value
-      case objTypeKey: // 0x0006
-         c.keyInfo = &keyInfo{}
-         c.keyInfo.decode(value.Value)
-      case objTypeManufacturer: // 0x0007
-         c.manufacturer = &value
-      case objTypeSignature: // 0x0008
-         c.signature = &certificateSignature{}
-         err := c.signature.decode(value.Value)
-         if err != nil {
-            return 0, err
-         }
-      default:
-         return 0, errors.New("FTLV.Type")
-      }
-      n += bytesReadFromFtlv // Move to the next FTLV object in rawData
-   }
-   return n, nil // Return total bytes consumed and nil for no error
 }

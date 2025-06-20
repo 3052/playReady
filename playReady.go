@@ -53,13 +53,6 @@ func sign(key *ecdsa.PrivateKey, hash []byte) ([]byte, error) {
    return append(r.Bytes(), s.Bytes()...), nil
 }
 
-func (f *ftlv) New(flags, Type int, value []byte) {
-   f.Flags = uint16(flags)
-   f.Type = uint16(Type)
-   f.Length = uint32(len(value) + 8)
-   f.Value = value
-}
-
 func (c *certificateInfo) New(securityLevel uint32, digest []byte) {
    c.securityLevel = securityLevel
    c.infoType = 2 // required
