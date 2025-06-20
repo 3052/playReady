@@ -1,14 +1,71 @@
 package playReady
 
 import (
-   "bytes"
-   "crypto/aes"
    "crypto/ecdsa"
    "encoding/binary"
    "errors"
    "github.com/deatil/go-cryptobin/cryptobin/crypto"
-   "github.com/deatil/go-cryptobin/mac"
 )
+
+func (l *License) decode(data []byte) error {
+   n := copy(l.Magic[:], data)
+   data = data[n:]
+   l.Offset = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   l.Version = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   n = copy(l.RightsID[:], data)
+   data = data[n:]
+   _, err := l.OuterContainer.decode(data)
+   if err != nil {
+      return err
+   }
+   var n1 int
+   for n1 < int(l.OuterContainer.Length)-16 {
+      var value ftlv
+      n3, err := value.decode(l.OuterContainer.Value[n1:])
+      if err != nil {
+         return err
+      }
+      n1 += n3
+      switch xmrType(value.Type) {
+      case globalPolicyContainerEntryType: // 2
+         // Rakuten
+      case playbackPolicyContainerEntryType: // 4
+         // Rakuten
+      case keyMaterialContainerEntryType: // 9
+         var n2 int
+         for n2 < int(value.Length)-16 {
+            var value1 ftlv
+            n4, err := value1.decode(value.Value[n2:])
+            if err != nil {
+               return err
+            }
+            n2 += n4
+            switch xmrType(value1.Type) {
+            case contentKeyEntryType: // 10
+               l.ContentKey = &ContentKey{}
+               l.ContentKey.decode(value1.Value)
+            case deviceKeyEntryType: // 42
+               l.eccKey = &eccKey{}
+               l.eccKey.decode(value1.Value)
+            case auxKeyEntryType: // 81
+               l.auxKeys = &auxKeys{}
+               l.auxKeys.decode(value1.Value)
+            default:
+               return errors.New("FTLV.type")
+            }
+         }
+      case signatureEntryType: // 11
+         l.signature = &licenseSignature{}
+         l.signature.decode(value.Value)
+         l.signature.Length = uint16(value.Length)
+      default:
+         return errors.New("FTLV.type")
+      }
+   }
+   return nil
+}
 
 func (f Fill) Read(data []byte) (int, error) {
    for index := range data {
@@ -163,26 +220,6 @@ func (c *certificateInfo) encode() []byte {
    return append(data, c.clientId[:]...)
 }
 
-func (l *License) encode() []byte {
-   data := l.Magic[:]
-   data = binary.BigEndian.AppendUint16(data, l.Offset)
-   data = binary.BigEndian.AppendUint16(data, l.Version)
-   data = append(data, l.RightsID[:]...)
-   return append(data, l.OuterContainer.encode()...)
-}
-
-type License struct {
-   Magic          [4]byte
-   Offset         uint16
-   Version        uint16
-   RightsID       [16]byte
-   OuterContainer ftlv
-   ContentKey     *ContentKey
-   eccKey         *eccKey
-   signature      *licenseSignature
-   auxKey         *auxKeys
-}
-
 // Decode decodes a byte slice into an AuxKey structure.
 func (a *auxKey) decode(data []byte) int {
    a.Location = binary.BigEndian.Uint32(data)
@@ -288,75 +325,14 @@ func (a *auxKeys) decode(data []byte) {
    }
 }
 
-func (l *License) verify(contentIntegrity []byte) error {
-   data := l.encode()
-   data = data[:len(data)-int(l.signature.Length)]
-   block, err := aes.NewCipher(contentIntegrity)
-   if err != nil {
-      return err
-   }
-   data = mac.NewCMAC(block, aes.BlockSize).MAC(data)
-   if !bytes.Equal(data, l.signature.Data) {
-      return errors.New("failed to decrypt the keys")
-   }
-   return nil
-}
-
-///
-
-func (l *License) decode(data []byte) error {
-   n := copy(l.Magic[:], data)
-   data = data[n:]
-   l.Offset = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   l.Version = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   n = copy(l.RightsID[:], data)
-   data = data[n:]
-   l.OuterContainer.decode(data)
-   var n1 int
-   for n1 < int(l.OuterContainer.Length)-16 {
-      var value ftlv
-      n3, err := value.decode(l.OuterContainer.Value[n1:])
-      if err != nil {
-         return err
-      }
-      n1 += n3
-      switch xmrType(value.Type) {
-      case globalPolicyContainerEntryType: // 2
-         // Rakuten
-      case playbackPolicyContainerEntryType: // 4
-         // Rakuten
-      case keyMaterialContainerEntryType: // 9
-         var n2 int
-         for n2 < int(value.Length)-16 {
-            var value1 ftlv
-            n4, err := value1.decode(value.Value[n2:])
-            if err != nil {
-               return err
-            }
-            n2 += n4
-            switch xmrType(value1.Type) {
-            case contentKeyEntryType: // 10
-               l.ContentKey = &ContentKey{}
-               l.ContentKey.decode(value1.Value)
-            case deviceKeyEntryType: // 42
-               l.eccKey = &eccKey{}
-               l.eccKey.decode(value1.Value)
-            case auxKeyEntryType: // 81
-               l.auxKey = &auxKeys{}
-               l.auxKey.decode(value1.Value)
-            default:
-               return errors.New("FTLV.type")
-            }
-         }
-      case signatureEntryType: // 11
-         l.signature = &licenseSignature{}
-         l.signature.decode(value.Value)
-         l.signature.Length = uint16(value.Length)
-      default:
-         return errors.New("FTLV.type")
-      }
-   }
-   return nil
+type License struct {
+   Magic          [4]byte
+   Offset         uint16
+   Version        uint16
+   RightsID       [16]byte
+   OuterContainer ftlv
+   ContentKey     *ContentKey
+   eccKey         *eccKey
+   signature      *licenseSignature
+   auxKeys         *auxKeys
 }

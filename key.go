@@ -12,6 +12,30 @@ import (
    "slices"
 )
 
+func (l *License) Decrypt(signEncrypt EcKey, data []byte) error {
+   var envelope xml.EnvelopeResponse
+   err := envelope.Unmarshal(data)
+   if err != nil {
+      return err
+   }
+   err = l.decode(envelope.
+      Body.
+      AcquireLicenseResponse.
+      AcquireLicenseResult.
+      Response.
+      LicenseResponse.
+      Licenses.
+      License,
+   )
+   if err != nil {
+      return err
+   }
+   if !bytes.Equal(l.eccKey.Value, signEncrypt.public()) {
+      return errors.New("license response is not for this device")
+   }
+   return l.ContentKey.decrypt(signEncrypt[0], l.auxKeys)
+}
+
 // they downgrade certs from the cert digest (hash of the signing key)
 func (f Fill) Key() (*EcKey, error) {
    key, err := ecdsa.GenerateKey(elliptic.P256(), f)
@@ -270,34 +294,6 @@ func (c *ContentKey) decrypt(key *ecdsa.PrivateKey, aux *auxKeys) error {
       return c.scalable(key, aux)
    }
    return errors.New("cannot decrypt key")
-}
-
-func (l *License) Decrypt(signEncrypt EcKey, data []byte) error {
-   var envelope xml.EnvelopeResponse
-   err := envelope.Unmarshal(data)
-   if err != nil {
-      return err
-   }
-   err = l.decode(envelope.
-      Body.
-      AcquireLicenseResponse.
-      AcquireLicenseResult.
-      Response.
-      LicenseResponse.
-      Licenses.
-      License,
-   )
-   if err != nil {
-      return err
-   }
-   if !bytes.Equal(l.eccKey.Value, signEncrypt.public()) {
-      return errors.New("license response is not for this device")
-   }
-   err = l.ContentKey.decrypt(signEncrypt[0], l.auxKey)
-   if err != nil {
-      return err
-   }
-   return l.verify(l.ContentKey.Integrity[:])
 }
 
 func (c *ContentKey) scalable(key *ecdsa.PrivateKey, auxKeys *auxKeys) error {
