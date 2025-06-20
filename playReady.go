@@ -9,6 +9,64 @@ import (
    "github.com/deatil/go-cryptobin/mac"
 )
 
+type ftlv struct {
+   Flags  uint16
+   Type   uint16
+   Length uint32
+   Value  []byte // The raw value bytes of the FTLV object
+}
+
+func (f *features) size() int {
+   n := binary.Size(f.entries)
+   for _, feature := range f.features {
+      n += binary.Size(feature)
+   }
+   return n
+}
+
+type features struct {
+   entries  uint32   // Number of feature entries
+   features []uint32 // Slice of feature IDs
+}
+
+func (k *keyData) size() int {
+   n := binary.Size(k.keyType)
+   n += binary.Size(k.length)
+   n += binary.Size(k.flags)
+   n += len(k.publicKey)
+   n += k.usage.size()
+   return n
+}
+
+type keyData struct {
+   keyType   uint16
+   length    uint16 // Total length of the keyData structure
+   flags     uint32
+   publicKey [64]byte // ECDSA P256 public key (X and Y coordinates)
+   usage     features // Features indicating key usage
+}
+
+func (k *keyInfo) size() int {
+   n := binary.Size(k.entries)
+   for _, key := range k.keys {
+      n += key.size()
+   }
+   return n
+}
+
+type keyInfo struct {
+   entries uint32    // Number of key entries
+   keys    []keyData // Slice of keyData structures
+}
+
+func (f *ftlv) size() int {
+   n := binary.Size(f.Flags)
+   n += binary.Size(f.Type)
+   n += binary.Size(f.Length)
+   n += len(f.Value)
+   return n
+}
+
 func (c *certificateSignature) New(signature, modelKey []byte) {
    c.signatureType = 1
    c.signatureLength = uint16(len(signature))
