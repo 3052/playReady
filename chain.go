@@ -12,41 +12,82 @@ import (
    "slices"
 )
 
+func (c *Chain) Leaf(modelKey, signEncryptKey *EcKey) error {
+   if !bytes.Equal(c.Certs[0].keyInfo.keys[0].publicKey[:], modelKey.public()) {
+      return errors.New("zgpriv not for cert")
+   }
+   if !c.verify() {
+      return errors.New("cert is not valid")
+   }
+   var cert Certificate
+   copy(cert.Magic[:], "CERT")
+   cert.Version = 1
+   {
+      sum := sha256.Sum256(signEncryptKey.public())
+      var value certificateInfo
+      value.New(c.Certs[0].certificateInfo.securityLevel, sum[:])
+      cert.certificateInfo = &value
+   }
+   {
+      // SCALABLE with SL2000, SUPPORTS_PR3_FEATURES
+      var data features
+      data.New(0xD)
+      var value ftlv
+      value.New(1, 5, data.encode())
+      cert.feature = &value
+   }
+   {
+      var value keyInfo
+      value.New(signEncryptKey.public())
+      cert.keyInfo = &value
+   }
+   {
+      var value certificateSignature
+      cert.LengthToSignature = uint32(cert.size())
+      cert.Length = cert.LengthToSignature
+      cert.Length += uint32(new(ftlv).size())
+      cert.Length += uint32(value.size())
+      sum := sha256.Sum256(cert.encode())
+      r, s, err := ecdsa.Sign(Fill('A'), modelKey[0], sum[:])
+      if err != nil {
+         return err
+      }
+      value.New(append(r.Bytes(), s.Bytes()...), modelKey.public())
+      cert.signature = &value
+   }
+   c.CertCount += 1
+   c.Certs = slices.Insert(c.Certs, 0, cert)
+   c.Length += cert.Length
+   return nil
+}
+
 func (c *Certificate) encode() []byte {
    data := c.Magic[:]
    data = binary.BigEndian.AppendUint32(data, c.Version)
    data = binary.BigEndian.AppendUint32(data, c.Length)
    data = binary.BigEndian.AppendUint32(data, c.LengthToSignature)
-   return append(data, c.rawData...)
-}
-
-func (c *Certificate) verify(pubKey []byte) bool {
-   if !bytes.Equal(c.signature.IssuerKey, pubKey) {
-      return false
+   if c.certificateInfo != nil {
+      var value ftlv
+      value.New(1, 1, c.certificateInfo.encode())
+      data = append(data, value.encode()...)
    }
-   // Reconstruct the ECDSA public key from the byte slice.
-   publicKey := ecdsa.PublicKey{
-      Curve: elliptic.P256(), // Assuming P256 curve
-      X:     new(big.Int).SetBytes(pubKey[:32]),
-      Y:     new(big.Int).SetBytes(pubKey[32:]),
+   if c.feature != nil {
+      data = append(data, c.feature.encode()...)
    }
-   data := c.encode()
-   data = data[:c.LengthToSignature]
-   signatureDigest := sha256.Sum256(data)
-   signature := c.signature.SignatureData
-   r := new(big.Int).SetBytes(signature[:32])
-   s := new(big.Int).SetBytes(signature[32:])
-   return ecdsa.Verify(&publicKey, signatureDigest[:], r, s)
-}
-
-func (c *Certificate) newNoSig(data []byte) {
-   copy(c.Magic[:], "CERT")
-   c.Version = 1
-   // length = length of raw data + header size (16) + signature size (144)
-   c.Length = uint32(len(data)) + 16 + 144
-   // lengthToSignature = length of raw data + header size (16)
-   c.LengthToSignature = uint32(len(data)) + 16
-   c.rawData = data
+   if c.keyInfo != nil {
+      var value ftlv
+      value.New(1, 6, c.keyInfo.encode())
+      data = append(data, value.encode()...)
+   }
+   if c.manufacturer != nil {
+      data = append(data, c.manufacturer.encode()...)
+   }
+   if c.signature != nil {
+      var value ftlv
+      value.New(1, 8, c.signature.encode())
+      data = append(data, value.encode()...)
+   }
+   return data
 }
 
 func (c *Chain) cipherData(key *xmlKey) ([]byte, error) {
@@ -67,31 +108,6 @@ func (c *Chain) cipherData(key *xmlKey) ([]byte, error) {
       return nil, err
    }
    return append(key.aesIv(), data1...), nil
-}
-
-// Encode encodes the Chain into a byte slice.
-func (c *Chain) Encode() []byte {
-   data := c.Magic[:]
-   data = binary.BigEndian.AppendUint32(data, c.Version)
-   data = binary.BigEndian.AppendUint32(data, c.Length)
-   data = binary.BigEndian.AppendUint32(data, c.Flags)
-   data = binary.BigEndian.AppendUint32(data, c.CertCount)
-   for _, cert := range c.Certs {
-      data = append(data, cert.encode()...)
-   }
-   return data
-}
-
-func (c *Chain) verify() bool {
-   modelBase := c.Certs[len(c.Certs)-1].signature.IssuerKey
-   for i := len(c.Certs) - 1; i >= 0; i-- {
-      valid := c.Certs[i].verify(modelBase[:])
-      if !valid {
-         return false
-      }
-      modelBase = c.Certs[i].keyInfo.keys[0].publicKey[:]
-   }
-   return true
 }
 
 // Decode decodes a byte slice into the Chain structure.
@@ -120,15 +136,6 @@ func (c *Chain) Decode(data []byte) error {
       data = data[n:]
    }
    return nil
-}
-
-type Chain struct {
-   Magic     [4]byte
-   Version   uint32
-   Length    uint32
-   Flags     uint32
-   CertCount uint32
-   Certs     []Certificate
 }
 
 func (c *Chain) RequestBody(signEncrypt EcKey, kid []byte) ([]byte, error) {
@@ -181,59 +188,54 @@ func (c *Chain) RequestBody(signEncrypt EcKey, kid []byte) ([]byte, error) {
    return envelope.Marshal()
 }
 
-func (c *Chain) Leaf(modelKey, signEncryptKey *EcKey) error {
-   if !bytes.Equal(c.Certs[0].keyInfo.keys[0].publicKey[:], modelKey.public()) {
-      return errors.New("zgpriv not for cert")
+func (c *Certificate) verify(pubKey []byte) bool {
+   if !bytes.Equal(c.signature.IssuerKey, pubKey) {
+      return false
    }
-   // Verify the existing chain's validity.
-   if !c.verify() {
-      return errors.New("cert is not valid")
+   // Reconstruct the ECDSA public key from the byte slice.
+   publicKey := ecdsa.PublicKey{
+      Curve: elliptic.P256(), // Assuming P256 curve
+      X:     new(big.Int).SetBytes(pubKey[:32]),
+      Y:     new(big.Int).SetBytes(pubKey[32:]),
    }
-   var leafData bytes.Buffer
-   {
-      digest := sha256.Sum256(signEncryptKey.public())
-      var data certificateInfo
-      data.New(c.Certs[0].certificateInfo.securityLevel, digest[:])
-      var value ftlv
-      value.New(1, 1, data.encode())
-      leafData.Write(value.encode())
-   }
-   {
-      // SCALABLE with SL2000, SUPPORTS_PR3_FEATURES
-      data := features{
-         entries:  1,
-         features: []uint32{0xD},
+   data := c.encode()
+   data = data[:c.LengthToSignature]
+   signatureDigest := sha256.Sum256(data)
+   signature := c.signature.SignatureData
+   r := new(big.Int).SetBytes(signature[:32])
+   s := new(big.Int).SetBytes(signature[32:])
+   return ecdsa.Verify(&publicKey, signatureDigest[:], r, s)
+}
+
+func (c *Chain) verify() bool {
+   modelBase := c.Certs[len(c.Certs)-1].signature.IssuerKey
+   for i := len(c.Certs) - 1; i >= 0; i-- {
+      valid := c.Certs[i].verify(modelBase[:])
+      if !valid {
+         return false
       }
-      // Create FTLV for features.
-      var value ftlv
-      value.New(1, 5, data.encode())
-      leafData.Write(value.encode())
+      modelBase = c.Certs[i].keyInfo.keys[0].publicKey[:]
    }
-   {
-      var data keyInfo
-      data.New(signEncryptKey.public())
-      var value ftlv
-      value.New(1, 6, data.encode())
-      leafData.Write(value.encode())
+   return true
+}
+
+func (c *Chain) Encode() []byte {
+   data := c.Magic[:]
+   data = binary.BigEndian.AppendUint32(data, c.Version)
+   data = binary.BigEndian.AppendUint32(data, c.Length)
+   data = binary.BigEndian.AppendUint32(data, c.Flags)
+   data = binary.BigEndian.AppendUint32(data, c.CertCount)
+   for _, cert := range c.Certs {
+      data = append(data, cert.encode()...)
    }
-   var unsigned Certificate
-   unsigned.newNoSig(leafData.Bytes())
-   {
-      digest := sha256.Sum256(unsigned.encode())
-      r, s, err := ecdsa.Sign(Fill('A'), modelKey[0], digest[:])
-      if err != nil {
-         return err
-      }
-      var data certificateSignature
-      data.New(append(r.Bytes(), s.Bytes()...), modelKey.public())
-      var value ftlv
-      value.New(1, 8, data.encode())
-      leafData.Write(value.encode())
-   }
-   unsigned.Length = uint32(leafData.Len()) + 16
-   unsigned.rawData = leafData.Bytes()
-   c.Length += unsigned.Length
-   c.CertCount += 1
-   c.Certs = slices.Insert(c.Certs, 0, unsigned)
-   return nil
+   return data
+}
+
+type Chain struct {
+   Magic     [4]byte
+   Version   uint32
+   Length    uint32
+   Flags     uint32
+   CertCount uint32
+   Certs     []Certificate
 }

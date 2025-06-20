@@ -12,6 +12,27 @@ import (
    "slices"
 )
 
+// new initializes a new key with provided data and type.
+func (k *keyData) New(data []byte, Type uint32) {
+   k.keyType = 1  // Assuming type 1 is for ECDSA keys
+   k.length = 512 // Assuming key length in bits
+   copy(k.publicKey[:], data)
+   k.usage.New(Type)
+}
+
+func (f *features) New(Type uint32) {
+   f.entries = 1
+   f.features = []uint32{Type}
+}
+
+func (k *keyInfo) encode() []byte {
+   data := binary.BigEndian.AppendUint32(nil, k.entries)
+   for _, key := range k.keys {
+      data = append(data, key.encode()...)
+   }
+   return data
+}
+
 func (l *License) Decrypt(signEncrypt EcKey, data []byte) error {
    var envelope xml.EnvelopeResponse
    err := envelope.Unmarshal(data)
@@ -194,14 +215,6 @@ func (c *ContentKey) scalable(key *ecdsa.PrivateKey, auxKeys *auxKeys) error {
    return nil
 }
 
-// new initializes a new key with provided data and type.
-func (k *keyData) New(data []byte, Type int) {
-   k.keyType = 1  // Assuming type 1 is for ECDSA keys
-   k.length = 512 // Assuming key length in bits
-   copy(k.publicKey[:], data)
-   k.usage.New(Type)
-}
-
 // encode encodes the key structure into a byte slice.
 func (k *keyData) encode() []byte {
    data := binary.BigEndian.AppendUint16(nil, k.keyType)
@@ -309,20 +322,6 @@ type eccKey struct {
    Curve  uint16
    Length uint16
    Value  []byte
-}
-
-func (f *features) New(Type int) {
-   f.entries = 1
-   f.features = []uint32{uint32(Type)}
-}
-
-// encode encodes the keyInfo structure into a byte slice.
-func (k *keyInfo) encode() []byte {
-   data := binary.BigEndian.AppendUint32(nil, k.entries)
-   for _, key := range k.keys {
-      data = append(data, key.encode()...)
-   }
-   return data
 }
 
 func (f *features) encode() []byte {

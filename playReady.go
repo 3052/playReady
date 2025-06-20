@@ -9,6 +9,54 @@ import (
    "github.com/deatil/go-cryptobin/mac"
 )
 
+func (c *certificateSignature) New(signature, modelKey []byte) {
+   c.signatureType = 1
+   c.signatureLength = uint16(len(signature))
+   c.SignatureData = signature
+   c.issuerLength = uint32(len(modelKey)) * 8
+   c.IssuerKey = modelKey
+}
+
+func (f *ftlv) New(flags, Type int, value []byte) {
+   f.Flags = uint16(flags)
+   f.Type = uint16(Type)
+   f.Length = uint32(len(value) + 8)
+   f.Value = value
+}
+
+func (c *certificateInfo) New(securityLevel uint32, digest []byte) {
+   c.securityLevel = securityLevel
+   c.infoType = 2 // Assuming infoType 2 is a standard type
+   copy(c.digest[:], digest)
+   c.expiry = 4294967295 // Max uint32, effectively never expires
+}
+
+func (c *certificateSignature) encode() []byte {
+   data := binary.BigEndian.AppendUint16(nil, c.signatureType)
+   data = binary.BigEndian.AppendUint16(data, c.signatureLength)
+   data = append(data, c.SignatureData...)
+   data = binary.BigEndian.AppendUint32(data, c.issuerLength)
+   data = append(data, c.IssuerKey...)
+   return data
+}
+
+func (f *ftlv) encode() []byte {
+   data := binary.BigEndian.AppendUint16(nil, f.Flags)
+   data = binary.BigEndian.AppendUint16(data, f.Type)
+   data = binary.BigEndian.AppendUint32(data, f.Length)
+   return append(data, f.Value...)
+}
+
+func (c *certificateInfo) encode() []byte {
+   data := c.certificateId[:]
+   data = binary.BigEndian.AppendUint32(data, c.securityLevel)
+   data = binary.BigEndian.AppendUint32(data, c.flags)
+   data = binary.BigEndian.AppendUint32(data, c.infoType)
+   data = append(data, c.digest[:]...)
+   data = binary.BigEndian.AppendUint32(data, c.expiry)
+   return append(data, c.clientId[:]...)
+}
+
 func (l *License) verify(contentIntegrity []byte) error {
    data := l.encode()
    data = data[:len(data)-int(l.signature.Length)]
@@ -78,23 +126,6 @@ func (l *License) decode(data []byte) error {
       }
    }
    return nil
-}
-
-func (c *certificateInfo) encode() []byte {
-   data := c.certificateId[:]
-   data = binary.BigEndian.AppendUint32(data, c.securityLevel)
-   data = binary.BigEndian.AppendUint32(data, c.flags)
-   data = binary.BigEndian.AppendUint32(data, c.infoType)
-   data = append(data, c.digest[:]...)
-   data = binary.BigEndian.AppendUint32(data, c.expiry)
-   return append(data, c.clientId[:]...)
-}
-
-func (c *certificateInfo) New(securityLevel uint32, digest []byte) {
-   c.securityLevel = securityLevel
-   c.infoType = 2 // Assuming infoType 2 is a standard type
-   copy(c.digest[:], digest)
-   c.expiry = 4294967295 // Max uint32, effectively never expires
 }
 
 type License struct {
@@ -236,41 +267,6 @@ func (a *auxKey) decode(data []byte) int {
    n := 4
    n += copy(a.Key[:], data[n:])
    return n
-}
-
-// Encode encodes an FTLV structure into a byte slice.
-func (f *ftlv) encode() []byte {
-   data := binary.BigEndian.AppendUint16(nil, f.Flags)
-   data = binary.BigEndian.AppendUint16(data, f.Type)
-   data = binary.BigEndian.AppendUint32(data, f.Length)
-   return append(data, f.Value...)
-}
-
-// New initializes an FTLV structure.
-func (f *ftlv) New(flags, Type int, value []byte) {
-   f.Flags = uint16(flags)
-   f.Type = uint16(Type)
-   f.Length = uint32(len(value) + 8)
-   f.Value = value
-}
-
-func (c *certificateSignature) New(signature, signEncryptKey []byte) {
-   c.signatureType = 1
-   c.signatureLength = uint16(len(signature))
-   c.SignatureData = signature
-   c.issuerLength = uint32(len(signEncryptKey))
-   c.IssuerKey = signEncryptKey
-}
-
-func (c *certificateSignature) encode() []byte {
-   data := binary.BigEndian.AppendUint16(nil, c.signatureType)
-   data = binary.BigEndian.AppendUint16(data, c.signatureLength)
-   data = append(data, c.SignatureData...)
-   // The original code multiplied issuerLength by 8, implying a bit length,
-   // but the IssuerKey length is in bytes. Assuming this multiplication
-   // is specific to how it was serialized for a purpose external to this data structure itself.
-   data = binary.BigEndian.AppendUint32(data, c.issuerLength*8)
-   return append(data, c.IssuerKey...)
 }
 
 // Decode decodes a byte slice into an AuxKeys structure.
