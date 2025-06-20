@@ -12,108 +12,6 @@ import (
    "slices"
 )
 
-// Constants for object types within the certificate structure.
-const (
-   objTypeBasic            = 0x0001
-   objTypeDomain           = 0x0002
-   objTypePc               = 0x0003
-   objTypeDevice           = 0x0004
-   objTypeFeature          = 0x0005
-   objTypeKey              = 0x0006
-   objTypeManufacturer     = 0x0007
-   objTypeSignature        = 0x0008
-   objTypeSilverlight      = 0x0009
-   objTypeMetering         = 0x000A
-   objTypeExtDataSignKey   = 0x000B
-   objTypeExtDataContainer = 0x000C
-   objTypeExtDataSignature = 0x000D
-   objTypeExtDataHwid      = 0x000E
-   objTypeServer           = 0x000F
-   objTypeSecurityVersion  = 0x0010
-   objTypeSecurityVersion2 = 0x0011
-)
-
-func (f *features) New(Type uint32) {
-   f.entries = 1 // required
-   f.features = []uint32{Type}
-}
-
-///
-
-// decode decodes a byte slice into the keyData structure. It returns the
-// number of bytes consumed.
-func (k *keyData) decode(data []byte) int {
-   k.keyType = binary.BigEndian.Uint16(data)
-   n := 2
-   k.length = binary.BigEndian.Uint16(data[n:])
-   n += 2
-   k.flags = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   n += copy(k.publicKey[:], data[n:])
-   n += k.usage.decode(data[n:])
-   return n
-}
-
-// new initializes a new key with provided data and type.
-func (k *keyData) New(data []byte, Type uint32) {
-   k.length = 512 // required
-   copy(k.publicKey[:], data)
-   k.usage.New(Type)
-}
-
-func (k *keyInfo) encode() []byte {
-   data := binary.BigEndian.AppendUint32(nil, k.entries)
-   for _, key := range k.keys {
-      data = append(data, key.encode()...)
-   }
-   return data
-}
-
-func (l *License) Decrypt(signEncrypt EcKey, data []byte) error {
-   var envelope xml.EnvelopeResponse
-   err := envelope.Unmarshal(data)
-   if err != nil {
-      return err
-   }
-   err = l.decode(envelope.
-      Body.
-      AcquireLicenseResponse.
-      AcquireLicenseResult.
-      Response.
-      LicenseResponse.
-      Licenses.
-      License,
-   )
-   if err != nil {
-      return err
-   }
-   if !bytes.Equal(l.eccKey.Value, signEncrypt.public()) {
-      return errors.New("license response is not for this device")
-   }
-   err = l.ContentKey.decrypt(signEncrypt[0], l.auxKeyObject)
-   if err != nil {
-      return err
-   }
-   return l.verify(l.ContentKey.Integrity[:])
-}
-
-func (e *EcKey) Decode(data []byte) {
-   var public ecdsa.PublicKey
-   public.Curve = elliptic.P256()
-   public.X, public.Y = public.Curve.ScalarBaseMult(data)
-   var private ecdsa.PrivateKey
-   private.D = new(big.Int).SetBytes(data)
-   private.PublicKey = public
-   e[0] = &private
-}
-
-func (k *keyInfo) New(signEncryptKey []byte) {
-   k.entries = 2 // required
-   k.keys = make([]keyData, 2)
-   k.keys[0].New(signEncryptKey, 1)
-   k.keys[1].New(signEncryptKey, 2)
-}
-
 // they downgrade certs from the cert digest (hash of the signing key)
 func (f Fill) Key() (*EcKey, error) {
    key, err := ecdsa.GenerateKey(elliptic.P256(), f)
@@ -121,66 +19,6 @@ func (f Fill) Key() (*EcKey, error) {
       return nil, err
    }
    return &EcKey{key}, nil
-}
-
-func newLa(m *ecdsa.PublicKey, cipherData, kid []byte) xml.La {
-   return xml.La{
-      XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/protocols",
-      Id:      "SignedData",
-      Version: "1",
-      ContentHeader: xml.ContentHeader{
-         WrmHeader: xml.WrmHeader{
-            XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/PlayReadyHeader",
-            Version: "4.0.0.0",
-            Data: xml.WrmHeaderData{
-               ProtectInfo: xml.ProtectInfo{
-                  KeyLen: "16",
-                  AlgId:  "AESCTR",
-               },
-               Kid: kid,
-            },
-         },
-      },
-      EncryptedData: xml.EncryptedData{
-         XmlNs: "http://www.w3.org/2001/04/xmlenc#",
-         Type:  "http://www.w3.org/2001/04/xmlenc#Element",
-         EncryptionMethod: xml.Algorithm{
-            Algorithm: "http://www.w3.org/2001/04/xmlenc#aes128-cbc",
-         },
-         KeyInfo: xml.KeyInfo{
-            XmlNs: "http://www.w3.org/2000/09/xmldsig#",
-            EncryptedKey: xml.EncryptedKey{
-               XmlNs: "http://www.w3.org/2001/04/xmlenc#",
-               EncryptionMethod: xml.Algorithm{
-                  Algorithm: "http://schemas.microsoft.com/DRM/2007/03/protocols#ecc256",
-               },
-               KeyInfo: xml.EncryptedKeyInfo{
-                  XmlNs:   "http://www.w3.org/2000/09/xmldsig#",
-                  KeyName: "WMRMServer",
-               },
-               CipherData: xml.CipherData{
-                  CipherValue: elGamalEncrypt(m, elGamalKeyGeneration()),
-               },
-            },
-         },
-         CipherData: xml.CipherData{
-            CipherValue: cipherData,
-         },
-      },
-   }
-}
-
-// decode decodes a byte slice into a ContentKey structure.
-func (c *ContentKey) decode(data []byte) {
-   n := copy(c.KeyID[:], data)
-   data = data[n:]
-   c.KeyType = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   c.CipherType = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   c.Length = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   c.Value = data
 }
 
 type ContentKey struct {
@@ -193,62 +31,12 @@ type ContentKey struct {
    Key        [16]byte
 }
 
-func (c *ContentKey) decrypt(key *ecdsa.PrivateKey, auxKeys *auxKeys) error {
-   switch c.CipherType {
-   case 3:
-      decrypted := elGamalDecrypt(c.Value, key)
-      n := copy(c.Integrity[:], decrypted)
-      decrypted = decrypted[n:]
-      copy(c.Key[:], decrypted)
-      return nil
-   case 6:
-      return c.scalable(key, auxKeys)
+func (f *features) encode() []byte {
+   data := binary.BigEndian.AppendUint32(nil, f.entries)
+   for _, feature := range f.features {
+      data = binary.BigEndian.AppendUint32(data, feature)
    }
-   return errors.New("cannot decrypt key")
-}
-
-func (c *ContentKey) scalable(key *ecdsa.PrivateKey, auxKeys *auxKeys) error {
-   rootKeyInfo := c.Value[:144]
-   rootKey := rootKeyInfo[128:]
-   leafKeys := c.Value[144:]
-   decrypted := elGamalDecrypt(rootKeyInfo[:128], key)
-   var (
-      ci [16]byte
-      ck [16]byte
-   )
-   for i := range 16 {
-      ci[i] = decrypted[i*2]
-      ck[i] = decrypted[i*2+1]
-   }
-   magicConstantZero, err := c.magicConstantZero()
-   if err != nil {
-      return err
-   }
-   rgbUplinkXkey := xorKey(ck[:], magicConstantZero)
-   contentKeyPrime, err := aesECBHandler(rgbUplinkXkey, ck[:], true)
-   if err != nil {
-      return err
-   }
-   auxKeyCalc, err := aesECBHandler(auxKeys.Keys[0].Key[:], contentKeyPrime, true)
-   if err != nil {
-      return err
-   }
-   oSecondaryKey, err := aesECBHandler(rootKey, ck[:], true)
-   if err != nil {
-      return err
-   }
-   rgbKey, err := aesECBHandler(leafKeys, auxKeyCalc, true)
-   if err != nil {
-      return err
-   }
-   rgbKey, err = aesECBHandler(rgbKey, oSecondaryKey, true)
-   if err != nil {
-      return err
-   }
-   n := copy(c.Integrity[:], rgbKey)
-   rgbKey = rgbKey[n:]
-   copy(c.Key[:], rgbKey)
-   return nil
+   return data
 }
 
 // encode encodes the key structure into a byte slice.
@@ -275,15 +63,6 @@ func xorKey(a, b []byte) []byte {
 // magicConstantZero returns a specific hex-decoded byte slice.
 func (*ContentKey) magicConstantZero() ([]byte, error) {
    return hex.DecodeString("7ee9ed4af773224f00b8ea7efb027cbb")
-}
-
-// Decode decodes a byte slice into an ECCKey structure.
-func (e *eccKey) decode(data []byte) {
-   e.Curve = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   e.Length = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   e.Value = data
 }
 
 func elGamalEncrypt(data, key *ecdsa.PublicKey) []byte {
@@ -360,10 +139,231 @@ type eccKey struct {
    Value  []byte
 }
 
-func (f *features) encode() []byte {
-   data := binary.BigEndian.AppendUint32(nil, f.entries)
-   for _, feature := range f.features {
-      data = binary.BigEndian.AppendUint32(data, feature)
+// Constants for object types within the certificate structure.
+const (
+   objTypeBasic            = 0x0001
+   objTypeDomain           = 0x0002
+   objTypePc               = 0x0003
+   objTypeDevice           = 0x0004
+   objTypeFeature          = 0x0005
+   objTypeKey              = 0x0006
+   objTypeManufacturer     = 0x0007
+   objTypeSignature        = 0x0008
+   objTypeSilverlight      = 0x0009
+   objTypeMetering         = 0x000A
+   objTypeExtDataSignKey   = 0x000B
+   objTypeExtDataContainer = 0x000C
+   objTypeExtDataSignature = 0x000D
+   objTypeExtDataHwid      = 0x000E
+   objTypeServer           = 0x000F
+   objTypeSecurityVersion  = 0x0010
+   objTypeSecurityVersion2 = 0x0011
+)
+
+func (f *features) New(Type uint32) {
+   f.entries = 1 // required
+   f.features = []uint32{Type}
+}
+
+// decode decodes a byte slice into the keyData structure. It returns the
+// number of bytes consumed.
+func (k *keyData) decode(data []byte) int {
+   k.keyType = binary.BigEndian.Uint16(data)
+   n := 2
+   k.length = binary.BigEndian.Uint16(data[n:])
+   n += 2
+   k.flags = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   n += copy(k.publicKey[:], data[n:])
+   n += k.usage.decode(data[n:])
+   return n
+}
+
+// new initializes a new key with provided data and type.
+func (k *keyData) New(data []byte, Type uint32) {
+   k.length = 512 // required
+   copy(k.publicKey[:], data)
+   k.usage.New(Type)
+}
+
+func (k *keyInfo) encode() []byte {
+   data := binary.BigEndian.AppendUint32(nil, k.entries)
+   for _, key := range k.keys {
+      data = append(data, key.encode()...)
    }
    return data
+}
+
+func (e *EcKey) Decode(data []byte) {
+   var public ecdsa.PublicKey
+   public.Curve = elliptic.P256()
+   public.X, public.Y = public.Curve.ScalarBaseMult(data)
+   var private ecdsa.PrivateKey
+   private.D = new(big.Int).SetBytes(data)
+   private.PublicKey = public
+   e[0] = &private
+}
+
+func (k *keyInfo) New(signEncryptKey []byte) {
+   k.entries = 2 // required
+   k.keys = make([]keyData, 2)
+   k.keys[0].New(signEncryptKey, 1)
+   k.keys[1].New(signEncryptKey, 2)
+}
+
+func newLa(m *ecdsa.PublicKey, cipherData, kid []byte) xml.La {
+   return xml.La{
+      XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/protocols",
+      Id:      "SignedData",
+      Version: "1",
+      ContentHeader: xml.ContentHeader{
+         WrmHeader: xml.WrmHeader{
+            XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/PlayReadyHeader",
+            Version: "4.0.0.0",
+            Data: xml.WrmHeaderData{
+               ProtectInfo: xml.ProtectInfo{
+                  KeyLen: "16",
+                  AlgId:  "AESCTR",
+               },
+               Kid: kid,
+            },
+         },
+      },
+      EncryptedData: xml.EncryptedData{
+         XmlNs: "http://www.w3.org/2001/04/xmlenc#",
+         Type:  "http://www.w3.org/2001/04/xmlenc#Element",
+         EncryptionMethod: xml.Algorithm{
+            Algorithm: "http://www.w3.org/2001/04/xmlenc#aes128-cbc",
+         },
+         KeyInfo: xml.KeyInfo{
+            XmlNs: "http://www.w3.org/2000/09/xmldsig#",
+            EncryptedKey: xml.EncryptedKey{
+               XmlNs: "http://www.w3.org/2001/04/xmlenc#",
+               EncryptionMethod: xml.Algorithm{
+                  Algorithm: "http://schemas.microsoft.com/DRM/2007/03/protocols#ecc256",
+               },
+               KeyInfo: xml.EncryptedKeyInfo{
+                  XmlNs:   "http://www.w3.org/2000/09/xmldsig#",
+                  KeyName: "WMRMServer",
+               },
+               CipherData: xml.CipherData{
+                  CipherValue: elGamalEncrypt(m, elGamalKeyGeneration()),
+               },
+            },
+         },
+         CipherData: xml.CipherData{
+            CipherValue: cipherData,
+         },
+      },
+   }
+}
+
+func (c *ContentKey) decrypt(key *ecdsa.PrivateKey, aux *auxKeys) error {
+   switch c.CipherType {
+   case 3:
+      decrypted := elGamalDecrypt(c.Value, key)
+      n := copy(c.Integrity[:], decrypted)
+      decrypted = decrypted[n:]
+      copy(c.Key[:], decrypted)
+      return nil
+   case 6:
+      return c.scalable(key, aux)
+   }
+   return errors.New("cannot decrypt key")
+}
+
+///
+
+// decode decodes a byte slice into a ContentKey structure.
+func (c *ContentKey) decode(data []byte) {
+   n := copy(c.KeyID[:], data)
+   data = data[n:]
+   c.KeyType = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   c.CipherType = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   c.Length = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   c.Value = data
+}
+
+func (c *ContentKey) scalable(key *ecdsa.PrivateKey, auxKeys *auxKeys) error {
+   rootKeyInfo := c.Value[:144]
+   rootKey := rootKeyInfo[128:]
+   leafKeys := c.Value[144:]
+   decrypted := elGamalDecrypt(rootKeyInfo[:128], key)
+   var (
+      ci [16]byte
+      ck [16]byte
+   )
+   for i := range 16 {
+      ci[i] = decrypted[i*2]
+      ck[i] = decrypted[i*2+1]
+   }
+   magicConstantZero, err := c.magicConstantZero()
+   if err != nil {
+      return err
+   }
+   rgbUplinkXkey := xorKey(ck[:], magicConstantZero)
+   contentKeyPrime, err := aesECBHandler(rgbUplinkXkey, ck[:], true)
+   if err != nil {
+      return err
+   }
+   auxKeyCalc, err := aesECBHandler(auxKeys.Keys[0].Key[:], contentKeyPrime, true)
+   if err != nil {
+      return err
+   }
+   oSecondaryKey, err := aesECBHandler(rootKey, ck[:], true)
+   if err != nil {
+      return err
+   }
+   rgbKey, err := aesECBHandler(leafKeys, auxKeyCalc, true)
+   if err != nil {
+      return err
+   }
+   rgbKey, err = aesECBHandler(rgbKey, oSecondaryKey, true)
+   if err != nil {
+      return err
+   }
+   n := copy(c.Integrity[:], rgbKey)
+   rgbKey = rgbKey[n:]
+   copy(c.Key[:], rgbKey)
+   return nil
+}
+
+// Decode decodes a byte slice into an ECCKey structure.
+func (e *eccKey) decode(data []byte) {
+   e.Curve = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   e.Length = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   e.Value = data
+}
+
+func (l *License) Decrypt(signEncrypt EcKey, data []byte) error {
+   var envelope xml.EnvelopeResponse
+   err := envelope.Unmarshal(data)
+   if err != nil {
+      return err
+   }
+   err = l.decode(envelope.
+      Body.
+      AcquireLicenseResponse.
+      AcquireLicenseResult.
+      Response.
+      LicenseResponse.
+      Licenses.
+      License,
+   )
+   if err != nil {
+      return err
+   }
+   if !bytes.Equal(l.eccKey.Value, signEncrypt.public()) {
+      return errors.New("license response is not for this device")
+   }
+   err = l.ContentKey.decrypt(signEncrypt[0], l.auxKeyObject)
+   if err != nil {
+      return err
+   }
+   return l.verify(l.ContentKey.Integrity[:])
 }
