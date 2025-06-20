@@ -59,7 +59,7 @@ func TestLeaf(t *testing.T) {
    }
    var z1 EcKey
    z1.Decode(data)
-   signEncryptKey, err := Fill('s').Key()
+   signEncryptKey, err := Fill('B').Key()
    if err != nil {
       t.Fatal(err)
    }

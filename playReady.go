@@ -10,8 +10,43 @@ import (
    "github.com/deatil/go-cryptobin/mac"
 )
 
+type ftlv struct {
+   Flags  uint16
+   Type   uint16
+   Length uint32
+   Value  []byte // The raw value bytes of the FTLV object
+}
+
+type certificateInfo struct {
+   certificateId [16]byte
+   securityLevel uint32
+   flags         uint32
+   infoType      uint32
+   digest        [32]byte
+   expiry        uint32
+   clientId      [16]byte // Client ID (can be used for license binding)
+}
+
+type features struct {
+   entries  uint32   // Number of feature entries
+   features []uint32 // Slice of feature IDs
+}
+
+type keyData struct {
+   keyType   uint16
+   length    uint16 // Total length of the keyData structure
+   flags     uint32
+   publicKey [64]byte // ECDSA P256 public key (X and Y coordinates)
+   usage     features // Features indicating key usage
+}
+
+type keyInfo struct {
+   entries uint32    // Number of key entries
+   keys    []keyData // Slice of keyData structures
+}
+
 func sign(key *ecdsa.PrivateKey, hash []byte) ([]byte, error) {
-   r, s, err := ecdsa.Sign(Fill('!'), key, hash)
+   r, s, err := ecdsa.Sign(Fill('A'), key, hash)
    if err != nil {
       return nil, err
    }

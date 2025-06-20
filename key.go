@@ -47,45 +47,6 @@ func (k *keyData) decode(data []byte) int {
    return n
 }
 
-///
-
-// decode decodes a byte slice into an FTLV structure.
-// It returns the number of bytes consumed.
-func (f *ftlv) decode(data []byte) int {
-   f.Flags = binary.BigEndian.Uint16(data)
-   n := 2
-   f.Type = binary.BigEndian.Uint16(data[n:])
-   n += 2
-   f.Length = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   // The Value slice should contain Length-8 bytes (total length minus Flags, Type, Length fields).
-   // Ensure not to panic if remaining data is less than expected FTLV Value
-   // length. Go's slicing will handle `data[n:][:f.Length-8]` gracefully if
-   // `f.Length-8` is larger than `len(data[n:])`, taking the minimum
-   // available. However, if f.Length is less than 8, f.Length-8 would be
-   // negative, causing a panic. A robust implementation would check
-   // f.Length >= 8 before slicing. For this request, we assume valid f.Length
-   // values as per the original code's implied behavior.
-   valueLen := int(f.Length - 8)
-   if valueLen < 0 {
-      // Handle malformed FTLV where Length is too small to contain header.
-      // This should ideally be an error, but per the original function's structure,
-      // we'll try to process and return bytes consumed.
-      // For now, we'll just set valueLen to 0 to avoid panic if Length is less than 8.
-      valueLen = 0
-   }
-   if valueLen > len(data[n:]) {
-      // If the reported length is greater than available data, take all
-      // available data.
-      f.Value = data[n:]
-   } else {
-      f.Value = data[n:][:valueLen]
-   }
-
-   n += len(f.Value)
-   return n
-}
-
 // new initializes a new key with provided data and type.
 func (k *keyData) New(data []byte, Type uint32) {
    k.length = 512 // required
