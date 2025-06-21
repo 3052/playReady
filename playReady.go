@@ -68,14 +68,6 @@ func (k *keyInfo) decode(data []byte) {
    }
 }
 
-func (f *ftlv) size() int {
-   n := 2 // Flags
-   n += 2 // Type
-   n += 4 // Length
-   n += len(f.Value)
-   return n
-}
-
 func (f *features) size() int {
    n := 4 // entries
    n += 4 * len(f.features)
@@ -140,13 +132,6 @@ func (c *certificateInfo) New(securityLevel uint32, digest []byte) {
    c.infoType = 2 // required
    copy(c.digest[:], digest)
    c.expiry = 4294967295 // required, Max uint32, effectively never expires
-}
-
-func (f *ftlv) encode() []byte {
-   data := binary.BigEndian.AppendUint16(nil, f.Flags)
-   data = binary.BigEndian.AppendUint16(data, f.Type)
-   data = binary.BigEndian.AppendUint32(data, f.Length)
-   return append(data, f.Value...)
 }
 
 func (c *certificateInfo) encode() []byte {

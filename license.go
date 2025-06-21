@@ -7,43 +7,6 @@ import (
    "errors"
 )
 
-type License struct {
-   Magic          [4]byte           // 0
-   Offset         uint16            // 1
-   Version        uint16            // 2
-   RightsID       [16]byte          // 3
-   GlobalPolicy   struct{}          // 4.2
-   PlaybackPolicy struct{}          // 4.4
-   ContentKey     *ContentKey       // 4.9.10
-   eccKey         *eccKey           // 4.9.42
-   auxKeys        *auxKeys          // 4.9.81
-   signature      *licenseSignature // 4.11
-}
-
-func (l *License) Decrypt(signEncrypt EcKey, data []byte) error {
-   var envelope xml.EnvelopeResponse
-   err := envelope.Unmarshal(data)
-   if err != nil {
-      return err
-   }
-   err = l.decode(envelope.
-      Body.
-      AcquireLicenseResponse.
-      AcquireLicenseResult.
-      Response.
-      LicenseResponse.
-      Licenses.
-      License,
-   )
-   if err != nil {
-      return err
-   }
-   if !bytes.Equal(l.eccKey.Value, signEncrypt.public()) {
-      return errors.New("license response is not for this device")
-   }
-   return l.ContentKey.decrypt(signEncrypt[0], l.auxKeys)
-}
-
 func (l *License) decode(data []byte) error {
    n := copy(l.Magic[:], data)
    data = data[n:]
@@ -101,4 +64,41 @@ func (l *License) decode(data []byte) error {
       }
    }
    return nil
+}
+
+type License struct {
+   Magic          [4]byte           // 0
+   Offset         uint16            // 1
+   Version        uint16            // 2
+   RightsID       [16]byte          // 3
+   GlobalPolicy   struct{}          // 4.2
+   PlaybackPolicy struct{}          // 4.4
+   ContentKey     *ContentKey       // 4.9.10
+   eccKey         *eccKey           // 4.9.42
+   auxKeys        *auxKeys          // 4.9.81
+   signature      *licenseSignature // 4.11
+}
+
+func (l *License) Decrypt(signEncrypt EcKey, data []byte) error {
+   var envelope xml.EnvelopeResponse
+   err := envelope.Unmarshal(data)
+   if err != nil {
+      return err
+   }
+   err = l.decode(envelope.
+      Body.
+      AcquireLicenseResponse.
+      AcquireLicenseResult.
+      Response.
+      LicenseResponse.
+      Licenses.
+      License,
+   )
+   if err != nil {
+      return err
+   }
+   if !bytes.Equal(l.eccKey.Value, signEncrypt.public()) {
+      return errors.New("license response is not for this device")
+   }
+   return l.ContentKey.decrypt(signEncrypt[0], l.auxKeys)
 }
