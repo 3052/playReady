@@ -3,68 +3,8 @@ package playReady
 import (
    "crypto/ecdsa"
    "encoding/binary"
-   "errors"
    "github.com/deatil/go-cryptobin/cryptobin/crypto"
 )
-
-func (l *License) decode(data []byte) error {
-   n := copy(l.Magic[:], data)
-   data = data[n:]
-   l.Offset = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   l.Version = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   n = copy(l.RightsID[:], data)
-   data = data[n:]
-   var outer ftlv
-   _, err := outer.decode(data)
-   if err != nil {
-      return err
-   }
-   for len(outer.Value) >= 1 {
-      var inner ftlv
-      n, err = inner.decode(outer.Value)
-      if err != nil {
-         return err
-      }
-      outer.Value = outer.Value[n:]
-      switch xmrType(inner.Type) {
-      case globalPolicyContainerEntryType: // 2
-         // Rakuten
-      case playbackPolicyContainerEntryType: // 4
-         // Rakuten
-      case keyMaterialContainerEntryType: // 9
-         for len(inner.Value) >= 1 {
-            var key ftlv
-            n, err = key.decode(inner.Value)
-            if err != nil {
-               return err
-            }
-            inner.Value = inner.Value[n:]
-            switch xmrType(key.Type) {
-            case contentKeyEntryType: // 10
-               l.ContentKey = &ContentKey{}
-               l.ContentKey.decode(key.Value)
-            case deviceKeyEntryType: // 42
-               l.eccKey = &eccKey{}
-               l.eccKey.decode(key.Value)
-            case auxKeyEntryType: // 81
-               l.auxKeys = &auxKeys{}
-               l.auxKeys.decode(key.Value)
-            default:
-               return errors.New("FTLV.type")
-            }
-         }
-      case signatureEntryType: // 11
-         l.signature = &licenseSignature{}
-         l.signature.decode(inner.Value)
-         l.signature.Length = uint16(inner.Length)
-      default:
-         return errors.New("FTLV.type")
-      }
-   }
-   return nil
-}
 
 // aesCBCHandler performs AES CBC encryption/decryption with PKCS7 padding.
 // Encrypts if encrypt is true, decrypts otherwise.
@@ -92,17 +32,6 @@ func aesECBHandler(data, key []byte, encrypt bool) ([]byte, error) {
          Aes().ECB().NoPadding().Decrypt()
       return bin.ToBytes(), bin.Error()
    }
-}
-
-type License struct {
-   Magic      [4]byte
-   Offset     uint16
-   Version    uint16
-   RightsID   [16]byte
-   ContentKey *ContentKey
-   eccKey     *eccKey
-   signature  *licenseSignature
-   auxKeys    *auxKeys
 }
 
 func (f Fill) Read(data []byte) (int, error) {

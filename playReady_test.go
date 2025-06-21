@@ -19,12 +19,12 @@ var key_tests = []struct {
    {
       key:    "ee0d569c019057569eaf28b988c206f6",
       kid_wv: "01038786b77fb6ca14eb864155de730e", // L1
-      url:    "https://busy.any-any.prd.api.discomax.com/drm-proxy/any/drm-proxy/drm/license/play-ready?drmKeyVersion=1&auth=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHBpcmF0aW9uVGltZSI6IjIwMjUtMDYtMjFUMDU6MDk6NTMuMTExODE0MTQ1WiIsImVkaXRJZCI6IjA2YTM4Mzk3LTg2MmQtNDQxOS1iZTg0LTA2NDE5Mzk4MjVlNyIsImFwcEJ1bmRsZSI6IiIsInBsYXRmb3JtIjoiIiwidXNlcklkIjoiVVNFUklEOmJvbHQ6MGQ0NWNjZjgtYjRhMi00MTQ3LWJiZWItYzdiY2IxNDBmMzgyIiwicHJvZmlsZUlkIjoiUFJPRklMRUlENGJlNDY5NDEtMDNhNS00N2U1LWI0MTQtZTlkOTVjMzlkMjE2IiwiZGV2aWNlSWQiOiIhIiwic3NhaSI6dHJ1ZSwic3RyZWFtVHlwZSI6InZvZCIsImhlYXJ0YmVhdEVuYWJsZWQiOmZhbHNlfQ.1U14dLn60izbiv1RUSOGHVvMifo80zxOj5PtI8NeiBs&x-wbd-tenant=beam&x-wbd-user-home-market=emea",
+      url:    "https://busy.any-any.prd.api.discomax.com/drm-proxy/any/drm-proxy/drm/license/play-ready?drmKeyVersion=1&auth=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHBpcmF0aW9uVGltZSI6IjIwMjUtMDYtMjFUMTE6MTc6NDQuNDQ1MDAxMDI1WiIsImVkaXRJZCI6IjA2YTM4Mzk3LTg2MmQtNDQxOS1iZTg0LTA2NDE5Mzk4MjVlNyIsImFwcEJ1bmRsZSI6IiIsInBsYXRmb3JtIjoiIiwidXNlcklkIjoiVVNFUklEOmJvbHQ6MGQ0NWNjZjgtYjRhMi00MTQ3LWJiZWItYzdiY2IxNDBmMzgyIiwicHJvZmlsZUlkIjoiUFJPRklMRUlENGJlNDY5NDEtMDNhNS00N2U1LWI0MTQtZTlkOTVjMzlkMjE2IiwiZGV2aWNlSWQiOiIhIiwic3NhaSI6dHJ1ZSwic3RyZWFtVHlwZSI6InZvZCIsImhlYXJ0YmVhdEVuYWJsZWQiOmZhbHNlfQ.NAd8f1xcOnnYjZ1sb_NqOobaYcRnN5HAY5B_pQwBl1o&x-wbd-tenant=beam&x-wbd-user-home-market=emea",
    },
    {
       key:    "ab82952e8b567a2359393201e4dde4b4",
       kid_wv: "318f7ece69afcfe3e96de31be6b77272",
-      url:    "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=4736eb79-5a18-4962-be8b-36ce572306a1",
+      url:    "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=760e7e4a-389b-4b12-841c-ec5cc48dc13e",
    },
    {
       key:    "00000000000000000000000000000000",

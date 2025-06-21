@@ -2,7 +2,6 @@ package playReady
 
 import (
    "41.neocities.org/playReady/xml"
-   "bytes"
    "crypto/ecdsa"
    "crypto/elliptic"
    "encoding/binary"
@@ -244,30 +243,6 @@ func (f Fill) Key() (*EcKey, error) {
       return nil, err
    }
    return &EcKey{key}, nil
-}
-
-func (l *License) Decrypt(signEncrypt EcKey, data []byte) error {
-   var envelope xml.EnvelopeResponse
-   err := envelope.Unmarshal(data)
-   if err != nil {
-      return err
-   }
-   err = l.decode(envelope.
-      Body.
-      AcquireLicenseResponse.
-      AcquireLicenseResult.
-      Response.
-      LicenseResponse.
-      Licenses.
-      License,
-   )
-   if err != nil {
-      return err
-   }
-   if !bytes.Equal(l.eccKey.Value, signEncrypt.public()) {
-      return errors.New("license response is not for this device")
-   }
-   return l.ContentKey.decrypt(signEncrypt[0], l.auxKeys)
 }
 
 type eccKey struct {
