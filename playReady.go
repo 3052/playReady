@@ -7,6 +7,34 @@ import (
    "github.com/deatil/go-cryptobin/cryptobin/crypto"
 )
 
+// aesCBCHandler performs AES CBC encryption/decryption with PKCS7 padding.
+// Encrypts if encrypt is true, decrypts otherwise.
+func aesCBCHandler(data, key, iv []byte, encrypt bool) ([]byte, error) {
+   if encrypt {
+      bin := crypto.FromBytes(data).WithKey(key).WithIv(iv).
+         Aes().CBC().PKCS7Padding().Encrypt()
+      return bin.ToBytes(), bin.Error()
+   } else {
+      bin := crypto.FromBytes(data).WithKey(key).WithIv(iv).
+         Aes().CBC().PKCS7Padding().Decrypt()
+      return bin.ToBytes(), bin.Error()
+   }
+}
+
+// aesECBHandler performs AES ECB encryption/decryption.
+// Encrypts if encrypt is true, decrypts otherwise.
+func aesECBHandler(data, key []byte, encrypt bool) ([]byte, error) {
+   if encrypt {
+      bin := crypto.FromBytes(data).WithKey(key).
+         Aes().ECB().NoPadding().Encrypt()
+      return bin.ToBytes(), bin.Error()
+   } else {
+      bin := crypto.FromBytes(data).WithKey(key).
+         Aes().ECB().NoPadding().Decrypt()
+      return bin.ToBytes(), bin.Error()
+   }
+}
+
 type License struct {
    Magic      [4]byte
    Offset     uint16
@@ -85,34 +113,6 @@ func (f Fill) Read(data []byte) (int, error) {
 }
 
 type Fill byte
-
-// aesECBHandler performs AES ECB encryption/decryption.
-// Encrypts if encrypt is true, decrypts otherwise.
-func aesECBHandler(data, key []byte, encrypt bool) ([]byte, error) {
-   if encrypt {
-      bin := crypto.FromBytes(data).WithKey(key).
-         Aes().ECB().NoPadding().Encrypt()
-      return bin.ToBytes(), bin.Error()
-   } else {
-      bin := crypto.FromBytes(data).WithKey(key).
-         Aes().ECB().NoPadding().Decrypt()
-      return bin.ToBytes(), bin.Error()
-   }
-}
-
-// aesCBCHandler performs AES CBC encryption/decryption with PKCS7 padding.
-// Encrypts if encrypt is true, decrypts otherwise.
-func aesCBCHandler(data, key, iv []byte, encrypt bool) ([]byte, error) {
-   if encrypt {
-      bin := crypto.FromBytes(data).WithKey(key).WithIv(iv).
-         Aes().CBC().PKCS7Padding().Encrypt()
-      return bin.ToBytes(), bin.Error()
-   } else {
-      bin := crypto.FromBytes(data).WithKey(key).WithIv(iv).
-         Aes().CBC().PKCS7Padding().Decrypt()
-      return bin.ToBytes(), bin.Error()
-   }
-}
 
 // decode decodes a byte slice into the features structure.
 // It returns the number of bytes consumed.
