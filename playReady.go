@@ -7,45 +7,6 @@ import (
    "github.com/deatil/go-cryptobin/cryptobin/crypto"
 )
 
-// aesCBCHandler performs AES CBC encryption/decryption with PKCS7 padding.
-// Encrypts if encrypt is true, decrypts otherwise.
-func aesCBCHandler(data, key, iv []byte, encrypt bool) ([]byte, error) {
-   if encrypt {
-      bin := crypto.FromBytes(data).WithKey(key).WithIv(iv).
-         Aes().CBC().PKCS7Padding().Encrypt()
-      return bin.ToBytes(), bin.Error()
-   } else {
-      bin := crypto.FromBytes(data).WithKey(key).WithIv(iv).
-         Aes().CBC().PKCS7Padding().Decrypt()
-      return bin.ToBytes(), bin.Error()
-   }
-}
-
-// aesECBHandler performs AES ECB encryption/decryption.
-// Encrypts if encrypt is true, decrypts otherwise.
-func aesECBHandler(data, key []byte, encrypt bool) ([]byte, error) {
-   if encrypt {
-      bin := crypto.FromBytes(data).WithKey(key).
-         Aes().ECB().NoPadding().Encrypt()
-      return bin.ToBytes(), bin.Error()
-   } else {
-      bin := crypto.FromBytes(data).WithKey(key).
-         Aes().ECB().NoPadding().Decrypt()
-      return bin.ToBytes(), bin.Error()
-   }
-}
-
-type License struct {
-   Magic      [4]byte
-   Offset     uint16
-   Version    uint16
-   RightsID   [16]byte
-   ContentKey *ContentKey
-   eccKey     *eccKey
-   signature  *licenseSignature
-   auxKeys    *auxKeys
-}
-
 func (l *License) decode(data []byte) error {
    n := copy(l.Magic[:], data)
    data = data[n:]
@@ -103,6 +64,45 @@ func (l *License) decode(data []byte) error {
       }
    }
    return nil
+}
+
+// aesCBCHandler performs AES CBC encryption/decryption with PKCS7 padding.
+// Encrypts if encrypt is true, decrypts otherwise.
+func aesCBCHandler(data, key, iv []byte, encrypt bool) ([]byte, error) {
+   if encrypt {
+      bin := crypto.FromBytes(data).WithKey(key).WithIv(iv).
+         Aes().CBC().PKCS7Padding().Encrypt()
+      return bin.ToBytes(), bin.Error()
+   } else {
+      bin := crypto.FromBytes(data).WithKey(key).WithIv(iv).
+         Aes().CBC().PKCS7Padding().Decrypt()
+      return bin.ToBytes(), bin.Error()
+   }
+}
+
+// aesECBHandler performs AES ECB encryption/decryption.
+// Encrypts if encrypt is true, decrypts otherwise.
+func aesECBHandler(data, key []byte, encrypt bool) ([]byte, error) {
+   if encrypt {
+      bin := crypto.FromBytes(data).WithKey(key).
+         Aes().ECB().NoPadding().Encrypt()
+      return bin.ToBytes(), bin.Error()
+   } else {
+      bin := crypto.FromBytes(data).WithKey(key).
+         Aes().ECB().NoPadding().Decrypt()
+      return bin.ToBytes(), bin.Error()
+   }
+}
+
+type License struct {
+   Magic      [4]byte
+   Offset     uint16
+   Version    uint16
+   RightsID   [16]byte
+   ContentKey *ContentKey
+   eccKey     *eccKey
+   signature  *licenseSignature
+   auxKeys    *auxKeys
 }
 
 func (f Fill) Read(data []byte) (int, error) {
