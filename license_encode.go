@@ -2,6 +2,49 @@ package playReady
 
 import "encoding/binary"
 
+func (l *License) Encode() []byte {
+   data := l.Magic[:]
+   data = binary.BigEndian.AppendUint16(data, l.Offset)
+   data = binary.BigEndian.AppendUint16(data, l.Version)
+   data = append(data, l.RightsID[:]...)
+   value := field{
+      Type: 1,
+      field: []field{
+         { Type: 2 }, // global policy
+         { Type: 4 }, // playback policy
+         {
+            Type: 9, // key material
+            field: []field{
+               {
+                  Type: 10, // content key
+                  Value: nil,
+               },
+               {
+                  Type: 42, // ecc key
+                  Value: nil,
+               },
+               {
+                  Type: 81, // aux key
+                  Value: nil,
+               },
+            },
+         },
+         {
+            Type: 11, // signature
+            Value: nil,
+         },
+      },
+   }
+   return value.Append(data)
+}
+
+type field struct {
+   Flag  uint16 // this can be 0 or 1
+   Type  uint16
+   Value []byte
+   field []field
+}
+
 func (f *field) Append(data []byte) []byte {
    data = binary.BigEndian.AppendUint16(data, f.Flag)
    data = binary.BigEndian.AppendUint16(data, f.Type)
@@ -15,38 +58,6 @@ func (f *field) Append(data []byte) []byte {
    } else {
       data = append(data, f.Value...)
    }
-   return data
-}
-
-// google.golang.org/protobuf/encoding/protowire#ConsumeField
-type field struct {
-   Flag  uint16 // this can be 0 or 1
-   Type  uint16
-   Value []byte
-   field []field
-}
-
-func (l *License) Encode() []byte {
-   data := l.Magic[:]
-   data = binary.BigEndian.AppendUint16(data, l.Offset)
-   data = binary.BigEndian.AppendUint16(data, l.Version)
-   data = append(data, l.RightsID[:]...)
-   // field{
-   //    Type: 1,
-   //    Value: []field{
-   //       { Type: 2 }, // global policy
-   //       { Type: 4 }, // global policy
-   //       {
-   //          Type: 9,
-   //          Value: []field{
-   //             { Type: 10 }, // content key
-   //             { Type: 42 }, // ecc key
-   //             { Type: 81 }, // aux key
-   //          },
-   //       },
-   //       { Type: 11 }, // signature
-   //    },
-   // }
    return data
 }
 

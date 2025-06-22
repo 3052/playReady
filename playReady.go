@@ -98,11 +98,6 @@ type features struct {
    features []uint32 // Slice of feature IDs
 }
 
-type keyInfo struct {
-   entries uint32    // Number of key entries
-   keys    []keyData // Slice of keyData structures
-}
-
 func (k *keyInfo) size() int {
    n := 4 // entries
    for _, key := range k.keys {

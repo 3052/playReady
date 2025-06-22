@@ -11,6 +11,35 @@ import (
    "slices"
 )
 
+func (k *keyData) Append(data []byte) []byte {
+   data = binary.BigEndian.AppendUint16(data, k.keyType)
+   data = binary.BigEndian.AppendUint16(data, k.length)
+   data = binary.BigEndian.AppendUint32(data, k.flags)
+   data = append(data, k.publicKey[:]...)
+   return k.usage.Append(data)
+}
+
+type keyInfo struct {
+   entries uint32    // Number of key entries
+   keys    []keyData // Slice of keyData structures
+}
+
+func (k *keyInfo) encode() []byte {
+   data := binary.BigEndian.AppendUint32(nil, k.entries)
+   for _, key := range k.keys {
+      data = key.Append(data)
+   }
+   return data
+}
+
+func (f *features) Append(data []byte) []byte {
+   data = binary.BigEndian.AppendUint32(data, f.entries)
+   for _, feature := range f.features {
+      data = binary.BigEndian.AppendUint32(data, feature)
+   }
+   return data
+}
+
 type keyData struct {
    keyType   uint16
    length    uint16 // Total length of the keyData structure
@@ -27,14 +56,6 @@ func (k *keyData) New(data []byte, Type uint32) {
       entries: 1,
       features: []uint32{Type},
    }
-}
-
-func (f *features) encode() []byte {
-   data := binary.BigEndian.AppendUint32(nil, f.entries)
-   for _, feature := range f.features {
-      data = binary.BigEndian.AppendUint32(data, feature)
-   }
-   return data
 }
 
 // Constants for object types within the certificate structure.
@@ -298,23 +319,6 @@ func (k *keyData) decode(data []byte) int {
    n += copy(k.publicKey[:], data[n:])
    n += k.usage.decode(data[n:])
    return n
-}
-
-// encode encodes the key structure into a byte slice.
-func (k *keyData) encode() []byte {
-   data := binary.BigEndian.AppendUint16(nil, k.keyType)
-   data = binary.BigEndian.AppendUint16(data, k.length)
-   data = binary.BigEndian.AppendUint32(data, k.flags)
-   data = append(data, k.publicKey[:]...)
-   return append(data, k.usage.encode()...)
-}
-
-func (k *keyInfo) encode() []byte {
-   data := binary.BigEndian.AppendUint32(nil, k.entries)
-   for _, key := range k.keys {
-      data = append(data, key.encode()...)
-   }
-   return data
 }
 
 func (k *keyInfo) New(signEncryptKey []byte) {
