@@ -6,6 +6,21 @@ import (
    "errors"
 )
 
+type InnerChallenge struct { // Renamed from Challenge
+   XmlNs     string `xml:"xmlns,attr"`
+   La        *La
+   Signature Signature
+}
+
+type La struct {
+   XMLName       xml.Name `xml:"LA"`
+   XmlNs         string   `xml:"xmlns,attr"`
+   Id            string   `xml:"Id,attr"`
+   Version       string
+   ContentHeader ContentHeader
+   EncryptedData EncryptedData
+}
+
 type WrmHeaderData struct { // Renamed from DATA
    ProtectInfo ProtectInfo `xml:"PROTECTINFO"`
    Kid         Bytes       `xml:"KID"`
@@ -141,12 +156,6 @@ type Features struct {
    Feature Feature
 }
 
-type InnerChallenge struct { // Renamed from Challenge
-   XmlNs     string `xml:"xmlns,attr"`
-   La        La
-   Signature Signature
-}
-
 type KeyInfo struct { // This is the chosen "KeyInfo" type
    XmlNs        string `xml:"xmlns,attr"`
    EncryptedKey EncryptedKey
@@ -154,15 +163,6 @@ type KeyInfo struct { // This is the chosen "KeyInfo" type
 
 func (l *La) Marshal() ([]byte, error) {
    return xml.Marshal(l)
-}
-
-type La struct {
-   XMLName       xml.Name `xml:"LA"`
-   XmlNs         string   `xml:"xmlns,attr"`
-   Id            string   `xml:"Id,attr"`
-   Version       string
-   ContentHeader ContentHeader
-   EncryptedData EncryptedData
 }
 
 type ProtectInfo struct {

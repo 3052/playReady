@@ -16,13 +16,13 @@ func (l *License) decode(data []byte) error {
    data = data[2:]
    n = copy(l.RightsID[:], data)
    data = data[n:]
-   var outer ftlv
+   var outer field
    _, err := outer.decode(data) // Type 1
    if err != nil {
       return err
    }
    for len(outer.Value) >= 1 {
-      var inner ftlv
+      var inner field
       n, err = inner.decode(outer.Value)
       if err != nil {
          return err
@@ -35,7 +35,7 @@ func (l *License) decode(data []byte) error {
          // Rakuten
       case keyMaterialContainerEntryType: // 9
          for len(inner.Value) >= 1 {
-            var key ftlv
+            var key field
             n, err = key.decode(inner.Value)
             if err != nil {
                return err
@@ -52,15 +52,14 @@ func (l *License) decode(data []byte) error {
                l.auxKeys = &auxKeys{}
                l.auxKeys.decode(key.Value)
             default:
-               return errors.New("FTLV.type")
+               return errors.New("field.type")
             }
          }
       case signatureEntryType: // 11
          l.signature = &licenseSignature{}
          l.signature.decode(inner.Value)
-         l.signature.Length = uint16(inner.Length)
       default:
-         return errors.New("FTLV.type")
+         return errors.New("field.type")
       }
    }
    return nil

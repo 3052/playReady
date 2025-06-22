@@ -82,8 +82,8 @@ func xorKey(a, b []byte) []byte {
    return c
 }
 
-func newLa(m *ecdsa.PublicKey, cipherData, kid []byte) xml.La {
-   return xml.La{
+func newLa(m *ecdsa.PublicKey, cipherData, kid []byte) *xml.La {
+   return &xml.La{
       XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/protocols",
       Id:      "SignedData",
       Version: "1",
