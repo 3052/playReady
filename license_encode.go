@@ -5,22 +5,6 @@ import (
    "errors"
 )
 
-func (l *License) Encode() []byte {
-   data := l.Magic[:]
-   data = binary.BigEndian.AppendUint16(data, l.Offset)
-   data = binary.BigEndian.AppendUint16(data, l.Version)
-   data = append(data, l.RightsID[:]...)
-   // outer FTLV
-   // inner FTLV
-   // 4.2 GlobalPolicy
-   // 4.4 PlaybackPolicy
-   // key FTLV
-   // 4.9.10 ContentKey
-   // 4.9.42 eccKey
-   // 4.9.81 auxKeys
-   return data
-}
-
 func (f *ftlv) New(Type uint16, value []byte) {
    f.Flags = 1
    f.Type = Type
@@ -28,11 +12,34 @@ func (f *ftlv) New(Type uint16, value []byte) {
    f.Value = value
 }
 
+func (l *License) Encode() []byte {
+   data := l.Magic[:]
+   data = binary.BigEndian.AppendUint16(data, l.Offset)
+   data = binary.BigEndian.AppendUint16(data, l.Version)
+   data = append(data, l.RightsID[:]...)
+   // outer FTLV
+   //    inner FTLV
+   //       4.2 GlobalPolicy
+   //       4.4 PlaybackPolicy
+   //    key FTLV
+   //       4.9.10 ContentKey
+   //       4.9.42 eccKey
+   //       4.9.81 auxKeys
+   return data
+}
+
 type ftlv struct {
    Flags  uint16
    Type   uint16
    Length uint32
-   Value  []byte // The raw value bytes of the FTLV object
+   Value  []byte
+}
+
+func (f *ftlv) encode() []byte {
+   data := binary.BigEndian.AppendUint16(nil, f.Flags)
+   data = binary.BigEndian.AppendUint16(data, f.Type)
+   data = binary.BigEndian.AppendUint32(data, f.Length)
+   return append(data, f.Value...)
 }
 
 func (f *ftlv) verify(data []byte) bool {
@@ -65,11 +72,4 @@ func (f *ftlv) size() int {
    n += 4 // Length
    n += len(f.Value)
    return n
-}
-
-func (f *ftlv) encode() []byte {
-   data := binary.BigEndian.AppendUint16(nil, f.Flags)
-   data = binary.BigEndian.AppendUint16(data, f.Type)
-   data = binary.BigEndian.AppendUint32(data, f.Length)
-   return append(data, f.Value...)
 }

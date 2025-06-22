@@ -17,7 +17,7 @@ func (l *License) decode(data []byte) error {
    n = copy(l.RightsID[:], data)
    data = data[n:]
    var outer ftlv
-   _, err := outer.decode(data)
+   _, err := outer.decode(data) // Type 1
    if err != nil {
       return err
    }
