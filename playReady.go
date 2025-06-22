@@ -98,14 +98,6 @@ type features struct {
    features []uint32 // Slice of feature IDs
 }
 
-type keyData struct {
-   keyType   uint16
-   length    uint16 // Total length of the keyData structure
-   flags     uint32
-   publicKey [64]byte // ECDSA P256 public key (X and Y coordinates)
-   usage     features // Features indicating key usage
-}
-
 type keyInfo struct {
    entries uint32    // Number of key entries
    keys    []keyData // Slice of keyData structures

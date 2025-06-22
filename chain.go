@@ -12,33 +12,23 @@ import (
    "slices"
 )
 
-func (c *Certificate) encode() []byte {
-   data := c.Magic[:]
-   data = binary.BigEndian.AppendUint32(data, c.Version)
-   data = binary.BigEndian.AppendUint32(data, c.Length)
-   data = binary.BigEndian.AppendUint32(data, c.LengthToSignature)
-   if c.certificateInfo != nil {
-      var value field
-      value.New(1, c.certificateInfo.encode())
-      data = append(data, value.encode()...)
+func (c *Certificate) verify(pubKey []byte) bool {
+   if !bytes.Equal(c.signature.IssuerKey, pubKey) {
+      return false
    }
-   if c.feature != nil {
-      data = append(data, c.feature.encode()...)
+   // Reconstruct the ECDSA public key from the byte slice.
+   publicKey := ecdsa.PublicKey{
+      Curve: elliptic.P256(), // Assuming P256 curve
+      X:     new(big.Int).SetBytes(pubKey[:32]),
+      Y:     new(big.Int).SetBytes(pubKey[32:]),
    }
-   if c.keyInfo != nil {
-      var value field
-      value.New(6, c.keyInfo.encode())
-      data = append(data, value.encode()...)
-   }
-   if c.manufacturer != nil {
-      data = append(data, c.manufacturer.encode()...)
-   }
-   if c.signature != nil {
-      var value field
-      value.New(8, c.signature.encode())
-      data = append(data, value.encode()...)
-   }
-   return data
+   data := c.Append(nil)
+   data = data[:c.LengthToSignature]
+   signatureDigest := sha256.Sum256(data)
+   signature := c.signature.signature
+   r := new(big.Int).SetBytes(signature[:32])
+   s := new(big.Int).SetBytes(signature[32:])
+   return ecdsa.Verify(&publicKey, signatureDigest[:], r, s)
 }
 
 func (c *Chain) Leaf(modelKey, signEncryptKey *EcKey) error {
@@ -59,11 +49,14 @@ func (c *Chain) Leaf(modelKey, signEncryptKey *EcKey) error {
    }
    {
       // SCALABLE with SL2000, SUPPORTS_PR3_FEATURES
-      var data features
-      data.New(0xD)
-      var value field
-      value.New(5, data.encode())
-      cert.feature = &value
+      value := features{
+         entries: 1,
+         features: []uint32{0xD},
+      }
+      cert.feature = &field{
+         Type: 5,
+         Value: value.encode(),
+      }
    }
    {
       var value keyInfo
@@ -72,7 +65,7 @@ func (c *Chain) Leaf(modelKey, signEncryptKey *EcKey) error {
    }
    {
       cert.LengthToSignature, cert.Length = cert.size()
-      sum := sha256.Sum256(cert.encode())
+      sum := sha256.Sum256(cert.Append(nil))
       signature, err := sign(modelKey[0], sum[:])
       if err != nil {
          return err
@@ -88,6 +81,55 @@ func (c *Chain) Leaf(modelKey, signEncryptKey *EcKey) error {
    c.Certs = slices.Insert(c.Certs, 0, cert)
    c.Length += cert.Length
    return nil
+}
+
+func (c *Chain) Encode() []byte {
+   data := c.Magic[:]
+   data = binary.BigEndian.AppendUint32(data, c.Version)
+   data = binary.BigEndian.AppendUint32(data, c.Length)
+   data = binary.BigEndian.AppendUint32(data, c.Flags)
+   data = binary.BigEndian.AppendUint32(data, c.CertCount)
+   for _, cert := range c.Certs {
+      data = cert.Append(data)
+   }
+   return data
+}
+
+func (c *Certificate) Append(data []byte) []byte {
+   data = append(data, c.Magic[:]...)
+   data = binary.BigEndian.AppendUint32(data, c.Version)
+   data = binary.BigEndian.AppendUint32(data, c.Length)
+   data = binary.BigEndian.AppendUint32(data, c.LengthToSignature)
+   if c.certificateInfo != nil {
+      value := field{
+         Flag: 1,
+         Type: 1,
+         Value: c.certificateInfo.encode(),
+      }
+      data = value.Append(data)
+   }
+   if c.feature != nil {
+      data = c.feature.Append(data)
+   }
+   if c.keyInfo != nil {
+      value := field{
+         Flag: 1,
+         Type: 6,
+         Value: c.keyInfo.encode(),
+      }
+      data = value.Append(data)
+   }
+   if c.manufacturer != nil {
+      data = c.manufacturer.Append(data)
+   }
+   if c.signature != nil {
+      value := field{
+         Type: 8,
+         Value: c.signature.encode(),
+      }
+      data = value.Append(data)
+   }
+   return data
 }
 
 func (c *Certificate) decode(data []byte) (int, error) {
@@ -228,18 +270,6 @@ type Chain struct {
    Certs     []Certificate
 }
 
-func (c *Chain) Encode() []byte {
-   data := c.Magic[:]
-   data = binary.BigEndian.AppendUint32(data, c.Version)
-   data = binary.BigEndian.AppendUint32(data, c.Length)
-   data = binary.BigEndian.AppendUint32(data, c.Flags)
-   data = binary.BigEndian.AppendUint32(data, c.CertCount)
-   for _, cert := range c.Certs {
-      data = append(data, cert.encode()...)
-   }
-   return data
-}
-
 func (c *Chain) RequestBody(signEncrypt EcKey, kid []byte) ([]byte, error) {
    var key xmlKey
    key.New()
@@ -367,6 +397,7 @@ func (c *certificateSignature) decode(data []byte) error {
    c.IssuerKey = data[:c.issuerLength/8]
    return nil
 }
+
 type Certificate struct {
    Magic             [4]byte               // bytes 0 - 3
    Version           uint32                // bytes 4 - 7
@@ -378,23 +409,3 @@ type Certificate struct {
    manufacturer      *field                // type 7
    signature         *certificateSignature // type 8
 }
-
-func (c *Certificate) verify(pubKey []byte) bool {
-   if !bytes.Equal(c.signature.IssuerKey, pubKey) {
-      return false
-   }
-   // Reconstruct the ECDSA public key from the byte slice.
-   publicKey := ecdsa.PublicKey{
-      Curve: elliptic.P256(), // Assuming P256 curve
-      X:     new(big.Int).SetBytes(pubKey[:32]),
-      Y:     new(big.Int).SetBytes(pubKey[32:]),
-   }
-   data := c.encode()
-   data = data[:c.LengthToSignature]
-   signatureDigest := sha256.Sum256(data)
-   signature := c.signature.signature
-   r := new(big.Int).SetBytes(signature[:32])
-   s := new(big.Int).SetBytes(signature[32:])
-   return ecdsa.Verify(&publicKey, signatureDigest[:], r, s)
-}
-

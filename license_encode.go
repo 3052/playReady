@@ -2,10 +2,20 @@ package playReady
 
 import "encoding/binary"
 
-func (f *field) New(Type uint16, Value []byte) {
-   f.Flag = 1
-   f.Type = Type
-   f.Value = Value
+func (f *field) Append(data []byte) []byte {
+   data = binary.BigEndian.AppendUint16(data, f.Flag)
+   data = binary.BigEndian.AppendUint16(data, f.Type)
+   data = binary.BigEndian.AppendUint32(
+      data, uint32(f.size()),
+   )
+   if f.field != nil {
+      for _, field1 := range f.field {
+         data = field1.Append(data)
+      }
+   } else {
+      data = append(data, f.Value...)
+   }
+   return data
 }
 
 // google.golang.org/protobuf/encoding/protowire#ConsumeField
@@ -64,20 +74,4 @@ func (f *field) size() int {
       n += len(f.Value)
    }
    return n
-}
-
-func (f *field) encode() []byte {
-   data := binary.BigEndian.AppendUint16(nil, f.Flag)
-   data = binary.BigEndian.AppendUint16(data, f.Type)
-   data = binary.BigEndian.AppendUint32(
-      data, uint32(f.size()),
-   )
-   if f.field != nil {
-      for _, field1 := range f.field {
-         data = append(data, field1.encode()...)
-      }
-   } else {
-      data = append(data, f.Value...)
-   }
-   return data
 }

@@ -11,6 +11,32 @@ import (
    "slices"
 )
 
+type keyData struct {
+   keyType   uint16
+   length    uint16 // Total length of the keyData structure
+   flags     uint32
+   publicKey [64]byte // ECDSA P256 public key (X and Y coordinates)
+   usage     features // Features indicating key usage
+}
+
+// new initializes a new key with provided data and type.
+func (k *keyData) New(data []byte, Type uint32) {
+   k.length = 512 // required
+   copy(k.publicKey[:], data)
+   k.usage = features{
+      entries: 1,
+      features: []uint32{Type},
+   }
+}
+
+func (f *features) encode() []byte {
+   data := binary.BigEndian.AppendUint32(nil, f.entries)
+   for _, feature := range f.features {
+      data = binary.BigEndian.AppendUint32(data, feature)
+   }
+   return data
+}
+
 // Constants for object types within the certificate structure.
 const (
    objTypeBasic            = 0x0001
@@ -260,19 +286,6 @@ func (e *eccKey) decode(data []byte) {
    e.Value = data
 }
 
-func (f *features) New(Type uint32) {
-   f.entries = 1 // required
-   f.features = []uint32{Type}
-}
-
-func (f *features) encode() []byte {
-   data := binary.BigEndian.AppendUint32(nil, f.entries)
-   for _, feature := range f.features {
-      data = binary.BigEndian.AppendUint32(data, feature)
-   }
-   return data
-}
-
 // decode decodes a byte slice into the keyData structure. It returns the
 // number of bytes consumed.
 func (k *keyData) decode(data []byte) int {
@@ -285,13 +298,6 @@ func (k *keyData) decode(data []byte) int {
    n += copy(k.publicKey[:], data[n:])
    n += k.usage.decode(data[n:])
    return n
-}
-
-// new initializes a new key with provided data and type.
-func (k *keyData) New(data []byte, Type uint32) {
-   k.length = 512 // required
-   copy(k.publicKey[:], data)
-   k.usage.New(Type)
 }
 
 // encode encodes the key structure into a byte slice.
