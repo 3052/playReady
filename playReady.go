@@ -139,12 +139,6 @@ func (a *auxKey) decode(data []byte) int {
    return n
 }
 
-type licenseSignature struct {
-   Type   uint16
-   Length uint16
-   Data   []byte
-}
-
 func UuidOrGuid(data []byte) {
    // Data1 (first 4 bytes) - swap endianness in place
    data[0], data[3] = data[3], data[0]
@@ -214,14 +208,6 @@ const (
    unknownContainersEntryType              xmrType = 65534
    playbackUnknownContainerEntryType       xmrType = 65534
 )
-
-func (l *licenseSignature) decode(data []byte) {
-   l.Type = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   l.Length = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   l.Data = data
-}
 
 // Decode decodes a byte slice into an AuxKeys structure.
 func (a *auxKeys) decode(data []byte) {
