@@ -11,55 +11,6 @@ import (
    "github.com/deatil/go-cryptobin/mac"
 )
 
-func (f *ftlv) Append(data []byte) []byte {
-   data = binary.BigEndian.AppendUint16(data, f.Flag)
-   data = binary.BigEndian.AppendUint16(data, f.Type)
-   data = binary.BigEndian.AppendUint32(
-      data, uint32(f.size()),
-   )
-   if f.ftlv != nil {
-      for _, field1 := range f.ftlv {
-         data = field1.Append(data)
-      }
-   } else {
-      data = append(data, f.Value...)
-   }
-   return data
-}
-
-func (f *ftlv) decode(data []byte) (int, error) {
-   f.Flag = binary.BigEndian.Uint16(data)
-   n := 2
-   f.Type = binary.BigEndian.Uint16(data[n:])
-   n += 2
-   length := binary.BigEndian.Uint32(data[n:])
-   n += 4
-   f.Value = data[n:length]
-   n += len(f.Value)
-   return n, nil
-}
-
-func (f *ftlv) size() int {
-   n := 2 // Flag
-   n += 2 // Type
-   n += 4 // Length
-   if f.ftlv != nil {
-      for _, field1 := range f.ftlv {
-         n += field1.size()
-      }
-   } else {
-      n += len(f.Value)
-   }
-   return n
-}
-
-type ftlv struct {
-   Flag  uint16 // this can be 0 or 1
-   Type  uint16
-   Value []byte
-   ftlv  []ftlv
-}
-
 // aesCBCHandler performs AES CBC encryption/decryption with PKCS7 padding.
 // Encrypts if encrypt is true, decrypts otherwise.
 func aesCBCHandler(data, key, iv []byte, encrypt bool) ([]byte, error) {
@@ -402,3 +353,37 @@ const (
    unknownContainersEntryType              xmrType = 65534
    playbackUnknownContainerEntryType       xmrType = 65534
 )
+
+func (f *ftlv) Append(data []byte) []byte {
+   data = binary.BigEndian.AppendUint16(data, f.Flag)
+   data = binary.BigEndian.AppendUint16(data, f.Type)
+   data = binary.BigEndian.AppendUint32(data, f.Length)
+   return append(data, f.Value...)
+}
+
+func (f *ftlv) size() int {
+   n := 2 // Flag
+   n += 2 // Type
+   n += 4 // Length
+   n += len(f.Value)
+   return n
+}
+
+type ftlv struct {
+   Flag   uint16 // this can be 0 or 1
+   Type   uint16
+   Length uint32
+   Value  []byte
+}
+
+func (f *ftlv) decode(data []byte) (int, error) {
+   f.Flag = binary.BigEndian.Uint16(data)
+   n := 2
+   f.Type = binary.BigEndian.Uint16(data[n:])
+   n += 2
+   f.Length = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   f.Value = data[n:f.Length]
+   n += len(f.Value)
+   return n, nil
+}
