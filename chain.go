@@ -306,6 +306,43 @@ func (c *Certificate) verify(pubKey []byte) bool {
 
 ///
 
+func (c *Chain) Leaf(modelKey, signEncryptKey *EcKey) error {
+   if !bytes.Equal(c.Certs[0].keyInfo.keys[0].publicKey[:], modelKey.public()) {
+      return errors.New("zgpriv not for cert")
+   }
+   if !c.verify() {
+      return errors.New("cert is not valid")
+   }
+   var cert Certificate
+   copy(cert.Magic[:], "CERT")
+   cert.Version = 1 // required
+   // SCALABLE with SL2000, SUPPORTS_PR3_FEATURES
+   cert.feature = newFeatures(0xD).ftlv(0, 5)
+   cert.keyInfo = newKeyInfo(signEncryptKey.public())
+   {
+      sum := sha256.Sum256(signEncryptKey.public())
+      cert.certificateInfo = c.Certs[0].certificateInfo.New(sum[:])
+   }
+   {
+      cert.LengthToSignature, cert.Length = cert.size()
+      sum := sha256.Sum256(cert.Append(nil))
+      signature, err := sign(modelKey[0], sum[:])
+      if err != nil {
+         return err
+      }
+      var value certificateSignature
+      err = value.New(signature, modelKey.public())
+      if err != nil {
+         return err
+      }
+      cert.signature = &value
+   }
+   c.CertCount += 1
+   c.Certs = slices.Insert(c.Certs, 0, cert)
+   c.Length += cert.Length
+   return nil
+}
+
 func (c *Certificate) Append(data []byte) []byte {
    data = append(data, c.Magic[:]...)
    data = binary.BigEndian.AppendUint32(data, c.Version)
@@ -341,56 +378,4 @@ func (c *Certificate) Append(data []byte) []byte {
       data = value.Append(data)
    }
    return data
-}
-
-func (c *Chain) Leaf(modelKey, signEncryptKey *EcKey) error {
-   if !bytes.Equal(c.Certs[0].keyInfo.keys[0].publicKey[:], modelKey.public()) {
-      return errors.New("zgpriv not for cert")
-   }
-   if !c.verify() {
-      return errors.New("cert is not valid")
-   }
-   var cert Certificate
-   copy(cert.Magic[:], "CERT")
-   cert.Version = 1 // required
-   {
-      sum := sha256.Sum256(signEncryptKey.public())
-      cert.certificateInfo = c.Certs[0].certificateInfo.New(sum[:])
-   }
-   {
-      // SCALABLE with SL2000, SUPPORTS_PR3_FEATURES
-      value := features{
-         entries:  1,
-         features: []uint32{0xD},
-      }
-      data1 := value.Append(nil)
-      cert.feature = &ftlv{
-         Type:  5,
-         Length: uint32(len(data1)) + 8,
-         Value: data1,
-      }
-   }
-   {
-      var value keyInfo
-      value.New(signEncryptKey.public())
-      cert.keyInfo = &value
-   }
-   {
-      cert.LengthToSignature, cert.Length = cert.size()
-      sum := sha256.Sum256(cert.Append(nil))
-      signature, err := sign(modelKey[0], sum[:])
-      if err != nil {
-         return err
-      }
-      var value certificateSignature
-      err = value.New(signature, modelKey.public())
-      if err != nil {
-         return err
-      }
-      cert.signature = &value
-   }
-   c.CertCount += 1
-   c.Certs = slices.Insert(c.Certs, 0, cert)
-   c.Length += cert.Length
-   return nil
 }

@@ -278,68 +278,6 @@ func (x *xmlKey) aesKey() []byte {
    return x.X[16:]
 }
 
-func (f *features) New(Type uint32) {
-   f.entries = 1
-   f.features = []uint32{Type}
-}
-
-type features struct {
-   entries  uint32   // Number of feature entries
-   features []uint32 // Slice of feature IDs
-}
-
-func (f *features) Append(data []byte) []byte {
-   data = binary.BigEndian.AppendUint32(data, f.entries)
-   for _, feature := range f.features {
-      data = binary.BigEndian.AppendUint32(data, feature)
-   }
-   return data
-}
-
-func (f *features) size() int {
-   n := 4 // entries
-   n += 4 * len(f.features)
-   return n
-}
-
-func (k *keyData) Append(data []byte) []byte {
-   data = binary.BigEndian.AppendUint16(data, k.keyType)
-   data = binary.BigEndian.AppendUint16(data, k.length)
-   data = binary.BigEndian.AppendUint32(data, k.flags)
-   data = append(data, k.publicKey[:]...)
-   return k.usage.Append(data)
-}
-
-// decode decodes a byte slice into the keyData structure. It returns the
-// number of bytes consumed.
-func (k *keyData) decode(data []byte) int {
-   k.keyType = binary.BigEndian.Uint16(data)
-   n := 2
-   k.length = binary.BigEndian.Uint16(data[n:])
-   n += 2
-   k.flags = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   n += copy(k.publicKey[:], data[n:])
-   n += k.usage.decode(data[n:])
-   return n
-}
-
-type keyData struct {
-   keyType   uint16
-   length    uint16 // Total length of the keyData structure
-   flags     uint32
-   publicKey [64]byte // ECDSA P256 public key (X and Y coordinates)
-   usage     features // Features indicating key usage
-}
-
-func newKeyData(PublicKey []byte, Type uint32) *keyData {
-   var key keyData
-   key.length = 512 // required
-   copy(key.publicKey[:], PublicKey)
-   key.usage.New(Type)
-   return &key
-}
-
 func (k *keyInfo) encode() []byte {
    data := binary.BigEndian.AppendUint32(nil, k.entries)
    for _, key := range k.keys {
@@ -354,14 +292,6 @@ func (k *keyInfo) size() int {
       n += key.size()
    }
    return n
-}
-
-func (k *keyInfo) New(signEncryptKey []byte) {
-   k.entries = 2 // required
-   k.keys = []*keyData{
-      newKeyData(signEncryptKey, 1),
-      newKeyData(signEncryptKey, 2),
-   }
 }
 
 type keyInfo struct {
@@ -379,4 +309,83 @@ func (k *keyInfo) decode(data []byte) {
       k.keys[i] = &key
       data = data[n:] // Advance data slice for the next key
    }
+}
+
+func newKeyInfo(signEncryptKey []byte) *keyInfo {
+   return &keyInfo{
+      entries: 2, // required
+      keys: []*keyData{
+         newKeyData(signEncryptKey, 1),
+         newKeyData(signEncryptKey, 2),
+      },
+   }
+}
+
+type features struct {
+   entries  uint32   // Number of feature entries
+   features []uint32 // Slice of feature IDs
+}
+
+func (f *features) size() int {
+   n := 4 // entries
+   n += 4 * len(f.features)
+   return n
+}
+
+func newFeatures(Type uint32) *features {
+   return &features{
+      entries: 1,
+      features: []uint32{Type},
+   }
+}
+
+func newKeyData(PublicKey []byte, Type uint32) *keyData {
+   var key keyData
+   key.length = 512 // required
+   copy(key.publicKey[:], PublicKey)
+   key.usage = newFeatures(Type)
+   return &key
+}
+
+func (k *keyData) Append(data []byte) []byte {
+   data = binary.BigEndian.AppendUint16(data, k.keyType)
+   data = binary.BigEndian.AppendUint16(data, k.length)
+   data = binary.BigEndian.AppendUint32(data, k.flags)
+   data = append(data, k.publicKey[:]...)
+   return k.usage.Append(data)
+}
+
+func (f *features) Append(data []byte) []byte {
+   data = binary.BigEndian.AppendUint32(data, f.entries)
+   for _, feature := range f.features {
+      data = binary.BigEndian.AppendUint32(data, feature)
+   }
+   return data
+}
+
+func (f *features) ftlv(Flag, Type uint16) *ftlv {
+   return newFtlv(Flag, Type, f.Append(nil))
+}
+
+type keyData struct {
+   keyType   uint16
+   length    uint16 // Total length of the keyData structure
+   flags     uint32
+   publicKey [64]byte // ECDSA P256 public key (X and Y coordinates)
+   usage     *features // Features indicating key usage
+}
+
+// decode decodes a byte slice into the keyData structure. It returns the
+// number of bytes consumed.
+func (k *keyData) decode(data []byte) int {
+   k.keyType = binary.BigEndian.Uint16(data)
+   n := 2
+   k.length = binary.BigEndian.Uint16(data[n:])
+   n += 2
+   k.flags = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   n += copy(k.publicKey[:], data[n:])
+   k.usage = &features{}
+   n += k.usage.decode(data[n:])
+   return n
 }
