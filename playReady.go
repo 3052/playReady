@@ -11,17 +11,13 @@ import (
    "github.com/deatil/go-cryptobin/mac"
 )
 
-func (c *certificateInfo) ftlv(Flag, Type uint16) *ftlv {
-   return newFtlv(Flag, Type, c.encode())
-}
-
-func newFtlv(Flag, Type uint16, Value []byte) *ftlv {
-   return &ftlv{
-      Flag: Flag,
-      Type: Type,
-      Length: 8 + uint32(len(Value)),
-      Value: Value,
-   }
+func (c *certificateInfo) New(securityLevel uint32, digest []byte) {
+   copy(c.digest[:], digest)
+   // required, Max uint32, effectively never expires
+   c.expiry = 4294967295
+   // required
+   c.infoType = 2
+   c.securityLevel = securityLevel
 }
 
 type certificateInfo struct {
@@ -34,15 +30,17 @@ type certificateInfo struct {
    clientId      [16]byte // Client ID (can be used for license binding)
 }
 
-func (c *certificateInfo) New(digest []byte) *certificateInfo {
-   var info certificateInfo
-   copy(info.digest[:], digest)
-   // required, Max uint32, effectively never expires
-   info.expiry = 4294967295
-   // required
-   info.infoType = 2
-   info.securityLevel = c.securityLevel
-   return &info
+func (c *certificateInfo) ftlv(Flag, Type uint16) *ftlv {
+   return newFtlv(Flag, Type, c.encode())
+}
+
+func newFtlv(Flag, Type uint16, Value []byte) *ftlv {
+   return &ftlv{
+      Flag:   Flag,
+      Type:   Type,
+      Length: 8 + uint32(len(Value)),
+      Value:  Value,
+   }
 }
 
 func (c *certificateInfo) encode() []byte {

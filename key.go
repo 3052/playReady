@@ -278,47 +278,12 @@ func (x *xmlKey) aesKey() []byte {
    return x.X[16:]
 }
 
-func (k *keyInfo) encode() []byte {
-   data := binary.BigEndian.AppendUint32(nil, k.entries)
-   for _, key := range k.keys {
-      data = key.Append(data)
+func (f *features) Append(data []byte) []byte {
+   data = binary.BigEndian.AppendUint32(data, f.entries)
+   for _, feature := range f.features {
+      data = binary.BigEndian.AppendUint32(data, feature)
    }
    return data
-}
-
-func (k *keyInfo) size() int {
-   n := 4 // entries
-   for _, key := range k.keys {
-      n += key.size()
-   }
-   return n
-}
-
-type keyInfo struct {
-   entries uint32 // can be 1 or 2
-   keys    []*keyData
-}
-
-func (k *keyInfo) decode(data []byte) {
-   k.entries = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   k.keys = make([]*keyData, k.entries)
-   for i := range k.entries { // Correctly iterate up to k.entries
-      var key keyData
-      n := key.decode(data)
-      k.keys[i] = &key
-      data = data[n:] // Advance data slice for the next key
-   }
-}
-
-func newKeyInfo(signEncryptKey []byte) *keyInfo {
-   return &keyInfo{
-      entries: 2, // required
-      keys: []*keyData{
-         newKeyData(signEncryptKey, 1),
-         newKeyData(signEncryptKey, 2),
-      },
-   }
 }
 
 type features struct {
@@ -332,21 +297,6 @@ func (f *features) size() int {
    return n
 }
 
-func newFeatures(Type uint32) *features {
-   return &features{
-      entries: 1,
-      features: []uint32{Type},
-   }
-}
-
-func newKeyData(PublicKey []byte, Type uint32) *keyData {
-   var key keyData
-   key.length = 512 // required
-   copy(key.publicKey[:], PublicKey)
-   key.usage = newFeatures(Type)
-   return &key
-}
-
 func (k *keyData) Append(data []byte) []byte {
    data = binary.BigEndian.AppendUint16(data, k.keyType)
    data = binary.BigEndian.AppendUint16(data, k.length)
@@ -355,28 +305,21 @@ func (k *keyData) Append(data []byte) []byte {
    return k.usage.Append(data)
 }
 
-func (f *features) Append(data []byte) []byte {
-   data = binary.BigEndian.AppendUint32(data, f.entries)
-   for _, feature := range f.features {
-      data = binary.BigEndian.AppendUint32(data, feature)
-   }
-   return data
-}
-
-func (f *features) ftlv(Flag, Type uint16) *ftlv {
-   return newFtlv(Flag, Type, f.Append(nil))
-}
-
 type keyData struct {
    keyType   uint16
    length    uint16 // Total length of the keyData structure
    flags     uint32
-   publicKey [64]byte // ECDSA P256 public key (X and Y coordinates)
+   publicKey [64]byte  // ECDSA P256 public key (X and Y coordinates)
    usage     *features // Features indicating key usage
 }
 
-// decode decodes a byte slice into the keyData structure. It returns the
-// number of bytes consumed.
+func newFeatures(Type uint32) *features {
+   return &features{
+      entries:  1,
+      features: []uint32{Type},
+   }
+}
+
 func (k *keyData) decode(data []byte) int {
    k.keyType = binary.BigEndian.Uint16(data)
    n := 2
@@ -388,4 +331,58 @@ func (k *keyData) decode(data []byte) int {
    k.usage = &features{}
    n += k.usage.decode(data[n:])
    return n
+}
+
+func (k *keyInfo) New(signEncryptKey []byte) {
+   k.entries = 2 // required
+   k.keys = make([]keyData, 2)
+   k.keys[0].New(signEncryptKey, 1)
+   k.keys[1].New(signEncryptKey, 2)
+}
+
+func (k *keyData) New(PublicKey []byte, Type uint32) {
+   k.length = 512 // required
+   copy(k.publicKey[:], PublicKey)
+   k.usage = newFeatures(Type)
+}
+
+func (k *keyInfo) size() int {
+   n := 4 // entries
+   for _, key := range k.keys {
+      n += key.size()
+   }
+   return n
+}
+
+func (k *keyInfo) decode(data []byte) {
+   k.entries = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   k.keys = make([]keyData, k.entries)
+   for i := range k.entries { // Correctly iterate up to k.entries
+      var key keyData
+      n := key.decode(data)
+      k.keys[i] = key
+      data = data[n:] // Advance data slice for the next key
+   }
+}
+
+type keyInfo struct {
+   entries uint32 // can be 1 or 2
+   keys    []keyData
+}
+
+func (f *features) ftlv(Flag, Type uint16) *ftlv {
+   return newFtlv(Flag, Type, f.Append(nil))
+}
+
+func (k *keyInfo) encode() []byte {
+   data := binary.BigEndian.AppendUint32(nil, k.entries)
+   for _, key := range k.keys {
+      data = key.Append(data)
+   }
+   return data
+}
+
+func (k *keyInfo) ftlv(Flag, Type uint16) *ftlv {
+   return newFtlv(Flag, Type, k.encode())
 }
