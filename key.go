@@ -11,6 +11,30 @@ import (
    "slices"
 )
 
+type keyInfo struct {
+   entries uint32 // can be 1 or 2
+   keys    []keyData // Slice of keyData structures
+}
+
+func (k *keyInfo) decode(data []byte) {
+   k.entries = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   k.keys = make([]keyData, k.entries)
+   for i := range k.entries { // Correctly iterate up to k.entries
+      var key keyData
+      n := key.decode(data) // Decode each keyData object
+      k.keys[i] = key
+      data = data[n:] // Advance data slice for the next key
+   }
+}
+
+func (k *keyInfo) New(signEncryptKey []byte) {
+   k.entries = 2 // required
+   k.keys = make([]keyData, 2)
+   k.keys[0].New(signEncryptKey, 1)
+   k.keys[1].New(signEncryptKey, 2)
+}
+
 type keyData struct {
    keyType   uint16
    length    uint16 // Total length of the keyData structure
@@ -51,36 +75,12 @@ func (k *keyData) Append(data []byte) []byte {
    return k.usage.Append(data)
 }
 
-func (k *keyInfo) New(signEncryptKey []byte) {
-   k.entries = 2 // required
-   k.keys = make([]keyData, 2)
-   k.keys[0].New(signEncryptKey, 1)
-   k.keys[1].New(signEncryptKey, 2)
-}
-
-type keyInfo struct {
-   entries uint32    // Number of key entries
-   keys    []keyData // Slice of keyData structures
-}
-
 func (k *keyInfo) encode() []byte {
    data := binary.BigEndian.AppendUint32(nil, k.entries)
    for _, key := range k.keys {
       data = key.Append(data)
    }
    return data
-}
-
-func (k *keyInfo) decode(data []byte) {
-   k.entries = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   k.keys = make([]keyData, k.entries)
-   for i := range k.entries { // Correctly iterate up to k.entries
-      var key keyData
-      n := key.decode(data) // Decode each keyData object
-      k.keys[i] = key
-      data = data[n:] // Advance data slice for the next key
-   }
 }
 
 func (k *keyInfo) size() int {
