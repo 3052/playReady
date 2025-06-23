@@ -168,23 +168,6 @@ func (c *Chain) Encode() []byte {
    return data
 }
 
-// decode decodes a byte slice into the certificateInfo structure.
-func (c *certificateInfo) decode(data []byte) {
-   n := copy(c.certificateId[:], data)
-   data = data[n:]
-   c.securityLevel = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   c.flags = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   c.infoType = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   n = copy(c.digest[:], data)
-   data = data[n:]
-   c.expiry = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   copy(c.clientId[:], data)
-}
-
 type certificateSignature struct {
    signatureType   uint16
    signatureLength uint16
@@ -329,21 +312,20 @@ func (c *Certificate) Append(data []byte) []byte {
    data = binary.BigEndian.AppendUint32(data, c.Length)
    data = binary.BigEndian.AppendUint32(data, c.LengthToSignature)
    if c.certificateInfo != nil {
-      value := ftlv{
-         Flag:  1,
-         Type:  1,
-         Value: c.certificateInfo.encode(),
-      }
-      data = value.Append(data)
+      data = c.certificateInfo.ftlv(1, 1).Append(data)
    }
    if c.feature != nil {
       data = c.feature.Append(data)
    }
    if c.keyInfo != nil {
+      // data = c.keyInfo.ftlv(1, 6).Append(data)
+      
+      data1 := c.keyInfo.encode()
       value := ftlv{
          Flag:  1,
          Type:  6,
-         Value: c.keyInfo.encode(),
+         Length: uint32(len(data1)) + 8,
+         Value: data1,
       }
       data = value.Append(data)
    }
@@ -351,9 +333,11 @@ func (c *Certificate) Append(data []byte) []byte {
       data = c.manufacturer.Append(data)
    }
    if c.signature != nil {
+      data1 := c.signature.encode()
       value := ftlv{
          Type:  8,
-         Value: c.signature.encode(),
+         Length: uint32(len(data1)) + 8,
+         Value: data1,
       }
       data = value.Append(data)
    }
@@ -372,9 +356,7 @@ func (c *Chain) Leaf(modelKey, signEncryptKey *EcKey) error {
    cert.Version = 1 // required
    {
       sum := sha256.Sum256(signEncryptKey.public())
-      var value certificateInfo
-      value.New(c.Certs[0].certificateInfo.securityLevel, sum[:])
-      cert.certificateInfo = &value
+      cert.certificateInfo = c.Certs[0].certificateInfo.New(sum[:])
    }
    {
       // SCALABLE with SL2000, SUPPORTS_PR3_FEATURES
@@ -382,9 +364,11 @@ func (c *Chain) Leaf(modelKey, signEncryptKey *EcKey) error {
          entries:  1,
          features: []uint32{0xD},
       }
+      data1 := value.Append(nil)
       cert.feature = &ftlv{
          Type:  5,
-         Value: value.Append(nil),
+         Length: uint32(len(data1)) + 8,
+         Value: data1,
       }
    }
    {

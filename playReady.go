@@ -11,20 +11,71 @@ import (
    "github.com/deatil/go-cryptobin/mac"
 )
 
-func (f *ftlv) Append(data []byte) []byte {
-   data = binary.BigEndian.AppendUint16(data, f.Flag)
-   data = binary.BigEndian.AppendUint16(data, f.Type)
-   data = binary.BigEndian.AppendUint32(
-      data, uint32(f.size()),
-   )
-   if f.ftlv != nil {
-      for _, field1 := range f.ftlv {
-         data = field1.Append(data)
-      }
-   } else {
-      data = append(data, f.Value...)
+func (c *certificateInfo) ftlv(Flag, Type uint16) *ftlv {
+   return newFtlv(Flag, Type, c.encode())
+}
+
+func newFtlv(Flag, Type uint16, Value []byte) *ftlv {
+   return &ftlv{
+      Flag: Flag,
+      Type: Type,
+      Length: 8 + uint32(len(Value)),
+      Value: Value,
    }
-   return data
+}
+
+type certificateInfo struct {
+   certificateId [16]byte
+   securityLevel uint32
+   flags         uint32
+   infoType      uint32
+   digest        [32]byte
+   expiry        uint32
+   clientId      [16]byte // Client ID (can be used for license binding)
+}
+
+func (c *certificateInfo) New(digest []byte) *certificateInfo {
+   var info certificateInfo
+   copy(info.digest[:], digest)
+   // required, Max uint32, effectively never expires
+   info.expiry = 4294967295
+   // required
+   info.infoType = 2
+   info.securityLevel = c.securityLevel
+   return &info
+}
+
+func (c *certificateInfo) encode() []byte {
+   data := c.certificateId[:]
+   data = binary.BigEndian.AppendUint32(data, c.securityLevel)
+   data = binary.BigEndian.AppendUint32(data, c.flags)
+   data = binary.BigEndian.AppendUint32(data, c.infoType)
+   data = append(data, c.digest[:]...)
+   data = binary.BigEndian.AppendUint32(data, c.expiry)
+   return append(data, c.clientId[:]...)
+}
+
+func (c *certificateInfo) decode(data []byte) {
+   n := copy(c.certificateId[:], data)
+   data = data[n:]
+   c.securityLevel = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   c.flags = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   c.infoType = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   n = copy(c.digest[:], data)
+   data = data[n:]
+   c.expiry = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   copy(c.clientId[:], data)
+}
+
+type ftlv struct {
+   Flag   uint16 // this can be 0 or 1
+   Type   uint16
+   Length uint32
+   Value  []byte
 }
 
 func (f *ftlv) decode(data []byte) (int, error) {
@@ -32,9 +83,9 @@ func (f *ftlv) decode(data []byte) (int, error) {
    n := 2
    f.Type = binary.BigEndian.Uint16(data[n:])
    n += 2
-   length := binary.BigEndian.Uint32(data[n:])
+   f.Length = binary.BigEndian.Uint32(data[n:])
    n += 4
-   f.Value = data[n:length]
+   f.Value = data[n:f.Length]
    n += len(f.Value)
    return n, nil
 }
@@ -43,21 +94,15 @@ func (f *ftlv) size() int {
    n := 2 // Flag
    n += 2 // Type
    n += 4 // Length
-   if f.ftlv != nil {
-      for _, field1 := range f.ftlv {
-         n += field1.size()
-      }
-   } else {
-      n += len(f.Value)
-   }
+   n += len(f.Value)
    return n
 }
 
-type ftlv struct {
-   Flag  uint16 // this can be 0 or 1
-   Type  uint16
-   Value []byte
-   ftlv  []ftlv
+func (f *ftlv) Append(data []byte) []byte {
+   data = binary.BigEndian.AppendUint16(data, f.Flag)
+   data = binary.BigEndian.AppendUint16(data, f.Type)
+   data = binary.BigEndian.AppendUint32(data, f.Length)
+   return append(data, f.Value...)
 }
 
 // aesCBCHandler performs AES CBC encryption/decryption with PKCS7 padding.
@@ -253,33 +298,6 @@ func (a *auxKeys) decode(data []byte) {
    }
 }
 
-type certificateInfo struct {
-   certificateId [16]byte
-   securityLevel uint32
-   flags         uint32
-   infoType      uint32
-   digest        [32]byte
-   expiry        uint32
-   clientId      [16]byte // Client ID (can be used for license binding)
-}
-
-func (c *certificateInfo) New(securityLevel uint32, digest []byte) {
-   c.securityLevel = securityLevel
-   c.infoType = 2 // required
-   copy(c.digest[:], digest)
-   c.expiry = 4294967295 // required, Max uint32, effectively never expires
-}
-
-func (c *certificateInfo) encode() []byte {
-   data := c.certificateId[:]
-   data = binary.BigEndian.AppendUint32(data, c.securityLevel)
-   data = binary.BigEndian.AppendUint32(data, c.flags)
-   data = binary.BigEndian.AppendUint32(data, c.infoType)
-   data = append(data, c.digest[:]...)
-   data = binary.BigEndian.AppendUint32(data, c.expiry)
-   return append(data, c.clientId[:]...)
-}
-
 // decode decodes a byte slice into the features structure.
 // It returns the number of bytes consumed.
 func (f *features) decode(data []byte) int {
@@ -310,26 +328,6 @@ func (k *keyData) size() int {
    n += 4 // flags
    n += len(k.publicKey)
    n += k.usage.size()
-   return n
-}
-
-func (k *keyInfo) decode(data []byte) {
-   k.entries = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   k.keys = make([]keyData, k.entries)
-   for i := range k.entries { // Correctly iterate up to k.entries
-      var key keyData
-      n := key.decode(data) // Decode each keyData object
-      k.keys[i] = key
-      data = data[n:] // Advance data slice for the next key
-   }
-}
-
-func (k *keyInfo) size() int {
-   n := 4 // entries
-   for _, key := range k.keys {
-      n += key.size()
-   }
    return n
 }
 
