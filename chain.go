@@ -319,7 +319,6 @@ func (c *Certificate) Append(data []byte) []byte {
    }
    if c.keyInfo != nil {
       // data = c.keyInfo.ftlv(1, 6).Append(data)
-      
       data1 := c.keyInfo.encode()
       value := ftlv{
          Flag:  1,

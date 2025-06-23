@@ -298,7 +298,6 @@ func (a *auxKeys) decode(data []byte) {
    }
 }
 
-// decode decodes a byte slice into the features structure.
 // It returns the number of bytes consumed.
 func (f *features) decode(data []byte) int {
    f.entries = binary.BigEndian.Uint32(data)
@@ -309,17 +308,6 @@ func (f *features) decode(data []byte) int {
       n += 4
    }
    return n
-}
-
-func (f *features) size() int {
-   n := 4 // entries
-   n += 4 * len(f.features)
-   return n
-}
-
-type features struct {
-   entries  uint32   // Number of feature entries
-   features []uint32 // Slice of feature IDs
 }
 
 func (k *keyData) size() int {
