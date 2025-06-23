@@ -11,95 +11,73 @@ import (
    "github.com/deatil/go-cryptobin/mac"
 )
 
-func (f *field) size() int {
-   n := 2 // Flag
-   n += 2 // Type
-   n += 4 // Length
-   if f.field != nil {
-      for _, field1 := range f.field {
-         n += field1.size()
-      }
+// aesCBCHandler performs AES CBC encryption/decryption with PKCS7 padding.
+// Encrypts if encrypt is true, decrypts otherwise.
+func aesCBCHandler(data, key, iv []byte, encrypt bool) ([]byte, error) {
+   if encrypt {
+      bin := crypto.FromBytes(data).WithKey(key).WithIv(iv).
+         Aes().CBC().PKCS7Padding().Encrypt()
+      return bin.ToBytes(), bin.Error()
    } else {
-      n += len(f.Value)
+      bin := crypto.FromBytes(data).WithKey(key).WithIv(iv).
+         Aes().CBC().PKCS7Padding().Decrypt()
+      return bin.ToBytes(), bin.Error()
    }
-   return n
 }
 
-type field struct {
-   Flag  uint16 // this can be 0 or 1
-   Type  uint16
-   Value []byte
-   field []field
-}
-
-func (l *License) Encode() []byte {
-   data := l.Magic[:]
-   data = binary.BigEndian.AppendUint16(data, l.Offset)
-   data = binary.BigEndian.AppendUint16(data, l.Version)
-   data = append(data, l.RightsID[:]...)
-   value := field{
-      Type: 1,
-      field: []field{
-         { Type: 2 }, // global policy
-         { Type: 4 }, // playback policy
-         {
-            Type: 9, // key material
-            field: []field{
-               {
-                  Type: 10, // content key
-                  Value: nil,
-               },
-               {
-                  Type: 42, // ecc key
-                  Value: nil,
-               },
-               {
-                  Type: 81, // aux key
-                  Value: nil,
-               },
-            },
-         },
-         {
-            Type: 11, // signature
-            Value: nil,
-         },
-      },
-   }
-   return value.Append(data)
-}
-
-func (f *field) Append(data []byte) []byte {
-   data = binary.BigEndian.AppendUint16(data, f.Flag)
-   data = binary.BigEndian.AppendUint16(data, f.Type)
-   data = binary.BigEndian.AppendUint32(
-      data, uint32(f.size()),
-   )
-   if f.field != nil {
-      for _, field1 := range f.field {
-         data = field1.Append(data)
-      }
+// aesECBHandler performs AES ECB encryption/decryption.
+// Encrypts if encrypt is true, decrypts otherwise.
+func aesECBHandler(data, key []byte, encrypt bool) ([]byte, error) {
+   if encrypt {
+      bin := crypto.FromBytes(data).WithKey(key).
+         Aes().ECB().NoPadding().Encrypt()
+      return bin.ToBytes(), bin.Error()
    } else {
-      data = append(data, f.Value...)
+      bin := crypto.FromBytes(data).WithKey(key).
+         Aes().ECB().NoPadding().Decrypt()
+      return bin.ToBytes(), bin.Error()
    }
-   return data
 }
 
-func (f *field) decode(data []byte) (int, error) {
-   f.Flag = binary.BigEndian.Uint16(data)
-   n := 2
-   f.Type = binary.BigEndian.Uint16(data[n:])
-   n += 2
-   length := binary.BigEndian.Uint32(data[n:])
-   n += 4
-   f.Value = data[n:length]
-   n += len(f.Value)
-   return n, nil
+func sign(key *ecdsa.PrivateKey, hash []byte) ([]byte, error) {
+   r, s, err := ecdsa.Sign(Fill('A'), key, hash)
+   if err != nil {
+      return nil, err
+   }
+   return append(r.Bytes(), s.Bytes()...), nil
 }
-func (l *licenseSignature) size() int {
-   n := 2 // type
-   n += 2 // length
-   n += len(l.Data)
-   return n
+
+func UuidOrGuid(data []byte) {
+   // Data1 (first 4 bytes) - swap endianness in place
+   data[0], data[3] = data[3], data[0]
+   data[1], data[2] = data[2], data[1]
+   // Data2 (next 2 bytes) - swap endianness in place
+   data[4], data[5] = data[5], data[4]
+   // Data3 (next 2 bytes) - swap endianness in place
+   data[6], data[7] = data[7], data[6]
+   // Data4 (last 8 bytes) - no change needed, so no operation here
+}
+
+func (f Fill) Read(data []byte) (int, error) {
+   for index := range data {
+      data[index] = byte(f)
+   }
+   return len(data), nil
+}
+
+type Fill byte
+
+type License struct {
+   Magic          [4]byte           // 0
+   Offset         uint16            // 1
+   Version        uint16            // 2
+   RightsID       [16]byte          // 3
+   GlobalPolicy   struct{}          // 4.2
+   PlaybackPolicy struct{}          // 4.4
+   ContentKey     *ContentKey       // 4.9.10
+   eccKey         *eccKey           // 4.9.42
+   auxKeys        *auxKeys          // 4.9.81
+   signature      *licenseSignature // 4.11
 }
 
 func (l *License) verify(data []byte) error {
@@ -114,12 +92,6 @@ func (l *License) verify(data []byte) error {
       return errors.New("failed to decrypt the keys")
    }
    return nil
-}
-
-type licenseSignature struct {
-   Type   uint16
-   Length uint16
-   Data   []byte
 }
 
 func (l *License) Decrypt(signEncrypt EcKey, data []byte) error {
@@ -201,101 +173,71 @@ func (l *License) decode(data []byte) error {
    return nil
 }
 
-func (l *licenseSignature) decode(data []byte) {
-   l.Type = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   l.Length = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   l.Data = data
-}
-
-type License struct {
-   Magic          [4]byte           // 0
-   Offset         uint16            // 1
-   Version        uint16            // 2
-   RightsID       [16]byte          // 3
-   GlobalPolicy   struct{}          // 4.2
-   PlaybackPolicy struct{}          // 4.4
-   ContentKey     *ContentKey       // 4.9.10
-   eccKey         *eccKey           // 4.9.42
-   auxKeys        *auxKeys          // 4.9.81
-   signature      *licenseSignature // 4.11
-}
-// aesCBCHandler performs AES CBC encryption/decryption with PKCS7 padding.
-// Encrypts if encrypt is true, decrypts otherwise.
-func aesCBCHandler(data, key, iv []byte, encrypt bool) ([]byte, error) {
-   if encrypt {
-      bin := crypto.FromBytes(data).WithKey(key).WithIv(iv).
-         Aes().CBC().PKCS7Padding().Encrypt()
-      return bin.ToBytes(), bin.Error()
-   } else {
-      bin := crypto.FromBytes(data).WithKey(key).WithIv(iv).
-         Aes().CBC().PKCS7Padding().Decrypt()
-      return bin.ToBytes(), bin.Error()
+func (l *License) Encode() []byte {
+   data := l.Magic[:]
+   data = binary.BigEndian.AppendUint16(data, l.Offset)
+   data = binary.BigEndian.AppendUint16(data, l.Version)
+   data = append(data, l.RightsID[:]...)
+   value := field{
+      Type: 1,
+      field: []field{
+         { Type: 2 }, // global policy
+         { Type: 4 }, // playback policy
+         {
+            Type: 9, // key material
+            field: []field{
+               {
+                  Type: 10, // content key
+                  Value: nil,
+               },
+               {
+                  Type: 42, // ecc key
+                  Value: nil,
+               },
+               {
+                  Type: 81, // aux key
+                  Value: nil,
+               },
+            },
+         },
+         {
+            Type: 11, // signature
+            Value: nil,
+         },
+      },
    }
+   return value.Append(data)
 }
 
-// aesECBHandler performs AES ECB encryption/decryption.
-// Encrypts if encrypt is true, decrypts otherwise.
-func aesECBHandler(data, key []byte, encrypt bool) ([]byte, error) {
-   if encrypt {
-      bin := crypto.FromBytes(data).WithKey(key).
-         Aes().ECB().NoPadding().Encrypt()
-      return bin.ToBytes(), bin.Error()
-   } else {
-      bin := crypto.FromBytes(data).WithKey(key).
-         Aes().ECB().NoPadding().Decrypt()
-      return bin.ToBytes(), bin.Error()
-   }
-}
-
-func (f Fill) Read(data []byte) (int, error) {
-   for index := range data {
-      data[index] = byte(f)
-   }
-   return len(data), nil
-}
-
-type Fill byte
-
-// decode decodes a byte slice into the features structure.
-// It returns the number of bytes consumed.
-func (f *features) decode(data []byte) int {
-   f.entries = binary.BigEndian.Uint32(data)
+// Decode decodes a byte slice into an AuxKey structure.
+func (a *auxKey) decode(data []byte) int {
+   a.Location = binary.BigEndian.Uint32(data)
    n := 4
-   f.features = make([]uint32, f.entries)
-   for i := range f.entries { // Correctly iterate up to f.entries
-      f.features[i] = binary.BigEndian.Uint32(data[n:])
-      n += 4
+   n += copy(a.Key[:], data[n:])
+   return n
+}
+
+type auxKey struct {
+   Location uint32
+   Key      [16]byte
+}
+
+type auxKeys struct {
+   Count uint16
+   Keys  []auxKey
+}
+
+// Decode decodes a byte slice into an AuxKeys structure.
+func (a *auxKeys) decode(data []byte) {
+   a.Count = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   a.Keys = make([]auxKey, a.Count)
+   for i := range a.Count {
+      var key auxKey
+      n := key.decode(data)
+      a.Keys[i] = key
+      data = data[n:]
    }
-   return n
-}
-
-func (k *keyInfo) decode(data []byte) {
-   k.entries = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   k.keys = make([]keyData, k.entries)
-   for i := range k.entries { // Correctly iterate up to k.entries
-      var key keyData
-      n := key.decode(data) // Decode each keyData object
-      k.keys[i] = key
-      data = data[n:] // Advance data slice for the next key
-   }
-}
-
-func (f *features) size() int {
-   n := 4 // entries
-   n += 4 * len(f.features)
-   return n
-}
-
-func (k *keyData) size() int {
-   n := 2 // keyType
-   n += 2 // length
-   n += 4 // flags
-   n += len(k.publicKey)
-   n += k.usage.size()
-   return n
 }
 
 type certificateInfo struct {
@@ -306,27 +248,6 @@ type certificateInfo struct {
    digest        [32]byte
    expiry        uint32
    clientId      [16]byte // Client ID (can be used for license binding)
-}
-
-type features struct {
-   entries  uint32   // Number of feature entries
-   features []uint32 // Slice of feature IDs
-}
-
-func (k *keyInfo) size() int {
-   n := 4 // entries
-   for _, key := range k.keys {
-      n += key.size()
-   }
-   return n
-}
-
-func sign(key *ecdsa.PrivateKey, hash []byte) ([]byte, error) {
-   r, s, err := ecdsa.Sign(Fill('A'), key, hash)
-   if err != nil {
-      return nil, err
-   }
-   return append(r.Bytes(), s.Bytes()...), nil
 }
 
 func (c *certificateInfo) New(securityLevel uint32, digest []byte) {
@@ -346,33 +267,127 @@ func (c *certificateInfo) encode() []byte {
    return append(data, c.clientId[:]...)
 }
 
-// Decode decodes a byte slice into an AuxKey structure.
-func (a *auxKey) decode(data []byte) int {
-   a.Location = binary.BigEndian.Uint32(data)
+// decode decodes a byte slice into the features structure.
+// It returns the number of bytes consumed.
+func (f *features) decode(data []byte) int {
+   f.entries = binary.BigEndian.Uint32(data)
    n := 4
-   n += copy(a.Key[:], data[n:])
+   f.features = make([]uint32, f.entries)
+   for i := range f.entries { // Correctly iterate up to f.entries
+      f.features[i] = binary.BigEndian.Uint32(data[n:])
+      n += 4
+   }
    return n
 }
 
-func UuidOrGuid(data []byte) {
-   // Data1 (first 4 bytes) - swap endianness in place
-   data[0], data[3] = data[3], data[0]
-   data[1], data[2] = data[2], data[1]
-   // Data2 (next 2 bytes) - swap endianness in place
-   data[4], data[5] = data[5], data[4]
-   // Data3 (next 2 bytes) - swap endianness in place
-   data[6], data[7] = data[7], data[6]
-   // Data4 (last 8 bytes) - no change needed, so no operation here
+func (f *features) size() int {
+   n := 4 // entries
+   n += 4 * len(f.features)
+   return n
 }
 
-type auxKeys struct {
-   Count uint16
-   Keys  []auxKey
+type features struct {
+   entries  uint32   // Number of feature entries
+   features []uint32 // Slice of feature IDs
 }
 
-type auxKey struct {
-   Location uint32
-   Key      [16]byte
+func (f *field) Append(data []byte) []byte {
+   data = binary.BigEndian.AppendUint16(data, f.Flag)
+   data = binary.BigEndian.AppendUint16(data, f.Type)
+   data = binary.BigEndian.AppendUint32(
+      data, uint32(f.size()),
+   )
+   if f.field != nil {
+      for _, field1 := range f.field {
+         data = field1.Append(data)
+      }
+   } else {
+      data = append(data, f.Value...)
+   }
+   return data
+}
+
+func (f *field) decode(data []byte) (int, error) {
+   f.Flag = binary.BigEndian.Uint16(data)
+   n := 2
+   f.Type = binary.BigEndian.Uint16(data[n:])
+   n += 2
+   length := binary.BigEndian.Uint32(data[n:])
+   n += 4
+   f.Value = data[n:length]
+   n += len(f.Value)
+   return n, nil
+}
+
+func (f *field) size() int {
+   n := 2 // Flag
+   n += 2 // Type
+   n += 4 // Length
+   if f.field != nil {
+      for _, field1 := range f.field {
+         n += field1.size()
+      }
+   } else {
+      n += len(f.Value)
+   }
+   return n
+}
+
+type field struct {
+   Flag  uint16 // this can be 0 or 1
+   Type  uint16
+   Value []byte
+   field []field
+}
+
+func (k *keyData) size() int {
+   n := 2 // keyType
+   n += 2 // length
+   n += 4 // flags
+   n += len(k.publicKey)
+   n += k.usage.size()
+   return n
+}
+
+func (k *keyInfo) decode(data []byte) {
+   k.entries = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   k.keys = make([]keyData, k.entries)
+   for i := range k.entries { // Correctly iterate up to k.entries
+      var key keyData
+      n := key.decode(data) // Decode each keyData object
+      k.keys[i] = key
+      data = data[n:] // Advance data slice for the next key
+   }
+}
+
+func (k *keyInfo) size() int {
+   n := 4 // entries
+   for _, key := range k.keys {
+      n += key.size()
+   }
+   return n
+}
+
+func (l *licenseSignature) size() int {
+   n := 2 // type
+   n += 2 // length
+   n += len(l.Data)
+   return n
+}
+
+type licenseSignature struct {
+   Type   uint16
+   Length uint16
+   Data   []byte
+}
+
+func (l *licenseSignature) decode(data []byte) {
+   l.Type = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   l.Length = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   l.Data = data
 }
 
 type xmrType uint16
@@ -423,16 +438,3 @@ const (
    unknownContainersEntryType              xmrType = 65534
    playbackUnknownContainerEntryType       xmrType = 65534
 )
-
-// Decode decodes a byte slice into an AuxKeys structure.
-func (a *auxKeys) decode(data []byte) {
-   a.Count = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   a.Keys = make([]auxKey, a.Count)
-   for i := range a.Count {
-      var key auxKey
-      n := key.decode(data)
-      a.Keys[i] = key
-      data = data[n:]
-   }
-}
