@@ -18,9 +18,9 @@ type Certificate struct {
    Length            uint32                // bytes 8 - 11
    LengthToSignature uint32                // bytes 12 - 15
    certificateInfo   *certificateInfo      // type 1
-   feature           *field                // type 5
+   feature           *ftlv                 // type 5
    keyInfo           *keyInfo              // type 6
-   manufacturer      *field                // type 7
+   manufacturer      *ftlv                 // type 7
    signature         *certificateSignature // type 8
 }
 
@@ -49,9 +49,9 @@ func (c *Certificate) Append(data []byte) []byte {
    data = binary.BigEndian.AppendUint32(data, c.Length)
    data = binary.BigEndian.AppendUint32(data, c.LengthToSignature)
    if c.certificateInfo != nil {
-      value := field{
-         Flag: 1,
-         Type: 1,
+      value := ftlv{
+         Flag:  1,
+         Type:  1,
          Value: c.certificateInfo.encode(),
       }
       data = value.Append(data)
@@ -60,9 +60,9 @@ func (c *Certificate) Append(data []byte) []byte {
       data = c.feature.Append(data)
    }
    if c.keyInfo != nil {
-      value := field{
-         Flag: 1,
-         Type: 6,
+      value := ftlv{
+         Flag:  1,
+         Type:  6,
          Value: c.keyInfo.encode(),
       }
       data = value.Append(data)
@@ -71,8 +71,8 @@ func (c *Certificate) Append(data []byte) []byte {
       data = c.manufacturer.Append(data)
    }
    if c.signature != nil {
-      value := field{
-         Type: 8,
+      value := ftlv{
+         Type:  8,
          Value: c.signature.encode(),
       }
       data = value.Append(data)
@@ -94,7 +94,7 @@ func (c *Certificate) decode(data []byte) (int, error) {
    c.LengthToSignature = binary.BigEndian.Uint32(data[n:])
    n += 4
    for n < int(c.Length) {
-      var value field
+      var value ftlv
       bytesReadFromFtlv, err := value.decode(data[n:])
       if err != nil {
          return 0, err
@@ -117,9 +117,9 @@ func (c *Certificate) decode(data []byte) (int, error) {
             return 0, err
          }
       default:
-         return 0, errors.New("field.Type")
+         return 0, errors.New("ftlv.Type")
       }
-      n += bytesReadFromFtlv // Move to the next field object in rawData
+      n += bytesReadFromFtlv
    }
    return n, nil // Return total bytes consumed and nil for no error
 }
@@ -130,21 +130,21 @@ func (c *Certificate) size() (uint32, uint32) {
    n += 4 // Length
    n += 4 // LengthToSignature
    if c.certificateInfo != nil {
-      n += new(field).size()
+      n += new(ftlv).size()
       n += binary.Size(c.certificateInfo)
    }
    if c.feature != nil {
       n += c.feature.size()
    }
    if c.keyInfo != nil {
-      n += new(field).size()
+      n += new(ftlv).size()
       n += c.keyInfo.size()
    }
    if c.manufacturer != nil {
       n += c.manufacturer.size()
    }
    n1 := n
-   n1 += new(field).size()
+   n1 += new(ftlv).size()
    n1 += c.signature.size()
    return uint32(n), uint32(n1)
 }
@@ -287,11 +287,11 @@ func (c *Chain) Leaf(modelKey, signEncryptKey *EcKey) error {
    {
       // SCALABLE with SL2000, SUPPORTS_PR3_FEATURES
       value := features{
-         entries: 1,
+         entries:  1,
          features: []uint32{0xD},
       }
-      cert.feature = &field{
-         Type: 5,
+      cert.feature = &ftlv{
+         Type:  5,
          Value: value.Append(nil),
       }
    }

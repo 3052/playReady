@@ -295,7 +295,7 @@ func (k *keyData) New(data []byte, Type uint32) {
    k.length = 512 // required
    copy(k.publicKey[:], data)
    k.usage = features{
-      entries: 1,
+      entries:  1,
       features: []uint32{Type},
    }
 }
