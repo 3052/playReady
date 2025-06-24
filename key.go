@@ -13,26 +13,26 @@ import (
    "slices"
 )
 
-func (c *CertFeature) Append(data []byte) []byte {
+func (c *CertFeatures) Append(data []byte) []byte {
    data = binary.BigEndian.AppendUint32(data, c.Entries)
-   for _, feature := range c.Feature {
+   for _, feature := range c.Features {
       data = binary.BigEndian.AppendUint32(data, feature)
    }
    return data
 }
 
-func (c *CertFeature) New(Type uint32) {
+func (c *CertFeatures) New(Type uint32) {
    c.Entries = 1
-   c.Feature = []uint32{Type}
+   c.Features = []uint32{Type}
 }
 
-func (c *CertFeature) ftlv(Flag, Type uint16) *Ftlv {
+func (c *CertFeatures) ftlv(Flag, Type uint16) *Ftlv {
    return newFtlv(Flag, Type, c.Append(nil))
 }
 
-func (c *CertFeature) size() int {
+func (c *CertFeatures) size() int {
    n := 4 // entries
-   n += 4 * len(c.Feature)
+   n += 4 * len(c.Features)
    return n
 }
 
@@ -72,26 +72,26 @@ func (k *KeyData) decode(data []byte) int {
 
 func (k *KeyInfo) New(signEncryptKey []byte) {
    k.Entries = 2 // required
-   k.Key = make([]KeyData, 2)
-   k.Key[0].New(signEncryptKey, 1)
-   k.Key[1].New(signEncryptKey, 2)
+   k.Keys = make([]KeyData, 2)
+   k.Keys[0].New(signEncryptKey, 1)
+   k.Keys[1].New(signEncryptKey, 2)
 }
 
 func (k *KeyInfo) decode(data []byte) {
    k.Entries = binary.BigEndian.Uint32(data)
    data = data[4:]
-   k.Key = make([]KeyData, k.Entries)
+   k.Keys = make([]KeyData, k.Entries)
    for i := range k.Entries {
       var key KeyData
       n := key.decode(data)
-      k.Key[i] = key
+      k.Keys[i] = key
       data = data[n:] // Advance data slice for the next key
    }
 }
 
 func (k *KeyInfo) encode() []byte {
    data := binary.BigEndian.AppendUint32(nil, k.Entries)
-   for _, key := range k.Key {
+   for _, key := range k.Keys {
       data = key.Append(data)
    }
    return data
@@ -103,7 +103,7 @@ func (k *KeyInfo) ftlv(Flag, Type uint16) *Ftlv {
 
 func (k *KeyInfo) size() int {
    n := 4 // entries
-   for _, key := range k.Key {
+   for _, key := range k.Keys {
       n += key.size()
    }
    return n
@@ -238,7 +238,7 @@ func elGamalKeyGeneration() *ecdsa.PublicKey {
    return &key
 }
 
-func (c *ContentKey) decrypt(key *ecdsa.PrivateKey, aux *auxKeys) error {
+func (c *ContentKey) decrypt(key *ecdsa.PrivateKey, aux *AuxKeys) error {
    switch c.CipherType {
    case 3:
       decrypted := elGamalDecrypt(c.Value, key)
@@ -252,7 +252,7 @@ func (c *ContentKey) decrypt(key *ecdsa.PrivateKey, aux *auxKeys) error {
    return errors.New("cannot decrypt key")
 }
 
-func (c *ContentKey) scalable(key *ecdsa.PrivateKey, auxKeys *auxKeys) error {
+func (c *ContentKey) scalable(key *ecdsa.PrivateKey, aux *AuxKeys) error {
    rootKeyInfo, leafKeys := c.Value[:144], c.Value[144:]
    rootKey := rootKeyInfo[128:]
    decrypted := elGamalDecrypt(rootKeyInfo[:128], key)
@@ -273,7 +273,7 @@ func (c *ContentKey) scalable(key *ecdsa.PrivateKey, auxKeys *auxKeys) error {
    if err != nil {
       return err
    }
-   auxKeyCalc, err := aesEcbEncrypt(auxKeys.Keys[0].Key[:], contentKeyPrime)
+   auxKeyCalc, err := aesEcbEncrypt(aux.Keys[0].Key[:], contentKeyPrime)
    if err != nil {
       return err
    }
@@ -368,7 +368,7 @@ type ContentKey struct {
 
 type KeyInfo struct {
    Entries uint32 // can be 1 or 2
-   Key    []KeyData
+   Keys    []KeyData
 }
 
 type KeyData struct {
@@ -376,12 +376,12 @@ type KeyData struct {
    Length    uint16
    Flags     uint32
    PublicKey [64]byte // ECDSA P256 public key (X and Y coordinates)
-   Usage     CertFeature
+   Usage     CertFeatures
 }
 
-type CertFeature struct {
-   Entries uint32
-   Feature []uint32
+type CertFeatures struct {
+   Entries  uint32
+   Features []uint32
 }
 
 type EccKey struct {

@@ -10,13 +10,12 @@ import (
    "github.com/emmansun/gmsm/cbcmac"
 )
 
-// Decode decodes a byte slice into an AuxKeys structure.
-func (a *auxKeys) decode(data []byte) {
+func (a *AuxKeys) decode(data []byte) {
    a.Count = binary.BigEndian.Uint16(data)
    data = data[2:]
-   a.Keys = make([]auxKey, a.Count)
+   a.Keys = make([]AuxKey, a.Count)
    for i := range a.Count {
-      var key auxKey
+      var key AuxKey
       n := key.decode(data)
       a.Keys[i] = key
       data = data[n:]
@@ -63,12 +62,12 @@ func (c *CertificateInfo) ftlv(Flag, Type uint16) *Ftlv {
 }
 
 // It returns the number of bytes consumed.
-func (c *CertFeature) decode(data []byte) int {
+func (c *CertFeatures) decode(data []byte) int {
    c.Entries = binary.BigEndian.Uint32(data)
    n := 4
-   c.Feature = make([]uint32, c.Entries)
+   c.Features = make([]uint32, c.Entries)
    for i := range c.Entries {
-      c.Feature[i] = binary.BigEndian.Uint32(data[n:])
+      c.Features[i] = binary.BigEndian.Uint32(data[n:])
       n += 4
    }
    return n
@@ -119,14 +118,14 @@ func (k *KeyData) size() int {
    return n
 }
 
-func (l *licenseSignature) size() int {
+func (l *LicenseSignature) size() int {
    n := 2 // type
    n += 2 // length
    n += len(l.Data)
    return n
 }
 
-func (l *licenseSignature) decode(data []byte) {
+func (l *LicenseSignature) decode(data []byte) {
    l.Type = binary.BigEndian.Uint16(data)
    data = data[2:]
    l.Length = binary.BigEndian.Uint16(data)
@@ -184,14 +183,14 @@ const (
 )
 
 func (l *License) verify(data []byte) error {
-   signature := new(Ftlv).size() + l.signature.size()
+   signature := new(Ftlv).size() + l.Signature.size()
    data = data[:len(data)-signature]
    block, err := aes.NewCipher(l.ContentKey.Integrity[:])
    if err != nil {
       return err
    }
    data = cbcmac.NewCMAC(block, aes.BlockSize).MAC(data)
-   if !bytes.Equal(data, l.signature.Data) {
+   if !bytes.Equal(data, l.Signature.Data) {
       return errors.New("failed to decrypt the keys")
    }
    return nil
@@ -246,7 +245,7 @@ func (l *License) Decrypt(signEncrypt EcKey, data []byte) error {
    if !bytes.Equal(l.EccKey.Value, signEncrypt.public()) {
       return errors.New("license response is not for this device")
    }
-   err = l.ContentKey.decrypt(signEncrypt[0], l.auxKeys)
+   err = l.ContentKey.decrypt(signEncrypt[0], l.AuxKeys)
    if err != nil {
       return err
    }
@@ -295,15 +294,15 @@ func (l *License) decode(data []byte) error {
                l.EccKey = &EccKey{}
                l.EccKey.decode(key.Value)
             case auxKeyEntryType: // 81
-               l.auxKeys = &auxKeys{}
-               l.auxKeys.decode(key.Value)
+               l.AuxKeys = &AuxKeys{}
+               l.AuxKeys.decode(key.Value)
             default:
                return errors.New("Ftlv.type")
             }
          }
       case signatureEntryType: // 11
-         l.signature = &licenseSignature{}
-         l.signature.decode(inner.Value)
+         l.Signature = &LicenseSignature{}
+         l.Signature.decode(inner.Value)
       default:
          return errors.New("Ftlv.type")
       }
@@ -311,15 +310,12 @@ func (l *License) decode(data []byte) error {
    return nil
 }
 
-// Decode decodes a byte slice into an AuxKey structure.
-func (a *auxKey) decode(data []byte) int {
+func (a *AuxKey) decode(data []byte) int {
    a.Location = binary.BigEndian.Uint32(data)
    n := 4
    n += copy(a.Key[:], data[n:])
    return n
 }
-
-///
 
 type License struct {
    Magic      [4]byte           // 0
@@ -328,28 +324,18 @@ type License struct {
    RightsID   [16]byte          // 3
    ContentKey *ContentKey       // 4.9.10
    EccKey     *EccKey           // 4.9.42
-   auxKeys    *auxKeys          // 4.9.81
-   signature  *licenseSignature // 4.11
+   AuxKeys    *AuxKeys          // 4.9.81
+   Signature  *LicenseSignature // 4.11
 }
 
-type auxKey struct {
+type AuxKeys struct {
+   Count uint16
+   Keys  []AuxKey
+}
+
+type AuxKey struct {
    Location uint32
    Key      [16]byte
-}
-
-type auxKeys struct {
-   Count uint16
-   Keys  []auxKey
-}
-
-type CertificateInfo struct {
-   certificateId [16]byte
-   securityLevel uint32
-   flags         uint32
-   infoType      uint32
-   digest        [32]byte
-   expiry        uint32
-   clientId      [16]byte // Client ID (can be used for license binding)
 }
 
 type Ftlv struct {
@@ -359,8 +345,20 @@ type Ftlv struct {
    Value  []byte
 }
 
-type licenseSignature struct {
+type LicenseSignature struct {
    Type   uint16
    Length uint16
    Data   []byte
+}
+
+///
+
+type CertificateInfo struct {
+   certificateId [16]byte
+   securityLevel uint32
+   flags         uint32
+   infoType      uint32
+   digest        [32]byte
+   expiry        uint32
+   clientId      [16]byte // Client ID (can be used for license binding)
 }

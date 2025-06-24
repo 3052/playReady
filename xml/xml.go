@@ -6,6 +6,32 @@ import (
    "errors"
 )
 
+type Data struct {
+   CertificateChains CertificateChains
+   Features          Features
+}
+
+type Features struct {
+   Feature Feature
+}
+
+type Feature struct {
+   Name string `xml:",attr"`
+}
+
+type EncryptedData struct {
+   XmlNs            string `xml:"xmlns,attr"`
+   Type             string `xml:"Type,attr"`
+   EncryptionMethod Algorithm
+   KeyInfo          KeyInfo
+   CipherData       CipherData
+}
+
+type KeyInfo struct { // This is the chosen "KeyInfo" type
+   XmlNs        string `xml:"xmlns,attr"`
+   EncryptedKey EncryptedKey
+}
+
 type InnerChallenge struct { // Renamed from Challenge
    XmlNs     string `xml:"xmlns,attr"`
    La        *La
@@ -123,19 +149,6 @@ func (d *Data) Marshal() ([]byte, error) {
    return xml.Marshal(d)
 }
 
-type Data struct {
-   CertificateChains CertificateChains
-   Features          Features
-}
-
-type EncryptedData struct {
-   XmlNs            string `xml:"xmlns,attr"`
-   Type             string `xml:"Type,attr"`
-   EncryptionMethod Algorithm
-   KeyInfo          KeyInfo
-   CipherData       CipherData
-}
-
 type EncryptedKey struct {
    XmlNs            string `xml:"xmlns,attr"`
    EncryptionMethod Algorithm
@@ -146,19 +159,6 @@ type EncryptedKey struct {
 type EncryptedKeyInfo struct { // Renamed from KeyInfo
    XmlNs   string `xml:"xmlns,attr"`
    KeyName string
-}
-
-type Feature struct {
-   Name string `xml:",attr"`
-}
-
-type Features struct {
-   Feature Feature
-}
-
-type KeyInfo struct { // This is the chosen "KeyInfo" type
-   XmlNs        string `xml:"xmlns,attr"`
-   EncryptedKey EncryptedKey
 }
 
 func (l *La) Marshal() ([]byte, error) {

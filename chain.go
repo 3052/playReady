@@ -15,13 +15,25 @@ import (
    "slices"
 )
 
+func (c *Chain) verify() bool {
+   modelBase := c.Certificates[c.CertCount-1].Signature.IssuerKey
+   for i := len(c.Certificates) - 1; i >= 0; i-- {
+      valid := c.Certificates[i].verify(modelBase[:])
+      if !valid {
+         return false
+      }
+      modelBase = c.Certificates[i].KeyInfo.Keys[0].PublicKey[:]
+   }
+   return true
+}
+
 func (c *Chain) Encode() []byte {
    data := c.Magic[:]
    data = binary.BigEndian.AppendUint32(data, c.Version)
    data = binary.BigEndian.AppendUint32(data, c.Length)
    data = binary.BigEndian.AppendUint32(data, c.Flags)
    data = binary.BigEndian.AppendUint32(data, c.CertCount)
-   for _, cert := range c.Certificate {
+   for _, cert := range c.Certificates {
       data = cert.Append(data)
    }
    return data
@@ -29,7 +41,7 @@ func (c *Chain) Encode() []byte {
 
 func (c *Chain) Leaf(modelKey, signEncryptKey *EcKey) error {
    if !bytes.Equal(
-      c.Certificate[0].KeyInfo.Key[0].PublicKey[:], modelKey.public(),
+      c.Certificates[0].KeyInfo.Keys[0].PublicKey[:], modelKey.public(),
    ) {
       return errors.New("zgpriv not for cert")
    }
@@ -41,14 +53,14 @@ func (c *Chain) Leaf(modelKey, signEncryptKey *EcKey) error {
    cert.Version = 1 // required
    {
       // SCALABLE with SL2000, SUPPORTS_PR3_FEATURES
-      var feature CertFeature
-      feature.New(0xD)
-      cert.Feature = feature.ftlv(0, 5)
+      var features CertFeatures
+      features.New(0xD)
+      cert.Features = features.ftlv(0, 5)
    }
    {
       sum := sha256.Sum256(signEncryptKey.public())
       cert.Info = &CertificateInfo{}
-      cert.Info.New(c.Certificate[0].Info.securityLevel, sum[:])
+      cert.Info.New(c.Certificates[0].Info.securityLevel, sum[:])
    }
    cert.KeyInfo = &KeyInfo{}
    cert.KeyInfo.New(signEncryptKey.public())
@@ -66,7 +78,7 @@ func (c *Chain) Leaf(modelKey, signEncryptKey *EcKey) error {
       }
    }
    c.CertCount += 1
-   c.Certificate = slices.Insert(c.Certificate, 0, cert)
+   c.Certificates = slices.Insert(c.Certificates, 0, cert)
    c.Length += cert.Length
    return nil
 }
@@ -206,8 +218,8 @@ func (c *Certificate) Append(data []byte) []byte {
    if c.Info != nil {
       data = c.Info.ftlv(1, 1).Append(data)
    }
-   if c.Feature != nil {
-      data = c.Feature.Append(data)
+   if c.Features != nil {
+      data = c.Features.Append(data)
    }
    if c.KeyInfo != nil {
       data = c.KeyInfo.ftlv(1, 6).Append(data)
@@ -230,8 +242,8 @@ func (c *Certificate) size() (uint32, uint32) {
       n += new(Ftlv).size()
       n += binary.Size(c.Info)
    }
-   if c.Feature != nil {
-      n += c.Feature.size()
+   if c.Features != nil {
+      n += c.Features.size()
    }
    if c.KeyInfo != nil {
       n += new(Ftlv).size()
@@ -280,14 +292,14 @@ func (c *Chain) Decode(data []byte) error {
    data = data[4:]
    c.CertCount = binary.BigEndian.Uint32(data)
    data = data[4:]
-   c.Certificate = make([]Certificate, c.CertCount)
+   c.Certificates = make([]Certificate, c.CertCount)
    for i := range c.CertCount {
       var cert Certificate
       n, err := cert.decode(data)
       if err != nil {
          return err
       }
-      c.Certificate[i] = cert
+      c.Certificates[i] = cert
       data = data[n:]
    }
    return nil
@@ -317,7 +329,7 @@ func (c *Certificate) decode(data []byte) (int, error) {
          c.Info = &CertificateInfo{}
          c.Info.decode(value.Value)
       case objTypeFeature: // 0x0005
-         c.Feature = &value
+         c.Features = &value
       case objTypeKey: // 0x0006
          c.KeyInfo = &KeyInfo{}
          c.KeyInfo.decode(value.Value)
@@ -338,36 +350,12 @@ func (c *Certificate) decode(data []byte) (int, error) {
 }
 
 type Chain struct {
-   Magic       [4]byte
-   Version     uint32
-   Length      uint32
-   Flags       uint32
-   CertCount   uint32
-   Certificate []Certificate
-}
-
-func (c *Chain) verify() bool {
-   modelBase := c.Certificate[c.CertCount-1].Signature.IssuerKey
-   for i := len(c.Certificate) - 1; i >= 0; i-- {
-      valid := c.Certificate[i].verify(modelBase[:])
-      if !valid {
-         return false
-      }
-      modelBase = c.Certificate[i].KeyInfo.Key[0].PublicKey[:]
-   }
-   return true
-}
-
-type Certificate struct {
-   Magic             [4]byte          // bytes 0 - 3
-   Version           uint32           // bytes 4 - 7
-   Length            uint32           // bytes 8 - 11
-   LengthToSignature uint32           // bytes 12 - 15
-   Info              *CertificateInfo // type 1
-   Feature           *Ftlv            // type 5
-   KeyInfo           *KeyInfo         // type 6
-   Manufacturer      *Ftlv            // type 7
-   Signature         *CertSignature   // type 8
+   Magic        [4]byte
+   Version      uint32
+   Length       uint32
+   Flags        uint32
+   CertCount    uint32
+   Certificates []Certificate
 }
 
 type CertSignature struct {
@@ -378,4 +366,16 @@ type CertSignature struct {
    IssuerLength uint32
    // The public key of the issuer that signed this certificate
    IssuerKey []byte
+}
+
+type Certificate struct {
+   Magic             [4]byte          // bytes 0 - 3
+   Version           uint32           // bytes 4 - 7
+   Length            uint32           // bytes 8 - 11
+   LengthToSignature uint32           // bytes 12 - 15
+   Info              *CertificateInfo // type 1
+   Features          *Ftlv            // type 5
+   KeyInfo           *KeyInfo         // type 6
+   Manufacturer      *Ftlv            // type 7
+   Signature         *CertSignature   // type 8
 }
