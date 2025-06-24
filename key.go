@@ -260,30 +260,15 @@ func (e *eccKey) decode(data []byte) {
    e.Value = data
 }
 
-type xmlKey struct {
-   PublicKey ecdsa.PublicKey
-   X         [32]byte
+func (f *features) ftlv(Flag, Type uint16) *ftlv {
+   return newFtlv(Flag, Type, f.Append(nil))
 }
 
-func (x *xmlKey) New() {
-   x.PublicKey.X, x.PublicKey.Y = elliptic.P256().ScalarBaseMult([]byte{1})
-   x.PublicKey.X.FillBytes(x.X[:])
-}
-
-func (x *xmlKey) aesIv() []byte {
-   return x.X[:16]
-}
-
-func (x *xmlKey) aesKey() []byte {
-   return x.X[16:]
-}
-
-func (f *features) Append(data []byte) []byte {
-   data = binary.BigEndian.AppendUint32(data, f.entries)
-   for _, feature := range f.features {
-      data = binary.BigEndian.AppendUint32(data, feature)
+func newFeatures(Type uint32) *features {
+   return &features{
+      entries:  1,
+      features: []uint32{Type},
    }
-   return data
 }
 
 type features struct {
@@ -297,27 +282,12 @@ func (f *features) size() int {
    return n
 }
 
-func (k *keyData) Append(data []byte) []byte {
-   data = binary.BigEndian.AppendUint16(data, k.keyType)
-   data = binary.BigEndian.AppendUint16(data, k.length)
-   data = binary.BigEndian.AppendUint32(data, k.flags)
-   data = append(data, k.publicKey[:]...)
-   return k.usage.Append(data)
-}
-
-type keyData struct {
-   keyType   uint16
-   length    uint16 // Total length of the keyData structure
-   flags     uint32
-   publicKey [64]byte  // ECDSA P256 public key (X and Y coordinates)
-   usage     *features // Features indicating key usage
-}
-
-func newFeatures(Type uint32) *features {
-   return &features{
-      entries:  1,
-      features: []uint32{Type},
+func (f *features) Append(data []byte) []byte {
+   data = binary.BigEndian.AppendUint32(data, f.entries)
+   for _, feature := range f.features {
+      data = binary.BigEndian.AppendUint32(data, feature)
    }
+   return data
 }
 
 func (k *keyData) decode(data []byte) int {
@@ -333,11 +303,20 @@ func (k *keyData) decode(data []byte) int {
    return n
 }
 
-func (k *keyInfo) New(signEncryptKey []byte) {
-   k.entries = 2 // required
-   k.keys = make([]keyData, 2)
-   k.keys[0].New(signEncryptKey, 1)
-   k.keys[1].New(signEncryptKey, 2)
+type keyData struct {
+   keyType   uint16
+   length    uint16 // Total length of the keyData structure
+   flags     uint32
+   publicKey [64]byte  // ECDSA P256 public key (X and Y coordinates)
+   usage     *features // Features indicating key usage
+}
+
+func (k *keyData) Append(data []byte) []byte {
+   data = binary.BigEndian.AppendUint16(data, k.keyType)
+   data = binary.BigEndian.AppendUint16(data, k.length)
+   data = binary.BigEndian.AppendUint32(data, k.flags)
+   data = append(data, k.publicKey[:]...)
+   return k.usage.Append(data)
 }
 
 func (k *keyData) New(PublicKey []byte, Type uint32) {
@@ -354,25 +333,9 @@ func (k *keyInfo) size() int {
    return n
 }
 
-func (k *keyInfo) decode(data []byte) {
-   k.entries = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   k.keys = make([]keyData, k.entries)
-   for i := range k.entries { // Correctly iterate up to k.entries
-      var key keyData
-      n := key.decode(data)
-      k.keys[i] = key
-      data = data[n:] // Advance data slice for the next key
-   }
-}
-
 type keyInfo struct {
    entries uint32 // can be 1 or 2
    keys    []keyData
-}
-
-func (f *features) ftlv(Flag, Type uint16) *ftlv {
-   return newFtlv(Flag, Type, f.Append(nil))
 }
 
 func (k *keyInfo) encode() []byte {
@@ -385,4 +348,41 @@ func (k *keyInfo) encode() []byte {
 
 func (k *keyInfo) ftlv(Flag, Type uint16) *ftlv {
    return newFtlv(Flag, Type, k.encode())
+}
+
+func (k *keyInfo) decode(data []byte) {
+   k.entries = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   k.keys = make([]keyData, k.entries)
+   for i := range k.entries { // Correctly iterate up to k.entries
+      var key keyData
+      n := key.decode(data)
+      k.keys[i] = key
+      data = data[n:] // Advance data slice for the next key
+   }
+}
+
+func (k *keyInfo) New(signEncryptKey []byte) {
+   k.entries = 2 // required
+   k.keys = make([]keyData, 2)
+   k.keys[0].New(signEncryptKey, 1)
+   k.keys[1].New(signEncryptKey, 2)
+}
+
+type xmlKey struct {
+   PublicKey ecdsa.PublicKey
+   X         [32]byte
+}
+
+func (x *xmlKey) New() {
+   x.PublicKey.X, x.PublicKey.Y = elliptic.P256().ScalarBaseMult([]byte{1})
+   x.PublicKey.X.FillBytes(x.X[:])
+}
+
+func (x *xmlKey) aesIv() []byte {
+   return x.X[:16]
+}
+
+func (x *xmlKey) aesKey() []byte {
+   return x.X[16:]
 }
