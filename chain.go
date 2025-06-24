@@ -122,13 +122,13 @@ func (c *Chain) RequestBody(signEncrypt EcKey, kid []byte) ([]byte, error) {
 }
 
 func (c *CertSignature) New(signature, modelKey []byte) error {
-   c.signatureType = 1 // required
-   c.signatureLength = 64
+   c.SignatureType = 1 // required
+   c.SignatureLength = 64
    if len(signature) != 64 {
       return errors.New("signature length invalid")
    }
-   c.signature = signature
-   c.issuerLength = 512
+   c.Signature = signature
+   c.IssuerLength = 512
    if len(modelKey) != 64 {
       return errors.New("model key length invalid")
    }
@@ -137,29 +137,29 @@ func (c *CertSignature) New(signature, modelKey []byte) error {
 }
 
 func (c *CertSignature) decode(data []byte) error {
-   c.signatureType = binary.BigEndian.Uint16(data)
+   c.SignatureType = binary.BigEndian.Uint16(data)
    data = data[2:]
-   c.signatureLength = binary.BigEndian.Uint16(data)
-   if c.signatureLength != 64 {
+   c.SignatureLength = binary.BigEndian.Uint16(data)
+   if c.SignatureLength != 64 {
       return errors.New("signature length invalid")
    }
    data = data[2:]
-   c.signature = data[:c.signatureLength]
-   data = data[c.signatureLength:]
-   c.issuerLength = binary.BigEndian.Uint32(data)
-   if c.issuerLength != 512 {
+   c.Signature = data[:c.SignatureLength]
+   data = data[c.SignatureLength:]
+   c.IssuerLength = binary.BigEndian.Uint32(data)
+   if c.IssuerLength != 512 {
       return errors.New("issuer length invalid")
    }
    data = data[4:]
-   c.IssuerKey = data[:c.issuerLength/8]
+   c.IssuerKey = data[:c.IssuerLength/8]
    return nil
 }
 
 func (c *CertSignature) encode() []byte {
-   data := binary.BigEndian.AppendUint16(nil, c.signatureType)
-   data = binary.BigEndian.AppendUint16(data, c.signatureLength)
-   data = append(data, c.signature...)
-   data = binary.BigEndian.AppendUint32(data, c.issuerLength)
+   data := binary.BigEndian.AppendUint16(nil, c.SignatureType)
+   data = binary.BigEndian.AppendUint16(data, c.SignatureLength)
+   data = append(data, c.Signature...)
+   data = binary.BigEndian.AppendUint32(data, c.IssuerLength)
    return append(data, c.IssuerKey...)
 }
 
@@ -259,7 +259,7 @@ func (c *Certificate) verify(pubKey []byte) bool {
    data := c.Append(nil)
    data = data[:c.LengthToSignature]
    signatureDigest := sha256.Sum256(data)
-   signature := c.Signature.signature
+   signature := c.Signature.Signature
    r := new(big.Int).SetBytes(signature[:32])
    s := new(big.Int).SetBytes(signature[32:])
    return ecdsa.Verify(&publicKey, signatureDigest[:], r, s)
@@ -370,14 +370,12 @@ type Certificate struct {
    Signature         *CertSignature   // type 8
 }
 
-///
-
 type CertSignature struct {
-   signatureType   uint16
-   signatureLength uint16
+   SignatureType   uint16
+   SignatureLength uint16
    // The actual signature bytes
-   signature    []byte
-   issuerLength uint32
+   Signature    []byte
+   IssuerLength uint32
    // The public key of the issuer that signed this certificate
    IssuerKey []byte
 }

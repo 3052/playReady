@@ -13,6 +13,139 @@ import (
    "slices"
 )
 
+func (c *certificateFeature) Append(data []byte) []byte {
+   data = binary.BigEndian.AppendUint32(data, c.entries)
+   for _, feature := range c.feature {
+      data = binary.BigEndian.AppendUint32(data, feature)
+   }
+   return data
+}
+
+func (c *certificateFeature) New(Type uint32) {
+   c.entries = 1
+   c.feature = []uint32{Type}
+}
+
+func (c *certificateFeature) ftlv(Flag, Type uint16) *Ftlv {
+   return newFtlv(Flag, Type, c.Append(nil))
+}
+
+func (c *certificateFeature) size() int {
+   n := 4 // entries
+   n += 4 * len(c.feature)
+   return n
+}
+
+// Decode decodes a byte slice into an ECCKey structure.
+func (e *eccKey) decode(data []byte) {
+   e.Curve = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   e.Length = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   e.Value = data
+}
+
+func (k *keyData) Append(data []byte) []byte {
+   data = binary.BigEndian.AppendUint16(data, k.keyType)
+   data = binary.BigEndian.AppendUint16(data, k.length)
+   data = binary.BigEndian.AppendUint32(data, k.flags)
+   data = append(data, k.publicKey[:]...)
+   return k.usage.Append(data)
+}
+
+func (k *keyData) New(PublicKey []byte, Type uint32) {
+   k.length = 512 // required
+   copy(k.publicKey[:], PublicKey)
+   k.usage.New(Type)
+}
+
+func (k *keyData) decode(data []byte) int {
+   k.keyType = binary.BigEndian.Uint16(data)
+   n := 2
+   k.length = binary.BigEndian.Uint16(data[n:])
+   n += 2
+   k.flags = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   n += copy(k.publicKey[:], data[n:])
+   n += k.usage.decode(data[n:])
+   return n
+}
+
+func (k *KeyInfo) New(signEncryptKey []byte) {
+   k.entries = 2 // required
+   k.keys = make([]keyData, 2)
+   k.keys[0].New(signEncryptKey, 1)
+   k.keys[1].New(signEncryptKey, 2)
+}
+
+func (k *KeyInfo) decode(data []byte) {
+   k.entries = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   k.keys = make([]keyData, k.entries)
+   for i := range k.entries { // Correctly iterate up to k.entries
+      var key keyData
+      n := key.decode(data)
+      k.keys[i] = key
+      data = data[n:] // Advance data slice for the next key
+   }
+}
+
+func (k *KeyInfo) encode() []byte {
+   data := binary.BigEndian.AppendUint32(nil, k.entries)
+   for _, key := range k.keys {
+      data = key.Append(data)
+   }
+   return data
+}
+
+func (k *KeyInfo) ftlv(Flag, Type uint16) *Ftlv {
+   return newFtlv(Flag, Type, k.encode())
+}
+
+func (k *KeyInfo) size() int {
+   n := 4 // entries
+   for _, key := range k.keys {
+      n += key.size()
+   }
+   return n
+}
+
+func (x *xmlKey) New() {
+   x.PublicKey.X, x.PublicKey.Y = elliptic.P256().ScalarBaseMult([]byte{1})
+   x.PublicKey.X.FillBytes(x.X[:])
+}
+
+func (x *xmlKey) aesIv() []byte {
+   return x.X[:16]
+}
+
+func (x *xmlKey) aesKey() []byte {
+   return x.X[16:]
+}
+
+// Constants for object types within the certificate structure.
+const (
+   objTypeBasic            = 0x0001
+   objTypeDomain           = 0x0002
+   objTypePc               = 0x0003
+   objTypeDevice           = 0x0004
+   objTypeFeature          = 0x0005
+   objTypeKey              = 0x0006
+   objTypeManufacturer     = 0x0007
+   objTypeSignature        = 0x0008
+   objTypeSilverlight      = 0x0009
+   objTypeMetering         = 0x000A
+   objTypeExtDataSignKey   = 0x000B
+   objTypeExtDataContainer = 0x000C
+   objTypeExtDataSignature = 0x000D
+   objTypeExtDataHwid      = 0x000E
+   objTypeServer           = 0x000F
+   objTypeSecurityVersion  = 0x0010
+   objTypeSecurityVersion2 = 0x0011
+)
+
+const wmrmPublicKey = "C8B6AF16EE941AADAA5389B4AF2C10E356BE42AF175EF3FACE93254E7B0B3D9B982B27B5CB2341326E56AA857DBFD5C634CE2CF9EA74FCA8F2AF5957EFEEA562"
+
 func elGamalDecrypt(ciphertext []byte, x *ecdsa.PrivateKey) []byte {
    // generator
    g := elliptic.P256()
@@ -175,16 +308,6 @@ func xorKey(a, b []byte) []byte {
    return c
 }
 
-type ContentKey struct {
-   KeyID      [16]byte
-   KeyType    uint16
-   CipherType uint16
-   Length     uint16
-   Value      []byte
-   Integrity  [16]byte
-   Key        [16]byte
-}
-
 // decode decodes a byte slice into a ContentKey structure.
 func (c *ContentKey) decode(data []byte) {
    n := copy(c.KeyID[:], data)
@@ -234,47 +357,27 @@ func (f Fill) Key() (*EcKey, error) {
    return &EcKey{key}, nil
 }
 
+///
+
+type ContentKey struct {
+   KeyID      [16]byte
+   KeyType    uint16
+   CipherType uint16
+   Length     uint16
+   Value      []byte
+   Integrity  [16]byte
+   Key        [16]byte
+}
+
 type certificateFeature struct {
    entries uint32   // Number of feature entries
    feature []uint32 // Slice of feature IDs
-}
-
-func (c *certificateFeature) Append(data []byte) []byte {
-   data = binary.BigEndian.AppendUint32(data, c.entries)
-   for _, feature := range c.feature {
-      data = binary.BigEndian.AppendUint32(data, feature)
-   }
-   return data
-}
-
-func (c *certificateFeature) New(Type uint32) {
-   c.entries = 1
-   c.feature = []uint32{Type}
-}
-
-func (c *certificateFeature) ftlv(Flag, Type uint16) *Ftlv {
-   return newFtlv(Flag, Type, c.Append(nil))
-}
-
-func (c *certificateFeature) size() int {
-   n := 4 // entries
-   n += 4 * len(c.feature)
-   return n
 }
 
 type eccKey struct {
    Curve  uint16
    Length uint16
    Value  []byte
-}
-
-// Decode decodes a byte slice into an ECCKey structure.
-func (e *eccKey) decode(data []byte) {
-   e.Curve = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   e.Length = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   e.Value = data
 }
 
 type keyData struct {
@@ -285,113 +388,12 @@ type keyData struct {
    usage     certificateFeature
 }
 
-func (k *keyData) Append(data []byte) []byte {
-   data = binary.BigEndian.AppendUint16(data, k.keyType)
-   data = binary.BigEndian.AppendUint16(data, k.length)
-   data = binary.BigEndian.AppendUint32(data, k.flags)
-   data = append(data, k.publicKey[:]...)
-   return k.usage.Append(data)
-}
-
-func (k *keyData) New(PublicKey []byte, Type uint32) {
-   k.length = 512 // required
-   copy(k.publicKey[:], PublicKey)
-   k.usage.New(Type)
-}
-
-func (k *keyData) decode(data []byte) int {
-   k.keyType = binary.BigEndian.Uint16(data)
-   n := 2
-   k.length = binary.BigEndian.Uint16(data[n:])
-   n += 2
-   k.flags = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   n += copy(k.publicKey[:], data[n:])
-   n += k.usage.decode(data[n:])
-   return n
-}
-
 type KeyInfo struct {
    entries uint32 // can be 1 or 2
    keys    []keyData
-}
-
-func (k *KeyInfo) New(signEncryptKey []byte) {
-   k.entries = 2 // required
-   k.keys = make([]keyData, 2)
-   k.keys[0].New(signEncryptKey, 1)
-   k.keys[1].New(signEncryptKey, 2)
-}
-
-func (k *KeyInfo) decode(data []byte) {
-   k.entries = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   k.keys = make([]keyData, k.entries)
-   for i := range k.entries { // Correctly iterate up to k.entries
-      var key keyData
-      n := key.decode(data)
-      k.keys[i] = key
-      data = data[n:] // Advance data slice for the next key
-   }
-}
-
-func (k *KeyInfo) encode() []byte {
-   data := binary.BigEndian.AppendUint32(nil, k.entries)
-   for _, key := range k.keys {
-      data = key.Append(data)
-   }
-   return data
-}
-
-func (k *KeyInfo) ftlv(Flag, Type uint16) *Ftlv {
-   return newFtlv(Flag, Type, k.encode())
-}
-
-func (k *KeyInfo) size() int {
-   n := 4 // entries
-   for _, key := range k.keys {
-      n += key.size()
-   }
-   return n
 }
 
 type xmlKey struct {
    PublicKey ecdsa.PublicKey
    X         [32]byte
 }
-
-func (x *xmlKey) New() {
-   x.PublicKey.X, x.PublicKey.Y = elliptic.P256().ScalarBaseMult([]byte{1})
-   x.PublicKey.X.FillBytes(x.X[:])
-}
-
-func (x *xmlKey) aesIv() []byte {
-   return x.X[:16]
-}
-
-func (x *xmlKey) aesKey() []byte {
-   return x.X[16:]
-}
-
-// Constants for object types within the certificate structure.
-const (
-   objTypeBasic            = 0x0001
-   objTypeDomain           = 0x0002
-   objTypePc               = 0x0003
-   objTypeDevice           = 0x0004
-   objTypeFeature          = 0x0005
-   objTypeKey              = 0x0006
-   objTypeManufacturer     = 0x0007
-   objTypeSignature        = 0x0008
-   objTypeSilverlight      = 0x0009
-   objTypeMetering         = 0x000A
-   objTypeExtDataSignKey   = 0x000B
-   objTypeExtDataContainer = 0x000C
-   objTypeExtDataSignature = 0x000D
-   objTypeExtDataHwid      = 0x000E
-   objTypeServer           = 0x000F
-   objTypeSecurityVersion  = 0x0010
-   objTypeSecurityVersion2 = 0x0011
-)
-
-const wmrmPublicKey = "C8B6AF16EE941AADAA5389B4AF2C10E356BE42AF175EF3FACE93254E7B0B3D9B982B27B5CB2341326E56AA857DBFD5C634CE2CF9EA74FCA8F2AF5957EFEEA562"
