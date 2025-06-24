@@ -72,8 +72,6 @@ type License struct {
    Offset         uint16            // 1
    Version        uint16            // 2
    RightsID       [16]byte          // 3
-   GlobalPolicy   struct{}          // 4.2
-   PlaybackPolicy struct{}          // 4.4
    ContentKey     *ContentKey       // 4.9.10
    eccKey         *eccKey           // 4.9.42
    auxKeys        *auxKeys          // 4.9.81
