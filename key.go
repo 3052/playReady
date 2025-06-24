@@ -260,31 +260,29 @@ func (e *eccKey) decode(data []byte) {
    e.Value = data
 }
 
-func (f *features) ftlv(Flag, Type uint16) *ftlv {
-   return newFtlv(Flag, Type, f.Append(nil))
+func (c *certificateFeature) ftlv(Flag, Type uint16) *ftlv {
+   return newFtlv(Flag, Type, c.Append(nil))
 }
 
-func newFeatures(Type uint32) *features {
-   return &features{
-      entries:  1,
-      features: []uint32{Type},
-   }
+func (c *certificateFeature) New(Type uint32) {
+   c.entries = 1
+   c.feature = []uint32{Type}
 }
 
-type features struct {
+type certificateFeature struct {
    entries  uint32   // Number of feature entries
-   features []uint32 // Slice of feature IDs
+   feature []uint32 // Slice of feature IDs
 }
 
-func (f *features) size() int {
+func (c *certificateFeature) size() int {
    n := 4 // entries
-   n += 4 * len(f.features)
+   n += 4 * len(c.feature)
    return n
 }
 
-func (f *features) Append(data []byte) []byte {
-   data = binary.BigEndian.AppendUint32(data, f.entries)
-   for _, feature := range f.features {
+func (c *certificateFeature) Append(data []byte) []byte {
+   data = binary.BigEndian.AppendUint32(data, c.entries)
+   for _, feature := range c.feature {
       data = binary.BigEndian.AppendUint32(data, feature)
    }
    return data
@@ -298,7 +296,6 @@ func (k *keyData) decode(data []byte) int {
    k.flags = binary.BigEndian.Uint32(data[n:])
    n += 4
    n += copy(k.publicKey[:], data[n:])
-   k.usage = &features{}
    n += k.usage.decode(data[n:])
    return n
 }
@@ -308,7 +305,7 @@ type keyData struct {
    length    uint16 // Total length of the keyData structure
    flags     uint32
    publicKey [64]byte  // ECDSA P256 public key (X and Y coordinates)
-   usage     *features // Features indicating key usage
+   usage     certificateFeature
 }
 
 func (k *keyData) Append(data []byte) []byte {
@@ -322,7 +319,7 @@ func (k *keyData) Append(data []byte) []byte {
 func (k *keyData) New(PublicKey []byte, Type uint32) {
    k.length = 512 // required
    copy(k.publicKey[:], PublicKey)
-   k.usage = newFeatures(Type)
+   k.usage.New(Type)
 }
 
 func (k *keyInfo) size() int {
