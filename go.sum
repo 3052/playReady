@@ -1,2 +1,2 @@
-github.com/go-webdl/crypto v0.0.0-20230227000000-a7f001f607b3 h1:7j4f+XB9HMfDJghePWTjuf1AvVSqtbkewCevNPrYFaU=
-github.com/go-webdl/crypto v0.0.0-20230227000000-a7f001f607b3/go.mod h1:tbiPb6WEkfBvuhoyHRqA4yek+NBoH5ijZBDrFUWm7lk=
+github.com/emmansun/gmsm v0.30.1 h1:IEBk+r4hcfVviNH1Q8KlMfreeIUnhZchMtsAgc7MsSI=
+github.com/emmansun/gmsm v0.30.1/go.mod h1:XRXzKUpqVGZy9ynVKPE8xFuKaPi8jtzk4ZEFG6/WewY=

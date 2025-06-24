@@ -10,7 +10,7 @@ import (
    "crypto/sha256"
    "encoding/binary"
    "errors"
-   "github.com/go-webdl/crypto/pkcs7"
+   "github.com/emmansun/gmsm/padding"
    "math/big"
    "slices"
 )
@@ -28,7 +28,7 @@ func (c *Chain) cipherData(key *xmlKey) ([]byte, error) {
    if err != nil {
       return nil, err
    }
-   data, _ = pkcs7.Pad(data, aes.BlockSize)
+   data = padding.NewPKCS7Padding(aes.BlockSize).Pad(data)
    block, err := aes.NewCipher(key.aesKey())
    if err != nil {
       return nil, err

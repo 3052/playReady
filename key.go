@@ -8,10 +8,48 @@ import (
    "encoding/binary"
    "encoding/hex"
    "errors"
-   "github.com/go-webdl/crypto/ecb"
+   "github.com/emmansun/gmsm/cipher"
    "math/big"
    "slices"
 )
+
+func elGamalDecrypt(ciphertext []byte, x *ecdsa.PrivateKey) []byte {
+   // generator
+   g := elliptic.P256()
+   // Unmarshal C1 component
+   c1X := new(big.Int).SetBytes(ciphertext[:32])
+   c1Y := new(big.Int).SetBytes(ciphertext[32:64])
+   // Unmarshal C2 component
+   c2X := new(big.Int).SetBytes(ciphertext[64:96])
+   c2Y := new(big.Int).SetBytes(ciphertext[96:])
+   // Calculate shared secret s = C1^x
+   sX, sY := g.ScalarMult(c1X, c1Y, x.D.Bytes())
+   // Invert the point for subtraction
+   sY.Neg(sY)
+   sY.Mod(sY, g.Params().P)
+   // Recover message point: M = C2 - s
+   mX, mY := g.Add(c2X, c2Y, sX, sY)
+   return append(mX.Bytes(), mY.Bytes()...)
+}
+
+func elGamalEncrypt(data, key *ecdsa.PublicKey) []byte {
+   g := elliptic.P256()
+   y := big.NewInt(1) // In a real scenario, y should be truly random
+   c1x, c1y := g.ScalarBaseMult(y.Bytes())
+   sX, sY := g.ScalarMult(key.X, key.Y, y.Bytes())
+   c2X, c2Y := g.Add(data.X, data.Y, sX, sY)
+   return slices.Concat(c1x.Bytes(), c1y.Bytes(), c2X.Bytes(), c2Y.Bytes())
+}
+
+func aesEcbEncrypt(data, key []byte) ([]byte, error) {
+   block, err := aes.NewCipher(key)
+   if err != nil {
+      return nil, err
+   }
+   data1 := make([]byte, len(data))
+   cipher.NewECBEncrypter(block).CryptBlocks(data1, data)
+   return data1, nil
+}
 
 func newLa(m *ecdsa.PublicKey, cipherData, kid []byte) *xml.La {
    return &xml.La{
@@ -66,34 +104,6 @@ func elGamalKeyGeneration() *ecdsa.PublicKey {
    key.X = new(big.Int).SetBytes(data[:32])
    key.Y = new(big.Int).SetBytes(data[32:])
    return &key
-}
-
-func elGamalEncrypt(data, key *ecdsa.PublicKey) []byte {
-   g := elliptic.P256()
-   y := big.NewInt(1) // In a real scenario, y should be truly random
-   c1x, c1y := g.ScalarBaseMult(y.Bytes())
-   sX, sY := g.ScalarMult(key.X, key.Y, y.Bytes())
-   c2X, c2Y := g.Add(data.X, data.Y, sX, sY)
-   return slices.Concat(c1x.Bytes(), c1y.Bytes(), c2X.Bytes(), c2Y.Bytes())
-}
-
-func elGamalDecrypt(ciphertext []byte, x *ecdsa.PrivateKey) []byte {
-   // generator
-   g := elliptic.P256()
-   // Unmarshal C1 component
-   c1X := new(big.Int).SetBytes(ciphertext[:32])
-   c1Y := new(big.Int).SetBytes(ciphertext[32:64])
-   // Unmarshal C2 component
-   c2X := new(big.Int).SetBytes(ciphertext[64:96])
-   c2Y := new(big.Int).SetBytes(ciphertext[96:])
-   // Calculate shared secret s = C1^x
-   sX, sY := g.ScalarMult(c1X, c1Y, x.D.Bytes())
-   // Invert the point for subtraction
-   sY.Neg(sY)
-   sY.Mod(sY, g.Params().P)
-   // Recover message point: M = C2 - s
-   mX, mY := g.Add(c2X, c2Y, sX, sY)
-   return append(mX.Bytes(), mY.Bytes()...)
 }
 
 func (c *ContentKey) decrypt(key *ecdsa.PrivateKey, aux *auxKeys) error {
@@ -362,15 +372,6 @@ func (x *xmlKey) aesIv() []byte {
 func (x *xmlKey) aesKey() []byte {
    return x.X[16:]
 }
-func aesEcbEncrypt(data, key []byte) ([]byte, error) {
-   block, err := aes.NewCipher(key)
-   if err != nil {
-      return nil, err
-   }
-   data1 := make([]byte, len(data))
-   ecb.NewECBEncrypter(block).CryptBlocks(data1, data)
-   return data1, nil
-}
 
 // Constants for object types within the certificate structure.
 const (
@@ -394,4 +395,3 @@ const (
 )
 
 const wmrmPublicKey = "C8B6AF16EE941AADAA5389B4AF2C10E356BE42AF175EF3FACE93254E7B0B3D9B982B27B5CB2341326E56AA857DBFD5C634CE2CF9EA74FCA8F2AF5957EFEEA562"
-
