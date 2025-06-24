@@ -114,9 +114,9 @@ func TestKey(t *testing.T) {
          t.Fatal(err)
       }
       content := license1.ContentKey
-      UuidOrGuid(content.KeyID[:])
-      if hex.EncodeToString(content.KeyID[:]) != test.kid_wv {
-         t.Fatal(".KeyID")
+      UuidOrGuid(content.KeyId[:])
+      if hex.EncodeToString(content.KeyId[:]) != test.kid_wv {
+         t.Fatal(".KeyId")
       }
       if hex.EncodeToString(content.Key[:]) != test.key {
          t.Fatal(".Key")

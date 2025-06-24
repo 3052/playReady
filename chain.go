@@ -29,7 +29,7 @@ func (c *Chain) Encode() []byte {
 
 func (c *Chain) Leaf(modelKey, signEncryptKey *EcKey) error {
    if !bytes.Equal(
-      c.Certificate[0].KeyInfo.keys[0].publicKey[:], modelKey.public(),
+      c.Certificate[0].KeyInfo.Key[0].PublicKey[:], modelKey.public(),
    ) {
       return errors.New("zgpriv not for cert")
    }
@@ -41,7 +41,7 @@ func (c *Chain) Leaf(modelKey, signEncryptKey *EcKey) error {
    cert.Version = 1 // required
    {
       // SCALABLE with SL2000, SUPPORTS_PR3_FEATURES
-      var feature certificateFeature
+      var feature CertFeature
       feature.New(0xD)
       cert.Feature = feature.ftlv(0, 5)
    }
@@ -353,7 +353,7 @@ func (c *Chain) verify() bool {
       if !valid {
          return false
       }
-      modelBase = c.Certificate[i].KeyInfo.keys[0].publicKey[:]
+      modelBase = c.Certificate[i].KeyInfo.Key[0].PublicKey[:]
    }
    return true
 }

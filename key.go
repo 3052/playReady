@@ -13,31 +13,30 @@ import (
    "slices"
 )
 
-func (c *certificateFeature) Append(data []byte) []byte {
-   data = binary.BigEndian.AppendUint32(data, c.entries)
-   for _, feature := range c.feature {
+func (c *CertFeature) Append(data []byte) []byte {
+   data = binary.BigEndian.AppendUint32(data, c.Entries)
+   for _, feature := range c.Feature {
       data = binary.BigEndian.AppendUint32(data, feature)
    }
    return data
 }
 
-func (c *certificateFeature) New(Type uint32) {
-   c.entries = 1
-   c.feature = []uint32{Type}
+func (c *CertFeature) New(Type uint32) {
+   c.Entries = 1
+   c.Feature = []uint32{Type}
 }
 
-func (c *certificateFeature) ftlv(Flag, Type uint16) *Ftlv {
+func (c *CertFeature) ftlv(Flag, Type uint16) *Ftlv {
    return newFtlv(Flag, Type, c.Append(nil))
 }
 
-func (c *certificateFeature) size() int {
+func (c *CertFeature) size() int {
    n := 4 // entries
-   n += 4 * len(c.feature)
+   n += 4 * len(c.Feature)
    return n
 }
 
-// Decode decodes a byte slice into an ECCKey structure.
-func (e *eccKey) decode(data []byte) {
+func (e *EccKey) decode(data []byte) {
    e.Curve = binary.BigEndian.Uint16(data)
    data = data[2:]
    e.Length = binary.BigEndian.Uint16(data)
@@ -45,54 +44,54 @@ func (e *eccKey) decode(data []byte) {
    e.Value = data
 }
 
-func (k *keyData) Append(data []byte) []byte {
-   data = binary.BigEndian.AppendUint16(data, k.keyType)
-   data = binary.BigEndian.AppendUint16(data, k.length)
-   data = binary.BigEndian.AppendUint32(data, k.flags)
-   data = append(data, k.publicKey[:]...)
-   return k.usage.Append(data)
+func (k *KeyData) Append(data []byte) []byte {
+   data = binary.BigEndian.AppendUint16(data, k.KeyType)
+   data = binary.BigEndian.AppendUint16(data, k.Length)
+   data = binary.BigEndian.AppendUint32(data, k.Flags)
+   data = append(data, k.PublicKey[:]...)
+   return k.Usage.Append(data)
 }
 
-func (k *keyData) New(PublicKey []byte, Type uint32) {
-   k.length = 512 // required
-   copy(k.publicKey[:], PublicKey)
-   k.usage.New(Type)
+func (k *KeyData) New(PublicKey []byte, Type uint32) {
+   k.Length = 512 // required
+   copy(k.PublicKey[:], PublicKey)
+   k.Usage.New(Type)
 }
 
-func (k *keyData) decode(data []byte) int {
-   k.keyType = binary.BigEndian.Uint16(data)
+func (k *KeyData) decode(data []byte) int {
+   k.KeyType = binary.BigEndian.Uint16(data)
    n := 2
-   k.length = binary.BigEndian.Uint16(data[n:])
+   k.Length = binary.BigEndian.Uint16(data[n:])
    n += 2
-   k.flags = binary.BigEndian.Uint32(data[n:])
+   k.Flags = binary.BigEndian.Uint32(data[n:])
    n += 4
-   n += copy(k.publicKey[:], data[n:])
-   n += k.usage.decode(data[n:])
+   n += copy(k.PublicKey[:], data[n:])
+   n += k.Usage.decode(data[n:])
    return n
 }
 
 func (k *KeyInfo) New(signEncryptKey []byte) {
-   k.entries = 2 // required
-   k.keys = make([]keyData, 2)
-   k.keys[0].New(signEncryptKey, 1)
-   k.keys[1].New(signEncryptKey, 2)
+   k.Entries = 2 // required
+   k.Key = make([]KeyData, 2)
+   k.Key[0].New(signEncryptKey, 1)
+   k.Key[1].New(signEncryptKey, 2)
 }
 
 func (k *KeyInfo) decode(data []byte) {
-   k.entries = binary.BigEndian.Uint32(data)
+   k.Entries = binary.BigEndian.Uint32(data)
    data = data[4:]
-   k.keys = make([]keyData, k.entries)
-   for i := range k.entries { // Correctly iterate up to k.entries
-      var key keyData
+   k.Key = make([]KeyData, k.Entries)
+   for i := range k.Entries {
+      var key KeyData
       n := key.decode(data)
-      k.keys[i] = key
+      k.Key[i] = key
       data = data[n:] // Advance data slice for the next key
    }
 }
 
 func (k *KeyInfo) encode() []byte {
-   data := binary.BigEndian.AppendUint32(nil, k.entries)
-   for _, key := range k.keys {
+   data := binary.BigEndian.AppendUint32(nil, k.Entries)
+   for _, key := range k.Key {
       data = key.Append(data)
    }
    return data
@@ -104,7 +103,7 @@ func (k *KeyInfo) ftlv(Flag, Type uint16) *Ftlv {
 
 func (k *KeyInfo) size() int {
    n := 4 // entries
-   for _, key := range k.keys {
+   for _, key := range k.Key {
       n += key.size()
    }
    return n
@@ -310,7 +309,7 @@ func xorKey(a, b []byte) []byte {
 
 // decode decodes a byte slice into a ContentKey structure.
 func (c *ContentKey) decode(data []byte) {
-   n := copy(c.KeyID[:], data)
+   n := copy(c.KeyId[:], data)
    data = data[n:]
    c.KeyType = binary.BigEndian.Uint16(data)
    data = data[2:]
@@ -357,10 +356,8 @@ func (f Fill) Key() (*EcKey, error) {
    return &EcKey{key}, nil
 }
 
-///
-
 type ContentKey struct {
-   KeyID      [16]byte
+   KeyId      [16]byte
    KeyType    uint16
    CipherType uint16
    Length     uint16
@@ -369,28 +366,28 @@ type ContentKey struct {
    Key        [16]byte
 }
 
-type certificateFeature struct {
-   entries uint32   // Number of feature entries
-   feature []uint32 // Slice of feature IDs
+type KeyInfo struct {
+   Entries uint32 // can be 1 or 2
+   Key    []KeyData
 }
 
-type eccKey struct {
+type KeyData struct {
+   KeyType   uint16
+   Length    uint16
+   Flags     uint32
+   PublicKey [64]byte // ECDSA P256 public key (X and Y coordinates)
+   Usage     CertFeature
+}
+
+type CertFeature struct {
+   Entries uint32
+   Feature []uint32
+}
+
+type EccKey struct {
    Curve  uint16
    Length uint16
    Value  []byte
-}
-
-type keyData struct {
-   keyType   uint16
-   length    uint16 // Total length of the keyData structure
-   flags     uint32
-   publicKey [64]byte // ECDSA P256 public key (X and Y coordinates)
-   usage     certificateFeature
-}
-
-type KeyInfo struct {
-   entries uint32 // can be 1 or 2
-   keys    []keyData
 }
 
 type xmlKey struct {
