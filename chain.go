@@ -3,14 +3,39 @@ package playReady
 import (
    "41.neocities.org/playReady/xml"
    "bytes"
+   "crypto/aes"
+   "crypto/cipher"
    "crypto/ecdsa"
    "crypto/elliptic"
    "crypto/sha256"
    "encoding/binary"
    "errors"
+   "github.com/go-webdl/crypto/pkcs7"
    "math/big"
    "slices"
 )
+
+func (c *Chain) cipherData(key *xmlKey) ([]byte, error) {
+   xmlData := xml.Data{
+      CertificateChains: xml.CertificateChains{
+         CertificateChain: c.Encode(),
+      },
+      Features: xml.Features{
+         Feature: xml.Feature{"AESCBC"}, // SCALABLE
+      },
+   }
+   data, err := xmlData.Marshal()
+   if err != nil {
+      return nil, err
+   }
+   data, _ = pkcs7.Pad(data, aes.BlockSize)
+   block, err := aes.NewCipher(key.aesKey())
+   if err != nil {
+      return nil, err
+   }
+   cipher.NewCBCEncrypter(block, key.aesIv()).CryptBlocks(data, data)
+   return append(key.aesIv(), data...), nil
+}
 
 type Certificate struct {
    Magic             [4]byte               // bytes 0 - 3
@@ -274,26 +299,6 @@ func (c *Chain) RequestBody(signEncrypt EcKey, kid []byte) ([]byte, error) {
       },
    }
    return envelope.Marshal()
-}
-
-func (c *Chain) cipherData(key *xmlKey) ([]byte, error) {
-   data := xml.Data{
-      CertificateChains: xml.CertificateChains{
-         CertificateChain: c.Encode(),
-      },
-      Features: xml.Features{
-         Feature: xml.Feature{"AESCBC"}, // SCALABLE
-      },
-   }
-   data1, err := data.Marshal()
-   if err != nil {
-      return nil, err
-   }
-   data1, err = aesCBCHandler(data1, key.aesKey(), key.aesIv(), true)
-   if err != nil {
-      return nil, err
-   }
-   return append(key.aesIv(), data1...), nil
 }
 
 func (c *Chain) verify() bool {

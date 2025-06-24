@@ -7,36 +7,21 @@ import (
    "crypto/ecdsa"
    "encoding/binary"
    "errors"
-   "github.com/deatil/go-cryptobin/cryptobin/crypto"
    "github.com/deatil/go-cryptobin/mac"
 )
 
-// aesCBCHandler performs AES CBC encryption/decryption with PKCS7 padding.
-// Encrypts if encrypt is true, decrypts otherwise.
-func aesCBCHandler(data, key, iv []byte, encrypt bool) ([]byte, error) {
-   if encrypt {
-      bin := crypto.FromBytes(data).WithKey(key).WithIv(iv).
-         Aes().CBC().PKCS7Padding().Encrypt()
-      return bin.ToBytes(), bin.Error()
-   } else {
-      bin := crypto.FromBytes(data).WithKey(key).WithIv(iv).
-         Aes().CBC().PKCS7Padding().Decrypt()
-      return bin.ToBytes(), bin.Error()
+func (l *License) verify(data []byte) error {
+   signature := new(ftlv).size() + l.signature.size()
+   data = data[:len(data)-signature]
+   block, err := aes.NewCipher(l.ContentKey.Integrity[:])
+   if err != nil {
+      return err
    }
-}
-
-// aesECBHandler performs AES ECB encryption/decryption.
-// Encrypts if encrypt is true, decrypts otherwise.
-func aesECBHandler(data, key []byte, encrypt bool) ([]byte, error) {
-   if encrypt {
-      bin := crypto.FromBytes(data).WithKey(key).
-         Aes().ECB().NoPadding().Encrypt()
-      return bin.ToBytes(), bin.Error()
-   } else {
-      bin := crypto.FromBytes(data).WithKey(key).
-         Aes().ECB().NoPadding().Decrypt()
-      return bin.ToBytes(), bin.Error()
+   data = mac.NewCMAC(block, aes.BlockSize).MAC(data)
+   if !bytes.Equal(data, l.signature.Data) {
+      return errors.New("failed to decrypt the keys")
    }
+   return nil
 }
 
 func sign(key *ecdsa.PrivateKey, hash []byte) ([]byte, error) {
@@ -76,20 +61,6 @@ type License struct {
    eccKey         *eccKey           // 4.9.42
    auxKeys        *auxKeys          // 4.9.81
    signature      *licenseSignature // 4.11
-}
-
-func (l *License) verify(data []byte) error {
-   signature := new(ftlv).size() + l.signature.size()
-   data = data[:len(data)-signature]
-   block, err := aes.NewCipher(l.ContentKey.Integrity[:])
-   if err != nil {
-      return err
-   }
-   data = mac.NewCMAC(block, aes.BlockSize).MAC(data)
-   if !bytes.Equal(data, l.signature.Data) {
-      return errors.New("failed to decrypt the keys")
-   }
-   return nil
 }
 
 func (l *License) Decrypt(signEncrypt EcKey, data []byte) error {

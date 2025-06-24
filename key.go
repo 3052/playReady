@@ -2,14 +2,69 @@ package playReady
 
 import (
    "41.neocities.org/playReady/xml"
+   "crypto/aes"
    "crypto/ecdsa"
    "crypto/elliptic"
    "encoding/binary"
    "encoding/hex"
    "errors"
+   "github.com/go-webdl/crypto/ecb"
    "math/big"
    "slices"
 )
+
+func aesEcbEncrypt(data, key []byte) ([]byte, error) {
+   block, err := aes.NewCipher(key)
+   if err != nil {
+      return nil, err
+   }
+   data1 := make([]byte, len(data))
+   ecb.NewECBEncrypter(block).CryptBlocks(data1, data)
+   return data1, nil
+}
+
+func (c *ContentKey) scalable(key *ecdsa.PrivateKey, auxKeys *auxKeys) error {
+   rootKeyInfo, leafKeys := c.Value[:144], c.Value[144:]
+   rootKey := rootKeyInfo[128:]
+   decrypted := elGamalDecrypt(rootKeyInfo[:128], key)
+   var (
+      ci [16]byte
+      ck [16]byte
+   )
+   for i := range 16 {
+      ci[i] = decrypted[i*2]
+      ck[i] = decrypted[i*2+1]
+   }
+   magicConstantZero, err := c.magicConstantZero()
+   if err != nil {
+      return err
+   }
+   rgbUplinkXkey := xorKey(ck[:], magicConstantZero)
+   contentKeyPrime, err := aesEcbEncrypt(rgbUplinkXkey, ck[:])
+   if err != nil {
+      return err
+   }
+   auxKeyCalc, err := aesEcbEncrypt(auxKeys.Keys[0].Key[:], contentKeyPrime)
+   if err != nil {
+      return err
+   }
+   oSecondaryKey, err := aesEcbEncrypt(rootKey, ck[:])
+   if err != nil {
+      return err
+   }
+   rgbKey, err := aesEcbEncrypt(leafKeys, auxKeyCalc)
+   if err != nil {
+      return err
+   }
+   rgbKey, err = aesEcbEncrypt(rgbKey, oSecondaryKey)
+   if err != nil {
+      return err
+   }
+   n := copy(c.Integrity[:], rgbKey)
+   rgbKey = rgbKey[n:]
+   copy(c.Key[:], rgbKey)
+   return nil
+}
 
 // Constants for object types within the certificate structure.
 const (
@@ -169,49 +224,6 @@ func (c *ContentKey) decrypt(key *ecdsa.PrivateKey, aux *auxKeys) error {
 // magicConstantZero returns a specific hex-decoded byte slice.
 func (*ContentKey) magicConstantZero() ([]byte, error) {
    return hex.DecodeString("7ee9ed4af773224f00b8ea7efb027cbb")
-}
-
-func (c *ContentKey) scalable(key *ecdsa.PrivateKey, auxKeys *auxKeys) error {
-   rootKeyInfo, leafKeys := c.Value[:144], c.Value[144:]
-   rootKey := rootKeyInfo[128:]
-   decrypted := elGamalDecrypt(rootKeyInfo[:128], key)
-   var (
-      ci [16]byte
-      ck [16]byte
-   )
-   for i := range 16 {
-      ci[i] = decrypted[i*2]
-      ck[i] = decrypted[i*2+1]
-   }
-   magicConstantZero, err := c.magicConstantZero()
-   if err != nil {
-      return err
-   }
-   rgbUplinkXkey := xorKey(ck[:], magicConstantZero)
-   contentKeyPrime, err := aesECBHandler(rgbUplinkXkey, ck[:], true)
-   if err != nil {
-      return err
-   }
-   auxKeyCalc, err := aesECBHandler(auxKeys.Keys[0].Key[:], contentKeyPrime, true)
-   if err != nil {
-      return err
-   }
-   oSecondaryKey, err := aesECBHandler(rootKey, ck[:], true)
-   if err != nil {
-      return err
-   }
-   rgbKey, err := aesECBHandler(leafKeys, auxKeyCalc, true)
-   if err != nil {
-      return err
-   }
-   rgbKey, err = aesECBHandler(rgbKey, oSecondaryKey, true)
-   if err != nil {
-      return err
-   }
-   n := copy(c.Integrity[:], rgbKey)
-   rgbKey = rgbKey[n:]
-   copy(c.Key[:], rgbKey)
-   return nil
 }
 
 type EcKey [1]*ecdsa.PrivateKey
