@@ -11,98 +11,6 @@ import (
    "github.com/deatil/go-cryptobin/mac"
 )
 
-type certificateInfo struct {
-   certificateId [16]byte
-   securityLevel uint32
-   flags         uint32
-   infoType      uint32
-   digest        [32]byte
-   expiry        uint32
-   clientId      [16]byte // Client ID (can be used for license binding)
-}
-
-func (c *certificateInfo) ftlv(Flag, Type uint16) *ftlv {
-   return newFtlv(Flag, Type, c.encode())
-}
-
-func newFtlv(Flag, Type uint16, Value []byte) *ftlv {
-   return &ftlv{
-      Flag:   Flag,
-      Type:   Type,
-      Length: 8 + uint32(len(Value)),
-      Value:  Value,
-   }
-}
-
-func (c *certificateInfo) New(securityLevel uint32, digest []byte) {
-   copy(c.digest[:], digest)
-   // required, Max uint32, effectively never expires
-   c.expiry = 4294967295
-   // required
-   c.infoType = 2
-   c.securityLevel = securityLevel
-}
-
-func (c *certificateInfo) encode() []byte {
-   data := c.certificateId[:]
-   data = binary.BigEndian.AppendUint32(data, c.securityLevel)
-   data = binary.BigEndian.AppendUint32(data, c.flags)
-   data = binary.BigEndian.AppendUint32(data, c.infoType)
-   data = append(data, c.digest[:]...)
-   data = binary.BigEndian.AppendUint32(data, c.expiry)
-   return append(data, c.clientId[:]...)
-}
-
-func (c *certificateInfo) decode(data []byte) {
-   n := copy(c.certificateId[:], data)
-   data = data[n:]
-   c.securityLevel = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   c.flags = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   c.infoType = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   n = copy(c.digest[:], data)
-   data = data[n:]
-   c.expiry = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   copy(c.clientId[:], data)
-}
-
-type ftlv struct {
-   Flag   uint16 // this can be 0 or 1
-   Type   uint16
-   Length uint32
-   Value  []byte
-}
-
-func (f *ftlv) decode(data []byte) (int, error) {
-   f.Flag = binary.BigEndian.Uint16(data)
-   n := 2
-   f.Type = binary.BigEndian.Uint16(data[n:])
-   n += 2
-   f.Length = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   f.Value = data[n:f.Length]
-   n += len(f.Value)
-   return n, nil
-}
-
-func (f *ftlv) size() int {
-   n := 2 // Flag
-   n += 2 // Type
-   n += 4 // Length
-   n += len(f.Value)
-   return n
-}
-
-func (f *ftlv) Append(data []byte) []byte {
-   data = binary.BigEndian.AppendUint16(data, f.Flag)
-   data = binary.BigEndian.AppendUint16(data, f.Type)
-   data = binary.BigEndian.AppendUint32(data, f.Length)
-   return append(data, f.Value...)
-}
-
 // aesCBCHandler performs AES CBC encryption/decryption with PKCS7 padding.
 // Encrypts if encrypt is true, decrypts otherwise.
 func aesCBCHandler(data, key, iv []byte, encrypt bool) ([]byte, error) {
@@ -172,6 +80,106 @@ type License struct {
    signature      *licenseSignature // 4.11
 }
 
+func (l *License) verify(data []byte) error {
+   signature := new(ftlv).size() + l.signature.size()
+   data = data[:len(data)-signature]
+   block, err := aes.NewCipher(l.ContentKey.Integrity[:])
+   if err != nil {
+      return err
+   }
+   data = mac.NewCMAC(block, aes.BlockSize).MAC(data)
+   if !bytes.Equal(data, l.signature.Data) {
+      return errors.New("failed to decrypt the keys")
+   }
+   return nil
+}
+
+func (l *License) Decrypt(signEncrypt EcKey, data []byte) error {
+   var envelope xml.EnvelopeResponse
+   err := envelope.Unmarshal(data)
+   if err != nil {
+      return err
+   }
+   data = envelope.
+      Body.
+      AcquireLicenseResponse.
+      AcquireLicenseResult.
+      Response.
+      LicenseResponse.
+      Licenses.
+      License
+   err = l.decode(data)
+   if err != nil {
+      return err
+   }
+   if !bytes.Equal(l.eccKey.Value, signEncrypt.public()) {
+      return errors.New("license response is not for this device")
+   }
+   err = l.ContentKey.decrypt(signEncrypt[0], l.auxKeys)
+   if err != nil {
+      return err
+   }
+   return l.verify(data)
+}
+
+func (l *License) decode(data []byte) error {
+   n := copy(l.Magic[:], data)
+   data = data[n:]
+   l.Offset = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   l.Version = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   n = copy(l.RightsID[:], data)
+   data = data[n:]
+   var outer ftlv
+   _, err := outer.decode(data) // Type 1
+   if err != nil {
+      return err
+   }
+   for len(outer.Value) >= 1 {
+      var inner ftlv
+      n, err = inner.decode(outer.Value)
+      if err != nil {
+         return err
+      }
+      outer.Value = outer.Value[n:]
+      switch xmrType(inner.Type) {
+      case globalPolicyContainerEntryType: // 2
+         // Rakuten
+      case playbackPolicyContainerEntryType: // 4
+         // Rakuten
+      case keyMaterialContainerEntryType: // 9
+         for len(inner.Value) >= 1 {
+            var key ftlv
+            n, err = key.decode(inner.Value)
+            if err != nil {
+               return err
+            }
+            inner.Value = inner.Value[n:]
+            switch xmrType(key.Type) {
+            case contentKeyEntryType: // 10
+               l.ContentKey = &ContentKey{}
+               l.ContentKey.decode(key.Value)
+            case deviceKeyEntryType: // 42
+               l.eccKey = &eccKey{}
+               l.eccKey.decode(key.Value)
+            case auxKeyEntryType: // 81
+               l.auxKeys = &auxKeys{}
+               l.auxKeys.decode(key.Value)
+            default:
+               return errors.New("ftlv.type")
+            }
+         }
+      case signatureEntryType: // 11
+         l.signature = &licenseSignature{}
+         l.signature.decode(inner.Value)
+      default:
+         return errors.New("ftlv.type")
+      }
+   }
+   return nil
+}
+
 // Decode decodes a byte slice into an AuxKey structure.
 func (a *auxKey) decode(data []byte) int {
    a.Location = binary.BigEndian.Uint32(data)
@@ -203,6 +211,55 @@ func (a *auxKeys) decode(data []byte) {
    }
 }
 
+func (c *certificateInfo) New(securityLevel uint32, digest []byte) {
+   copy(c.digest[:], digest)
+   // required, Max uint32, effectively never expires
+   c.expiry = 4294967295
+   // required
+   c.infoType = 2
+   c.securityLevel = securityLevel
+}
+
+func (c *certificateInfo) encode() []byte {
+   data := c.certificateId[:]
+   data = binary.BigEndian.AppendUint32(data, c.securityLevel)
+   data = binary.BigEndian.AppendUint32(data, c.flags)
+   data = binary.BigEndian.AppendUint32(data, c.infoType)
+   data = append(data, c.digest[:]...)
+   data = binary.BigEndian.AppendUint32(data, c.expiry)
+   return append(data, c.clientId[:]...)
+}
+
+func (c *certificateInfo) decode(data []byte) {
+   n := copy(c.certificateId[:], data)
+   data = data[n:]
+   c.securityLevel = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   c.flags = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   c.infoType = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   n = copy(c.digest[:], data)
+   data = data[n:]
+   c.expiry = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   copy(c.clientId[:], data)
+}
+
+type certificateInfo struct {
+   certificateId [16]byte
+   securityLevel uint32
+   flags         uint32
+   infoType      uint32
+   digest        [32]byte
+   expiry        uint32
+   clientId      [16]byte // Client ID (can be used for license binding)
+}
+
+func (c *certificateInfo) ftlv(Flag, Type uint16) *ftlv {
+   return newFtlv(Flag, Type, c.encode())
+}
+
 // It returns the number of bytes consumed.
 func (f *features) decode(data []byte) int {
    f.entries = binary.BigEndian.Uint32(data)
@@ -213,6 +270,49 @@ func (f *features) decode(data []byte) int {
       n += 4
    }
    return n
+}
+
+func newFtlv(Flag, Type uint16, Value []byte) *ftlv {
+   return &ftlv{
+      Flag:   Flag,
+      Type:   Type,
+      Length: 8 + uint32(len(Value)),
+      Value:  Value,
+   }
+}
+
+type ftlv struct {
+   Flag   uint16 // this can be 0 or 1
+   Type   uint16
+   Length uint32
+   Value  []byte
+}
+
+func (f *ftlv) decode(data []byte) (int, error) {
+   f.Flag = binary.BigEndian.Uint16(data)
+   n := 2
+   f.Type = binary.BigEndian.Uint16(data[n:])
+   n += 2
+   f.Length = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   f.Value = data[n:f.Length]
+   n += len(f.Value)
+   return n, nil
+}
+
+func (f *ftlv) size() int {
+   n := 2 // Flag
+   n += 2 // Type
+   n += 4 // Length
+   n += len(f.Value)
+   return n
+}
+
+func (f *ftlv) Append(data []byte) []byte {
+   data = binary.BigEndian.AppendUint16(data, f.Flag)
+   data = binary.BigEndian.AppendUint16(data, f.Type)
+   data = binary.BigEndian.AppendUint32(data, f.Length)
+   return append(data, f.Value...)
 }
 
 func (k *keyData) size() int {
@@ -293,98 +393,3 @@ const (
    unknownContainersEntryType              xmrType = 65534
    playbackUnknownContainerEntryType       xmrType = 65534
 )
-
-func (l *License) verify(data []byte) error {
-   signature := new(ftlv).size() + l.signature.size()
-   data = data[:len(data)-signature]
-   block, err := aes.NewCipher(l.ContentKey.Integrity[:])
-   if err != nil {
-      return err
-   }
-   data = mac.NewCMAC(block, aes.BlockSize).MAC(data)
-   if !bytes.Equal(data, l.signature.Data) {
-      return errors.New("failed to decrypt the keys")
-   }
-   return nil
-}
-
-///
-
-func (l *License) Decrypt(signEncrypt EcKey, data []byte) error {
-   var envelope xml.EnvelopeResponse
-   err := envelope.Unmarshal(data)
-   if err != nil {
-      return err
-   }
-   data = envelope.Body.AcquireLicenseResponse.AcquireLicenseResult.Response.LicenseResponse.Licenses.License
-   err = l.decode(data)
-   if err != nil {
-      return err
-   }
-   if !bytes.Equal(l.eccKey.Value, signEncrypt.public()) {
-      return errors.New("license response is not for this device")
-   }
-   err = l.ContentKey.decrypt(signEncrypt[0], l.auxKeys)
-   if err != nil {
-      return err
-   }
-   return l.verify(data)
-}
-
-func (l *License) decode(data []byte) error {
-   n := copy(l.Magic[:], data)
-   data = data[n:]
-   l.Offset = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   l.Version = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   n = copy(l.RightsID[:], data)
-   data = data[n:]
-   var outer ftlv
-   _, err := outer.decode(data) // Type 1
-   if err != nil {
-      return err
-   }
-   for len(outer.Value) >= 1 {
-      var inner ftlv
-      n, err = inner.decode(outer.Value)
-      if err != nil {
-         return err
-      }
-      outer.Value = outer.Value[n:]
-      switch xmrType(inner.Type) {
-      case globalPolicyContainerEntryType: // 2
-         // Rakuten
-      case playbackPolicyContainerEntryType: // 4
-         // Rakuten
-      case keyMaterialContainerEntryType: // 9
-         for len(inner.Value) >= 1 {
-            var key ftlv
-            n, err = key.decode(inner.Value)
-            if err != nil {
-               return err
-            }
-            inner.Value = inner.Value[n:]
-            switch xmrType(key.Type) {
-            case contentKeyEntryType: // 10
-               l.ContentKey = &ContentKey{}
-               l.ContentKey.decode(key.Value)
-            case deviceKeyEntryType: // 42
-               l.eccKey = &eccKey{}
-               l.eccKey.decode(key.Value)
-            case auxKeyEntryType: // 81
-               l.auxKeys = &auxKeys{}
-               l.auxKeys.decode(key.Value)
-            default:
-               return errors.New("ftlv.type")
-            }
-         }
-      case signatureEntryType: // 11
-         l.signature = &licenseSignature{}
-         l.signature.decode(inner.Value)
-      default:
-         return errors.New("ftlv.type")
-      }
-   }
-   return nil
-}
