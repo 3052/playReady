@@ -23,38 +23,38 @@ func (a *AuxKeys) decode(data []byte) {
 }
 
 func (c *CertificateInfo) New(securityLevel uint32, digest []byte) {
-   copy(c.digest[:], digest)
+   copy(c.Digest[:], digest)
    // required, Max uint32, effectively never expires
-   c.expiry = 4294967295
+   c.Expiry = 4294967295
    // required
-   c.infoType = 2
-   c.securityLevel = securityLevel
+   c.InfoType = 2
+   c.SecurityLevel = securityLevel
 }
 
 func (c *CertificateInfo) encode() []byte {
-   data := c.certificateId[:]
-   data = binary.BigEndian.AppendUint32(data, c.securityLevel)
-   data = binary.BigEndian.AppendUint32(data, c.flags)
-   data = binary.BigEndian.AppendUint32(data, c.infoType)
-   data = append(data, c.digest[:]...)
-   data = binary.BigEndian.AppendUint32(data, c.expiry)
-   return append(data, c.clientId[:]...)
+   data := c.CertificateId[:]
+   data = binary.BigEndian.AppendUint32(data, c.SecurityLevel)
+   data = binary.BigEndian.AppendUint32(data, c.Flags)
+   data = binary.BigEndian.AppendUint32(data, c.InfoType)
+   data = append(data, c.Digest[:]...)
+   data = binary.BigEndian.AppendUint32(data, c.Expiry)
+   return append(data, c.ClientId[:]...)
 }
 
 func (c *CertificateInfo) decode(data []byte) {
-   n := copy(c.certificateId[:], data)
+   n := copy(c.CertificateId[:], data)
    data = data[n:]
-   c.securityLevel = binary.BigEndian.Uint32(data)
+   c.SecurityLevel = binary.BigEndian.Uint32(data)
    data = data[4:]
-   c.flags = binary.BigEndian.Uint32(data)
+   c.Flags = binary.BigEndian.Uint32(data)
    data = data[4:]
-   c.infoType = binary.BigEndian.Uint32(data)
+   c.InfoType = binary.BigEndian.Uint32(data)
    data = data[4:]
-   n = copy(c.digest[:], data)
+   n = copy(c.Digest[:], data)
    data = data[n:]
-   c.expiry = binary.BigEndian.Uint32(data)
+   c.Expiry = binary.BigEndian.Uint32(data)
    data = data[4:]
-   copy(c.clientId[:], data)
+   copy(c.ClientId[:], data)
 }
 
 func (c *CertificateInfo) ftlv(Flag, Type uint16) *Ftlv {
@@ -351,14 +351,12 @@ type LicenseSignature struct {
    Data   []byte
 }
 
-///
-
 type CertificateInfo struct {
-   certificateId [16]byte
-   securityLevel uint32
-   flags         uint32
-   infoType      uint32
-   digest        [32]byte
-   expiry        uint32
-   clientId      [16]byte // Client ID (can be used for license binding)
+   CertificateId [16]byte
+   SecurityLevel uint32
+   Flags         uint32
+   InfoType      uint32
+   Digest        [32]byte
+   Expiry        uint32
+   ClientId      [16]byte // Client ID (can be used for license binding)
 }
