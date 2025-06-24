@@ -180,7 +180,7 @@ func (a *auxKeys) decode(data []byte) {
    }
 }
 
-func (c *certificateInfo) New(securityLevel uint32, digest []byte) {
+func (c *CertificateInfo) New(securityLevel uint32, digest []byte) {
    copy(c.digest[:], digest)
    // required, Max uint32, effectively never expires
    c.expiry = 4294967295
@@ -189,7 +189,7 @@ func (c *certificateInfo) New(securityLevel uint32, digest []byte) {
    c.securityLevel = securityLevel
 }
 
-func (c *certificateInfo) encode() []byte {
+func (c *CertificateInfo) encode() []byte {
    data := c.certificateId[:]
    data = binary.BigEndian.AppendUint32(data, c.securityLevel)
    data = binary.BigEndian.AppendUint32(data, c.flags)
@@ -199,7 +199,7 @@ func (c *certificateInfo) encode() []byte {
    return append(data, c.clientId[:]...)
 }
 
-func (c *certificateInfo) decode(data []byte) {
+func (c *CertificateInfo) decode(data []byte) {
    n := copy(c.certificateId[:], data)
    data = data[n:]
    c.securityLevel = binary.BigEndian.Uint32(data)
@@ -215,7 +215,7 @@ func (c *certificateInfo) decode(data []byte) {
    copy(c.clientId[:], data)
 }
 
-type certificateInfo struct {
+type CertificateInfo struct {
    certificateId [16]byte
    securityLevel uint32
    flags         uint32
@@ -225,7 +225,7 @@ type certificateInfo struct {
    clientId      [16]byte // Client ID (can be used for license binding)
 }
 
-func (c *certificateInfo) ftlv(Flag, Type uint16) *ftlv {
+func (c *CertificateInfo) ftlv(Flag, Type uint16) *ftlv {
    return newFtlv(Flag, Type, c.encode())
 }
 

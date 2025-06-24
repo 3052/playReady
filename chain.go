@@ -15,188 +15,6 @@ import (
    "slices"
 )
 
-func (c *Chain) cipherData(key *xmlKey) ([]byte, error) {
-   xmlData := xml.Data{
-      CertificateChains: xml.CertificateChains{
-         CertificateChain: c.Encode(),
-      },
-      Features: xml.Features{
-         Feature: xml.Feature{"AESCBC"}, // SCALABLE
-      },
-   }
-   data, err := xmlData.Marshal()
-   if err != nil {
-      return nil, err
-   }
-   data = padding.NewPKCS7Padding(aes.BlockSize).Pad(data)
-   block, err := aes.NewCipher(key.aesKey())
-   if err != nil {
-      return nil, err
-   }
-   cipher.NewCBCEncrypter(block, key.aesIv()).CryptBlocks(data, data)
-   return append(key.aesIv(), data...), nil
-}
-
-type Certificate struct {
-   Magic             [4]byte               // bytes 0 - 3
-   Version           uint32                // bytes 4 - 7
-   Length            uint32                // bytes 8 - 11
-   LengthToSignature uint32                // bytes 12 - 15
-   info              *certificateInfo      // type 1
-   feature           *ftlv                 // type 5
-   keyInfo           *keyInfo              // type 6
-   manufacturer      *ftlv                 // type 7
-   signature         *certificateSignature // type 8
-}
-
-func (c *Certificate) Append(data []byte) []byte {
-   data = append(data, c.Magic[:]...)
-   data = binary.BigEndian.AppendUint32(data, c.Version)
-   data = binary.BigEndian.AppendUint32(data, c.Length)
-   data = binary.BigEndian.AppendUint32(data, c.LengthToSignature)
-   if c.info != nil {
-      data = c.info.ftlv(1, 1).Append(data)
-   }
-   if c.feature != nil {
-      data = c.feature.Append(data)
-   }
-   if c.keyInfo != nil {
-      data = c.keyInfo.ftlv(1, 6).Append(data)
-   }
-   if c.manufacturer != nil {
-      data = c.manufacturer.Append(data)
-   }
-   if c.signature != nil {
-      data = c.signature.ftlv(0, 8).Append(data)
-   }
-   return data
-}
-
-func (c *Certificate) decode(data []byte) (int, error) {
-   // Copy the magic bytes and check for "CERT" signature.
-   n := copy(c.Magic[:], data)
-   if string(c.Magic[:]) != "CERT" {
-      return 0, errors.New("failed to find cert magic")
-   }
-   // Decode Version, Length, and LengthToSignature fields.
-   c.Version = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   c.Length = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   c.LengthToSignature = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   for n < int(c.Length) {
-      var value ftlv
-      bytesReadFromFtlv, err := value.decode(data[n:])
-      if err != nil {
-         return 0, err
-      }
-      switch value.Type {
-      case objTypeBasic: // 0x0001
-         c.info = &certificateInfo{}
-         c.info.decode(value.Value)
-      case objTypeFeature: // 0x0005
-         c.feature = &value
-      case objTypeKey: // 0x0006
-         c.keyInfo = &keyInfo{}
-         c.keyInfo.decode(value.Value)
-      case objTypeManufacturer: // 0x0007
-         c.manufacturer = &value
-      case objTypeSignature: // 0x0008
-         c.signature = &certificateSignature{}
-         err := c.signature.decode(value.Value)
-         if err != nil {
-            return 0, err
-         }
-      default:
-         return 0, errors.New("ftlv.Type")
-      }
-      n += bytesReadFromFtlv
-   }
-   return n, nil // Return total bytes consumed and nil for no error
-}
-
-func (c *Certificate) size() (uint32, uint32) {
-   n := len(c.Magic)
-   n += 4 // Version
-   n += 4 // Length
-   n += 4 // LengthToSignature
-   if c.info != nil {
-      n += new(ftlv).size()
-      n += binary.Size(c.info)
-   }
-   if c.feature != nil {
-      n += c.feature.size()
-   }
-   if c.keyInfo != nil {
-      n += new(ftlv).size()
-      n += c.keyInfo.size()
-   }
-   if c.manufacturer != nil {
-      n += c.manufacturer.size()
-   }
-   n1 := n
-   n1 += new(ftlv).size()
-   n1 += c.signature.size()
-   return uint32(n), uint32(n1)
-}
-
-func (c *Certificate) verify(pubKey []byte) bool {
-   if !bytes.Equal(c.signature.IssuerKey, pubKey) {
-      return false
-   }
-   // Reconstruct the ECDSA public key from the byte slice.
-   publicKey := ecdsa.PublicKey{
-      Curve: elliptic.P256(), // Assuming P256 curve
-      X:     new(big.Int).SetBytes(pubKey[:32]),
-      Y:     new(big.Int).SetBytes(pubKey[32:]),
-   }
-   data := c.Append(nil)
-   data = data[:c.LengthToSignature]
-   signatureDigest := sha256.Sum256(data)
-   signature := c.signature.signature
-   r := new(big.Int).SetBytes(signature[:32])
-   s := new(big.Int).SetBytes(signature[32:])
-   return ecdsa.Verify(&publicKey, signatureDigest[:], r, s)
-}
-
-type Chain struct {
-   Magic     [4]byte
-   Version   uint32
-   Length    uint32
-   Flags     uint32
-   CertCount uint32
-   Certs     []Certificate
-}
-
-// Decode decodes a byte slice into the Chain structure.
-func (c *Chain) Decode(data []byte) error {
-   n := copy(c.Magic[:], data)
-   if string(c.Magic[:]) != "CHAI" {
-      return errors.New("failed to find chain magic")
-   }
-   data = data[n:]
-   c.Version = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   c.Length = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   c.Flags = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   c.CertCount = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   c.Certs = make([]Certificate, c.CertCount)
-   for i := range c.CertCount {
-      var cert Certificate
-      n, err := cert.decode(data)
-      if err != nil {
-         return err
-      }
-      c.Certs[i] = cert
-      data = data[n:]
-   }
-   return nil
-}
-
 func (c *Chain) Encode() []byte {
    data := c.Magic[:]
    data = binary.BigEndian.AppendUint32(data, c.Version)
@@ -227,8 +45,8 @@ func (c *Chain) Leaf(modelKey, signEncryptKey *EcKey) error {
    }
    {
       sum := sha256.Sum256(signEncryptKey.public())
-      cert.info = &certificateInfo{}
-      cert.info.New(c.Certs[0].info.securityLevel, sum[:])
+      cert.Info = &CertificateInfo{}
+      cert.Info.New(c.Certs[0].Info.securityLevel, sum[:])
    }
    cert.keyInfo = &keyInfo{}
    cert.keyInfo.New(signEncryptKey.public())
@@ -313,16 +131,6 @@ func (c *Chain) verify() bool {
    return true
 }
 
-type certificateSignature struct {
-   signatureType   uint16
-   signatureLength uint16
-   // The actual signature bytes
-   signature    []byte
-   issuerLength uint32
-   // The public key of the issuer that signed this certificate
-   IssuerKey []byte
-}
-
 func (c *certificateSignature) New(signature, modelKey []byte) error {
    c.signatureType = 1 // required
    c.signatureLength = 64
@@ -376,4 +184,199 @@ func (c *certificateSignature) size() int {
    n += 4  // issuerLength
    n += 64 // issuerKey
    return n
+}
+
+func (c *Chain) cipherData(key *xmlKey) ([]byte, error) {
+   xmlData := xml.Data{
+      CertificateChains: xml.CertificateChains{
+         CertificateChain: c.Encode(),
+      },
+      Features: xml.Features{
+         Feature: xml.Feature{"AESCBC"}, // SCALABLE
+      },
+   }
+   data, err := xmlData.Marshal()
+   if err != nil {
+      return nil, err
+   }
+   data = padding.NewPKCS7Padding(aes.BlockSize).Pad(data)
+   block, err := aes.NewCipher(key.aesKey())
+   if err != nil {
+      return nil, err
+   }
+   cipher.NewCBCEncrypter(block, key.aesIv()).CryptBlocks(data, data)
+   return append(key.aesIv(), data...), nil
+}
+
+func (c *Certificate) Append(data []byte) []byte {
+   data = append(data, c.Magic[:]...)
+   data = binary.BigEndian.AppendUint32(data, c.Version)
+   data = binary.BigEndian.AppendUint32(data, c.Length)
+   data = binary.BigEndian.AppendUint32(data, c.LengthToSignature)
+   if c.Info != nil {
+      data = c.Info.ftlv(1, 1).Append(data)
+   }
+   if c.feature != nil {
+      data = c.feature.Append(data)
+   }
+   if c.keyInfo != nil {
+      data = c.keyInfo.ftlv(1, 6).Append(data)
+   }
+   if c.manufacturer != nil {
+      data = c.manufacturer.Append(data)
+   }
+   if c.signature != nil {
+      data = c.signature.ftlv(0, 8).Append(data)
+   }
+   return data
+}
+
+func (c *Certificate) size() (uint32, uint32) {
+   n := len(c.Magic)
+   n += 4 // Version
+   n += 4 // Length
+   n += 4 // LengthToSignature
+   if c.Info != nil {
+      n += new(ftlv).size()
+      n += binary.Size(c.Info)
+   }
+   if c.feature != nil {
+      n += c.feature.size()
+   }
+   if c.keyInfo != nil {
+      n += new(ftlv).size()
+      n += c.keyInfo.size()
+   }
+   if c.manufacturer != nil {
+      n += c.manufacturer.size()
+   }
+   n1 := n
+   n1 += new(ftlv).size()
+   n1 += c.signature.size()
+   return uint32(n), uint32(n1)
+}
+
+func (c *Certificate) verify(pubKey []byte) bool {
+   if !bytes.Equal(c.signature.IssuerKey, pubKey) {
+      return false
+   }
+   // Reconstruct the ECDSA public key from the byte slice.
+   publicKey := ecdsa.PublicKey{
+      Curve: elliptic.P256(), // Assuming P256 curve
+      X:     new(big.Int).SetBytes(pubKey[:32]),
+      Y:     new(big.Int).SetBytes(pubKey[32:]),
+   }
+   data := c.Append(nil)
+   data = data[:c.LengthToSignature]
+   signatureDigest := sha256.Sum256(data)
+   signature := c.signature.signature
+   r := new(big.Int).SetBytes(signature[:32])
+   s := new(big.Int).SetBytes(signature[32:])
+   return ecdsa.Verify(&publicKey, signatureDigest[:], r, s)
+}
+
+// Decode decodes a byte slice into the Chain structure.
+func (c *Chain) Decode(data []byte) error {
+   n := copy(c.Magic[:], data)
+   if string(c.Magic[:]) != "CHAI" {
+      return errors.New("failed to find chain magic")
+   }
+   data = data[n:]
+   c.Version = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   c.Length = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   c.Flags = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   c.CertCount = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   c.Certs = make([]Certificate, c.CertCount)
+   for i := range c.CertCount {
+      var cert Certificate
+      n, err := cert.decode(data)
+      if err != nil {
+         return err
+      }
+      c.Certs[i] = cert
+      data = data[n:]
+   }
+   return nil
+}
+
+type Chain struct {
+   Magic     [4]byte
+   Version   uint32
+   Length    uint32
+   Flags     uint32
+   CertCount uint32
+   Certs     []Certificate
+}
+
+func (c *Certificate) decode(data []byte) (int, error) {
+   // Copy the magic bytes and check for "CERT" signature.
+   n := copy(c.Magic[:], data)
+   if string(c.Magic[:]) != "CERT" {
+      return 0, errors.New("failed to find cert magic")
+   }
+   // Decode Version, Length, and LengthToSignature fields.
+   c.Version = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   c.Length = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   c.LengthToSignature = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   for n < int(c.Length) {
+      var value ftlv
+      bytesReadFromFtlv, err := value.decode(data[n:])
+      if err != nil {
+         return 0, err
+      }
+      switch value.Type {
+      case objTypeBasic: // 0x0001
+         c.Info = &CertificateInfo{}
+         c.Info.decode(value.Value)
+      case objTypeFeature: // 0x0005
+         c.feature = &value
+      case objTypeKey: // 0x0006
+         c.keyInfo = &keyInfo{}
+         c.keyInfo.decode(value.Value)
+      case objTypeManufacturer: // 0x0007
+         c.manufacturer = &value
+      case objTypeSignature: // 0x0008
+         c.signature = &certificateSignature{}
+         err := c.signature.decode(value.Value)
+         if err != nil {
+            return 0, err
+         }
+      default:
+         return 0, errors.New("ftlv.Type")
+      }
+      n += bytesReadFromFtlv
+   }
+   return n, nil // Return total bytes consumed and nil for no error
+}
+
+///
+
+type Certificate struct {
+   Magic             [4]byte               // bytes 0 - 3
+   Version           uint32                // bytes 4 - 7
+   Length            uint32                // bytes 8 - 11
+   LengthToSignature uint32                // bytes 12 - 15
+   Info              *CertificateInfo      // type 1
+   
+   feature           *ftlv                 // type 5
+   keyInfo           *keyInfo              // type 6
+   manufacturer      *ftlv                 // type 7
+   signature         *certificateSignature // type 8
+}
+
+type certificateSignature struct {
+   signatureType   uint16
+   signatureLength uint16
+   // The actual signature bytes
+   signature    []byte
+   issuerLength uint32
+   // The public key of the issuer that signed this certificate
+   IssuerKey []byte
 }
