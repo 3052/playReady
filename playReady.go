@@ -7,7 +7,7 @@ import (
    "crypto/ecdsa"
    "encoding/binary"
    "errors"
-   "github.com/deatil/go-cryptobin/mac"
+   "github.com/go-webdl/crypto/cmac"
 )
 
 func (l *License) verify(data []byte) error {
@@ -17,7 +17,7 @@ func (l *License) verify(data []byte) error {
    if err != nil {
       return err
    }
-   data = mac.NewCMAC(block, aes.BlockSize).MAC(data)
+   data, _ = cmac.Sum(data, block, aes.BlockSize)
    if !bytes.Equal(data, l.signature.Data) {
       return errors.New("failed to decrypt the keys")
    }
