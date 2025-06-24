@@ -235,7 +235,7 @@ func (f Fill) Key() (*EcKey, error) {
 }
 
 type certificateFeature struct {
-   entries  uint32   // Number of feature entries
+   entries uint32   // Number of feature entries
    feature []uint32 // Slice of feature IDs
 }
 
@@ -252,7 +252,7 @@ func (c *certificateFeature) New(Type uint32) {
    c.feature = []uint32{Type}
 }
 
-func (c *certificateFeature) ftlv(Flag, Type uint16) *ftlv {
+func (c *certificateFeature) ftlv(Flag, Type uint16) *Ftlv {
    return newFtlv(Flag, Type, c.Append(nil))
 }
 
@@ -281,7 +281,7 @@ type keyData struct {
    keyType   uint16
    length    uint16 // Total length of the keyData structure
    flags     uint32
-   publicKey [64]byte  // ECDSA P256 public key (X and Y coordinates)
+   publicKey [64]byte // ECDSA P256 public key (X and Y coordinates)
    usage     certificateFeature
 }
 
@@ -311,19 +311,19 @@ func (k *keyData) decode(data []byte) int {
    return n
 }
 
-type keyInfo struct {
+type KeyInfo struct {
    entries uint32 // can be 1 or 2
    keys    []keyData
 }
 
-func (k *keyInfo) New(signEncryptKey []byte) {
+func (k *KeyInfo) New(signEncryptKey []byte) {
    k.entries = 2 // required
    k.keys = make([]keyData, 2)
    k.keys[0].New(signEncryptKey, 1)
    k.keys[1].New(signEncryptKey, 2)
 }
 
-func (k *keyInfo) decode(data []byte) {
+func (k *KeyInfo) decode(data []byte) {
    k.entries = binary.BigEndian.Uint32(data)
    data = data[4:]
    k.keys = make([]keyData, k.entries)
@@ -335,7 +335,7 @@ func (k *keyInfo) decode(data []byte) {
    }
 }
 
-func (k *keyInfo) encode() []byte {
+func (k *KeyInfo) encode() []byte {
    data := binary.BigEndian.AppendUint32(nil, k.entries)
    for _, key := range k.keys {
       data = key.Append(data)
@@ -343,11 +343,11 @@ func (k *keyInfo) encode() []byte {
    return data
 }
 
-func (k *keyInfo) ftlv(Flag, Type uint16) *ftlv {
+func (k *KeyInfo) ftlv(Flag, Type uint16) *Ftlv {
    return newFtlv(Flag, Type, k.encode())
 }
 
-func (k *keyInfo) size() int {
+func (k *KeyInfo) size() int {
    n := 4 // entries
    for _, key := range k.keys {
       n += key.size()

@@ -21,14 +21,16 @@ func (c *Chain) Encode() []byte {
    data = binary.BigEndian.AppendUint32(data, c.Length)
    data = binary.BigEndian.AppendUint32(data, c.Flags)
    data = binary.BigEndian.AppendUint32(data, c.CertCount)
-   for _, cert := range c.Certs {
+   for _, cert := range c.Certificate {
       data = cert.Append(data)
    }
    return data
 }
 
 func (c *Chain) Leaf(modelKey, signEncryptKey *EcKey) error {
-   if !bytes.Equal(c.Certs[0].keyInfo.keys[0].publicKey[:], modelKey.public()) {
+   if !bytes.Equal(
+      c.Certificate[0].KeyInfo.keys[0].publicKey[:], modelKey.public(),
+   ) {
       return errors.New("zgpriv not for cert")
    }
    if !c.verify() {
@@ -41,15 +43,15 @@ func (c *Chain) Leaf(modelKey, signEncryptKey *EcKey) error {
       // SCALABLE with SL2000, SUPPORTS_PR3_FEATURES
       var feature certificateFeature
       feature.New(0xD)
-      cert.feature = feature.ftlv(0, 5)
+      cert.Feature = feature.ftlv(0, 5)
    }
    {
       sum := sha256.Sum256(signEncryptKey.public())
       cert.Info = &CertificateInfo{}
-      cert.Info.New(c.Certs[0].Info.securityLevel, sum[:])
+      cert.Info.New(c.Certificate[0].Info.securityLevel, sum[:])
    }
-   cert.keyInfo = &keyInfo{}
-   cert.keyInfo.New(signEncryptKey.public())
+   cert.KeyInfo = &KeyInfo{}
+   cert.KeyInfo.New(signEncryptKey.public())
    {
       cert.LengthToSignature, cert.Length = cert.size()
       sum := sha256.Sum256(cert.Append(nil))
@@ -57,14 +59,14 @@ func (c *Chain) Leaf(modelKey, signEncryptKey *EcKey) error {
       if err != nil {
          return err
       }
-      cert.signature = &certificateSignature{}
-      err = cert.signature.New(signature, modelKey.public())
+      cert.Signature = &CertSignature{}
+      err = cert.Signature.New(signature, modelKey.public())
       if err != nil {
          return err
       }
    }
    c.CertCount += 1
-   c.Certs = slices.Insert(c.Certs, 0, cert)
+   c.Certificate = slices.Insert(c.Certificate, 0, cert)
    c.Length += cert.Length
    return nil
 }
@@ -119,19 +121,7 @@ func (c *Chain) RequestBody(signEncrypt EcKey, kid []byte) ([]byte, error) {
    return envelope.Marshal()
 }
 
-func (c *Chain) verify() bool {
-   modelBase := c.Certs[len(c.Certs)-1].signature.IssuerKey
-   for i := len(c.Certs) - 1; i >= 0; i-- {
-      valid := c.Certs[i].verify(modelBase[:])
-      if !valid {
-         return false
-      }
-      modelBase = c.Certs[i].keyInfo.keys[0].publicKey[:]
-   }
-   return true
-}
-
-func (c *certificateSignature) New(signature, modelKey []byte) error {
+func (c *CertSignature) New(signature, modelKey []byte) error {
    c.signatureType = 1 // required
    c.signatureLength = 64
    if len(signature) != 64 {
@@ -146,7 +136,7 @@ func (c *certificateSignature) New(signature, modelKey []byte) error {
    return nil
 }
 
-func (c *certificateSignature) decode(data []byte) error {
+func (c *CertSignature) decode(data []byte) error {
    c.signatureType = binary.BigEndian.Uint16(data)
    data = data[2:]
    c.signatureLength = binary.BigEndian.Uint16(data)
@@ -165,7 +155,7 @@ func (c *certificateSignature) decode(data []byte) error {
    return nil
 }
 
-func (c *certificateSignature) encode() []byte {
+func (c *CertSignature) encode() []byte {
    data := binary.BigEndian.AppendUint16(nil, c.signatureType)
    data = binary.BigEndian.AppendUint16(data, c.signatureLength)
    data = append(data, c.signature...)
@@ -173,11 +163,11 @@ func (c *certificateSignature) encode() []byte {
    return append(data, c.IssuerKey...)
 }
 
-func (c *certificateSignature) ftlv(Flag, Type uint16) *ftlv {
+func (c *CertSignature) ftlv(Flag, Type uint16) *Ftlv {
    return newFtlv(Flag, Type, c.encode())
 }
 
-func (c *certificateSignature) size() int {
+func (c *CertSignature) size() int {
    n := 2  // signatureType
    n += 2  // signatureLength
    n += 64 // signature
@@ -216,17 +206,17 @@ func (c *Certificate) Append(data []byte) []byte {
    if c.Info != nil {
       data = c.Info.ftlv(1, 1).Append(data)
    }
-   if c.feature != nil {
-      data = c.feature.Append(data)
+   if c.Feature != nil {
+      data = c.Feature.Append(data)
    }
-   if c.keyInfo != nil {
-      data = c.keyInfo.ftlv(1, 6).Append(data)
+   if c.KeyInfo != nil {
+      data = c.KeyInfo.ftlv(1, 6).Append(data)
    }
-   if c.manufacturer != nil {
-      data = c.manufacturer.Append(data)
+   if c.Manufacturer != nil {
+      data = c.Manufacturer.Append(data)
    }
-   if c.signature != nil {
-      data = c.signature.ftlv(0, 8).Append(data)
+   if c.Signature != nil {
+      data = c.Signature.ftlv(0, 8).Append(data)
    }
    return data
 }
@@ -237,27 +227,27 @@ func (c *Certificate) size() (uint32, uint32) {
    n += 4 // Length
    n += 4 // LengthToSignature
    if c.Info != nil {
-      n += new(ftlv).size()
+      n += new(Ftlv).size()
       n += binary.Size(c.Info)
    }
-   if c.feature != nil {
-      n += c.feature.size()
+   if c.Feature != nil {
+      n += c.Feature.size()
    }
-   if c.keyInfo != nil {
-      n += new(ftlv).size()
-      n += c.keyInfo.size()
+   if c.KeyInfo != nil {
+      n += new(Ftlv).size()
+      n += c.KeyInfo.size()
    }
-   if c.manufacturer != nil {
-      n += c.manufacturer.size()
+   if c.Manufacturer != nil {
+      n += c.Manufacturer.size()
    }
    n1 := n
-   n1 += new(ftlv).size()
-   n1 += c.signature.size()
+   n1 += new(Ftlv).size()
+   n1 += c.Signature.size()
    return uint32(n), uint32(n1)
 }
 
 func (c *Certificate) verify(pubKey []byte) bool {
-   if !bytes.Equal(c.signature.IssuerKey, pubKey) {
+   if !bytes.Equal(c.Signature.IssuerKey, pubKey) {
       return false
    }
    // Reconstruct the ECDSA public key from the byte slice.
@@ -269,7 +259,7 @@ func (c *Certificate) verify(pubKey []byte) bool {
    data := c.Append(nil)
    data = data[:c.LengthToSignature]
    signatureDigest := sha256.Sum256(data)
-   signature := c.signature.signature
+   signature := c.Signature.signature
    r := new(big.Int).SetBytes(signature[:32])
    s := new(big.Int).SetBytes(signature[32:])
    return ecdsa.Verify(&publicKey, signatureDigest[:], r, s)
@@ -290,26 +280,17 @@ func (c *Chain) Decode(data []byte) error {
    data = data[4:]
    c.CertCount = binary.BigEndian.Uint32(data)
    data = data[4:]
-   c.Certs = make([]Certificate, c.CertCount)
+   c.Certificate = make([]Certificate, c.CertCount)
    for i := range c.CertCount {
       var cert Certificate
       n, err := cert.decode(data)
       if err != nil {
          return err
       }
-      c.Certs[i] = cert
+      c.Certificate[i] = cert
       data = data[n:]
    }
    return nil
-}
-
-type Chain struct {
-   Magic     [4]byte
-   Version   uint32
-   Length    uint32
-   Flags     uint32
-   CertCount uint32
-   Certs     []Certificate
 }
 
 func (c *Certificate) decode(data []byte) (int, error) {
@@ -326,7 +307,7 @@ func (c *Certificate) decode(data []byte) (int, error) {
    c.LengthToSignature = binary.BigEndian.Uint32(data[n:])
    n += 4
    for n < int(c.Length) {
-      var value ftlv
+      var value Ftlv
       bytesReadFromFtlv, err := value.decode(data[n:])
       if err != nil {
          return 0, err
@@ -336,42 +317,62 @@ func (c *Certificate) decode(data []byte) (int, error) {
          c.Info = &CertificateInfo{}
          c.Info.decode(value.Value)
       case objTypeFeature: // 0x0005
-         c.feature = &value
+         c.Feature = &value
       case objTypeKey: // 0x0006
-         c.keyInfo = &keyInfo{}
-         c.keyInfo.decode(value.Value)
+         c.KeyInfo = &KeyInfo{}
+         c.KeyInfo.decode(value.Value)
       case objTypeManufacturer: // 0x0007
-         c.manufacturer = &value
+         c.Manufacturer = &value
       case objTypeSignature: // 0x0008
-         c.signature = &certificateSignature{}
-         err := c.signature.decode(value.Value)
+         c.Signature = &CertSignature{}
+         err := c.Signature.decode(value.Value)
          if err != nil {
             return 0, err
          }
       default:
-         return 0, errors.New("ftlv.Type")
+         return 0, errors.New("Ftlv.Type")
       }
       n += bytesReadFromFtlv
    }
    return n, nil // Return total bytes consumed and nil for no error
 }
 
-///
-
-type Certificate struct {
-   Magic             [4]byte               // bytes 0 - 3
-   Version           uint32                // bytes 4 - 7
-   Length            uint32                // bytes 8 - 11
-   LengthToSignature uint32                // bytes 12 - 15
-   Info              *CertificateInfo      // type 1
-   
-   feature           *ftlv                 // type 5
-   keyInfo           *keyInfo              // type 6
-   manufacturer      *ftlv                 // type 7
-   signature         *certificateSignature // type 8
+type Chain struct {
+   Magic       [4]byte
+   Version     uint32
+   Length      uint32
+   Flags       uint32
+   CertCount   uint32
+   Certificate []Certificate
 }
 
-type certificateSignature struct {
+func (c *Chain) verify() bool {
+   modelBase := c.Certificate[c.CertCount-1].Signature.IssuerKey
+   for i := len(c.Certificate) - 1; i >= 0; i-- {
+      valid := c.Certificate[i].verify(modelBase[:])
+      if !valid {
+         return false
+      }
+      modelBase = c.Certificate[i].KeyInfo.keys[0].publicKey[:]
+   }
+   return true
+}
+
+type Certificate struct {
+   Magic             [4]byte          // bytes 0 - 3
+   Version           uint32           // bytes 4 - 7
+   Length            uint32           // bytes 8 - 11
+   LengthToSignature uint32           // bytes 12 - 15
+   Info              *CertificateInfo // type 1
+   Feature           *Ftlv            // type 5
+   KeyInfo           *KeyInfo         // type 6
+   Manufacturer      *Ftlv            // type 7
+   Signature         *CertSignature   // type 8
+}
+
+///
+
+type CertSignature struct {
    signatureType   uint16
    signatureLength uint16
    // The actual signature bytes

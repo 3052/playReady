@@ -11,7 +11,7 @@ import (
 )
 
 func (l *License) verify(data []byte) error {
-   signature := new(ftlv).size() + l.signature.size()
+   signature := new(Ftlv).size() + l.signature.size()
    data = data[:len(data)-signature]
    block, err := aes.NewCipher(l.ContentKey.Integrity[:])
    if err != nil {
@@ -53,14 +53,14 @@ func (f Fill) Read(data []byte) (int, error) {
 type Fill byte
 
 type License struct {
-   Magic          [4]byte           // 0
-   Offset         uint16            // 1
-   Version        uint16            // 2
-   RightsID       [16]byte          // 3
-   ContentKey     *ContentKey       // 4.9.10
-   eccKey         *eccKey           // 4.9.42
-   auxKeys        *auxKeys          // 4.9.81
-   signature      *licenseSignature // 4.11
+   Magic      [4]byte           // 0
+   Offset     uint16            // 1
+   Version    uint16            // 2
+   RightsID   [16]byte          // 3
+   ContentKey *ContentKey       // 4.9.10
+   eccKey     *eccKey           // 4.9.42
+   auxKeys    *auxKeys          // 4.9.81
+   signature  *licenseSignature // 4.11
 }
 
 func (l *License) Decrypt(signEncrypt EcKey, data []byte) error {
@@ -100,13 +100,13 @@ func (l *License) decode(data []byte) error {
    data = data[2:]
    n = copy(l.RightsID[:], data)
    data = data[n:]
-   var outer ftlv
+   var outer Ftlv
    _, err := outer.decode(data) // Type 1
    if err != nil {
       return err
    }
    for len(outer.Value) >= 1 {
-      var inner ftlv
+      var inner Ftlv
       n, err = inner.decode(outer.Value)
       if err != nil {
          return err
@@ -119,7 +119,7 @@ func (l *License) decode(data []byte) error {
          // Rakuten
       case keyMaterialContainerEntryType: // 9
          for len(inner.Value) >= 1 {
-            var key ftlv
+            var key Ftlv
             n, err = key.decode(inner.Value)
             if err != nil {
                return err
@@ -136,14 +136,14 @@ func (l *License) decode(data []byte) error {
                l.auxKeys = &auxKeys{}
                l.auxKeys.decode(key.Value)
             default:
-               return errors.New("ftlv.type")
+               return errors.New("Ftlv.type")
             }
          }
       case signatureEntryType: // 11
          l.signature = &licenseSignature{}
          l.signature.decode(inner.Value)
       default:
-         return errors.New("ftlv.type")
+         return errors.New("Ftlv.type")
       }
    }
    return nil
@@ -225,7 +225,7 @@ type CertificateInfo struct {
    clientId      [16]byte // Client ID (can be used for license binding)
 }
 
-func (c *CertificateInfo) ftlv(Flag, Type uint16) *ftlv {
+func (c *CertificateInfo) ftlv(Flag, Type uint16) *Ftlv {
    return newFtlv(Flag, Type, c.encode())
 }
 
@@ -241,8 +241,8 @@ func (c *certificateFeature) decode(data []byte) int {
    return n
 }
 
-func newFtlv(Flag, Type uint16, Value []byte) *ftlv {
-   return &ftlv{
+func newFtlv(Flag, Type uint16, Value []byte) *Ftlv {
+   return &Ftlv{
       Flag:   Flag,
       Type:   Type,
       Length: 8 + uint32(len(Value)),
@@ -250,14 +250,14 @@ func newFtlv(Flag, Type uint16, Value []byte) *ftlv {
    }
 }
 
-type ftlv struct {
+type Ftlv struct {
    Flag   uint16 // this can be 0 or 1
    Type   uint16
    Length uint32
    Value  []byte
 }
 
-func (f *ftlv) decode(data []byte) (int, error) {
+func (f *Ftlv) decode(data []byte) (int, error) {
    f.Flag = binary.BigEndian.Uint16(data)
    n := 2
    f.Type = binary.BigEndian.Uint16(data[n:])
@@ -269,7 +269,7 @@ func (f *ftlv) decode(data []byte) (int, error) {
    return n, nil
 }
 
-func (f *ftlv) size() int {
+func (f *Ftlv) size() int {
    n := 2 // Flag
    n += 2 // Type
    n += 4 // Length
@@ -277,7 +277,7 @@ func (f *ftlv) size() int {
    return n
 }
 
-func (f *ftlv) Append(data []byte) []byte {
+func (f *Ftlv) Append(data []byte) []byte {
    data = binary.BigEndian.AppendUint16(data, f.Flag)
    data = binary.BigEndian.AppendUint16(data, f.Type)
    data = binary.BigEndian.AppendUint32(data, f.Length)
