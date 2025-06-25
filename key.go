@@ -13,31 +13,6 @@ import (
    "slices"
 )
 
-type ContentKey struct {
-   KeyId      [16]byte
-   KeyType    uint16
-   CipherType uint16
-   Length     uint16
-   Value      []byte
-   
-   Integrity  [16]byte
-   Key        [16]byte
-}
-
-func (c *ContentKey) decrypt(key *ecdsa.PrivateKey, aux *AuxKeys) error {
-   switch c.CipherType {
-   case 3:
-      decrypted := elGamalDecrypt(c.Value, key)
-      n := copy(c.Integrity[:], decrypted)
-      decrypted = decrypted[n:]
-      copy(c.Key[:], decrypted)
-      return nil
-   case 6:
-      return c.scalable(key, aux)
-   }
-   return errors.New("cannot decrypt key")
-}
-
 func (k *KeyInfo) New(signEncryptKey []byte) {
    k.Entries = 2 // required
    k.Keys = make([]KeyData, 2)
@@ -65,19 +40,6 @@ func (k *KeyInfo) size() int {
    return n
 }
 
-func (x *xmlKey) New() {
-   x.PublicKey.X, x.PublicKey.Y = elliptic.P256().ScalarBaseMult([]byte{1})
-   x.PublicKey.X.FillBytes(x.X[:])
-}
-
-func (x *xmlKey) aesIv() []byte {
-   return x.X[:16]
-}
-
-func (x *xmlKey) aesKey() []byte {
-   return x.X[16:]
-}
-
 // Constants for object types within the certificate structure.
 const (
    objTypeBasic            = 0x0001
@@ -100,25 +62,6 @@ const (
 )
 
 const wmrmPublicKey = "C8B6AF16EE941AADAA5389B4AF2C10E356BE42AF175EF3FACE93254E7B0B3D9B982B27B5CB2341326E56AA857DBFD5C634CE2CF9EA74FCA8F2AF5957EFEEA562"
-
-func elGamalDecrypt(ciphertext []byte, x *ecdsa.PrivateKey) []byte {
-   // generator
-   g := elliptic.P256()
-   // Unmarshal C1 component
-   c1X := new(big.Int).SetBytes(ciphertext[:32])
-   c1Y := new(big.Int).SetBytes(ciphertext[32:64])
-   // Unmarshal C2 component
-   c2X := new(big.Int).SetBytes(ciphertext[64:96])
-   c2Y := new(big.Int).SetBytes(ciphertext[96:])
-   // Calculate shared secret s = C1^x
-   sX, sY := g.ScalarMult(c1X, c1Y, x.D.Bytes())
-   // Invert the point for subtraction
-   sY.Neg(sY)
-   sY.Mod(sY, g.Params().P)
-   // Recover message point: M = C2 - s
-   mX, mY := g.Add(c2X, c2Y, sX, sY)
-   return append(mX.Bytes(), mY.Bytes()...)
-}
 
 // xorKey performs XOR operation on two byte slices.
 func xorKey(a, b []byte) []byte {
@@ -227,49 +170,6 @@ func (c *CertFeatures) size() int {
    n := 4 // entries
    n += 4 * len(c.Features)
    return n
-}
-
-func (c *ContentKey) scalable(key *ecdsa.PrivateKey, aux *AuxKeys) error {
-   rootKeyInfo, leafKeys := c.Value[:144], c.Value[144:]
-   rootKey := rootKeyInfo[128:]
-   decrypted := elGamalDecrypt(rootKeyInfo[:128], key)
-   var (
-      ci [16]byte
-      ck [16]byte
-   )
-   for i := range 16 {
-      ci[i] = decrypted[i*2]
-      ck[i] = decrypted[i*2+1]
-   }
-   magicConstantZero, err := c.magicConstantZero()
-   if err != nil {
-      return err
-   }
-   rgbUplinkXkey := xorKey(ck[:], magicConstantZero)
-   contentKeyPrime, err := aesEcbEncrypt(rgbUplinkXkey, ck[:])
-   if err != nil {
-      return err
-   }
-   auxKeyCalc, err := aesEcbEncrypt(aux.Keys[0].Key[:], contentKeyPrime)
-   if err != nil {
-      return err
-   }
-   oSecondaryKey, err := aesEcbEncrypt(rootKey, ck[:])
-   if err != nil {
-      return err
-   }
-   rgbKey, err := aesEcbEncrypt(leafKeys, auxKeyCalc)
-   if err != nil {
-      return err
-   }
-   rgbKey, err = aesEcbEncrypt(rgbKey, oSecondaryKey)
-   if err != nil {
-      return err
-   }
-   n := copy(c.Integrity[:], rgbKey)
-   rgbKey = rgbKey[n:]
-   copy(c.Key[:], rgbKey)
-   return nil
 }
 
 // magicConstantZero returns a specific hex-decoded byte slice.
@@ -403,7 +303,106 @@ func (c *ContentKey) decode(data []byte) {
    c.Value = data
 }
 
+func (x *xmlKey) New() {
+   x.PublicKey.X, x.PublicKey.Y = elliptic.P256().ScalarBaseMult([]byte{1})
+   x.PublicKey.X.FillBytes(x.X[:])
+}
+
+func (x *xmlKey) aesIv() []byte {
+   return x.X[:16]
+}
+
+func (x *xmlKey) aesKey() []byte {
+   return x.X[16:]
+}
+
 type xmlKey struct {
    PublicKey ecdsa.PublicKey
    X         [32]byte
+}
+
+type ContentKey struct {
+   KeyId      [16]byte
+   KeyType    uint16
+   CipherType uint16
+   Length     uint16
+   Value      []byte
+   
+   Integrity  [16]byte
+   Key        [16]byte
+}
+
+func elGamalDecrypt(data []byte, key *ecdsa.PrivateKey) []byte {
+   curve := elliptic.P256()
+   // Unmarshal C1 component
+   c1X := new(big.Int).SetBytes(data[:32])
+   c1Y := new(big.Int).SetBytes(data[32:64])
+   // Unmarshal C2 component
+   c2X := new(big.Int).SetBytes(data[64:96])
+   c2Y := new(big.Int).SetBytes(data[96:])
+   // Calculate shared secret s = C1^x
+   sX, sY := curve.ScalarMult(c1X, c1Y, key.D.Bytes())
+   // Invert the point for subtraction
+   sY.Neg(sY)
+   sY.Mod(sY, curve.Params().P)
+   // Recover message point: M = C2 - s
+   mX, mY := curve.Add(c2X, c2Y, sX, sY)
+   return append(mX.Bytes(), mY.Bytes()...)
+}
+
+func (c *ContentKey) decrypt(key *ecdsa.PrivateKey, aux *AuxKeys) error {
+   switch c.CipherType {
+   case 3:
+      decrypted := elGamalDecrypt(c.Value, key) // len 64
+      n := copy(c.Integrity[:], decrypted)
+      decrypted = decrypted[n:]
+      copy(c.Key[:], decrypted)
+      return nil
+   case 6:
+      return c.scalable(key, aux)
+   }
+   return errors.New("cannot decrypt key")
+}
+
+func (c *ContentKey) scalable(key *ecdsa.PrivateKey, aux *AuxKeys) error {
+   rootKeyInfo, leafKeys := c.Value[:144], c.Value[144:]
+   rootKey := rootKeyInfo[128:]
+   decrypted := elGamalDecrypt(rootKeyInfo[:128], key) // len 64
+   var (
+      ci [16]byte
+      ck [16]byte
+   )
+   for i := range 16 {
+      ci[i] = decrypted[i*2]
+      ck[i] = decrypted[i*2+1]
+   }
+   magicConstantZero, err := c.magicConstantZero()
+   if err != nil {
+      return err
+   }
+   rgbUplinkXkey := xorKey(ck[:], magicConstantZero)
+   contentKeyPrime, err := aesEcbEncrypt(rgbUplinkXkey, ck[:])
+   if err != nil {
+      return err
+   }
+   auxKeyCalc, err := aesEcbEncrypt(aux.Keys[0].Key[:], contentKeyPrime)
+   if err != nil {
+      return err
+   }
+   oSecondaryKey, err := aesEcbEncrypt(rootKey, ck[:])
+   if err != nil {
+      return err
+   }
+   rgbKey, err := aesEcbEncrypt(leafKeys, auxKeyCalc)
+   if err != nil {
+      return err
+   }
+   rgbKey, err = aesEcbEncrypt(rgbKey, oSecondaryKey)
+   if err != nil {
+      return err
+   }
+   n := copy(c.Integrity[:], rgbKey)
+   rgbKey = rgbKey[n:]
+   copy(c.Key[:], rgbKey)
+   return nil
 }

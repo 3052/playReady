@@ -10,6 +10,48 @@ import (
    "github.com/emmansun/gmsm/cbcmac"
 )
 
+func (l *License) Decrypt(signEncrypt EcKey, data []byte) error {
+   var envelope xml.EnvelopeResponse
+   err := envelope.Unmarshal(data)
+   if err != nil {
+      return err
+   }
+   data = envelope.
+      Body.
+      AcquireLicenseResponse.
+      AcquireLicenseResult.
+      Response.
+      LicenseResponse.
+      Licenses.
+      License
+   err = l.decode(data)
+   if err != nil {
+      return err
+   }
+   if !bytes.Equal(l.EccKey.Value, signEncrypt.public()) {
+      return errors.New("license response is not for this device")
+   }
+   err = l.ContentKey.decrypt(signEncrypt[0], l.AuxKeys)
+   if err != nil {
+      return err
+   }
+   return l.verify(data)
+}
+
+func (l *License) verify(data []byte) error {
+   signature := new(Ftlv).size() + l.Signature.size()
+   data = data[:len(data)-signature]
+   block, err := aes.NewCipher(l.ContentKey.Integrity[:])
+   if err != nil {
+      return err
+   }
+   data = cbcmac.NewCMAC(block, aes.BlockSize).MAC(data)
+   if !bytes.Equal(data, l.Signature.Data) {
+      return errors.New("failed to decrypt the keys")
+   }
+   return nil
+}
+
 func (c *CertificateInfo) New(securityLevel uint32, digest []byte) {
    copy(c.Digest[:], digest)
    // required, Max uint32, effectively never expires
@@ -122,20 +164,6 @@ const (
    playbackUnknownContainerEntryType       xmrType = 65534
 )
 
-func (l *License) verify(data []byte) error {
-   signature := new(Ftlv).size() + l.Signature.size()
-   data = data[:len(data)-signature]
-   block, err := aes.NewCipher(l.ContentKey.Integrity[:])
-   if err != nil {
-      return err
-   }
-   data = cbcmac.NewCMAC(block, aes.BlockSize).MAC(data)
-   if !bytes.Equal(data, l.Signature.Data) {
-      return errors.New("failed to decrypt the keys")
-   }
-   return nil
-}
-
 func sign(key *ecdsa.PrivateKey, hash []byte) ([]byte, error) {
    r, s, err := ecdsa.Sign(Fill('A'), key, hash)
    if err != nil {
@@ -163,34 +191,6 @@ func (f Fill) Read(data []byte) (int, error) {
 }
 
 type Fill byte
-
-func (l *License) Decrypt(signEncrypt EcKey, data []byte) error {
-   var envelope xml.EnvelopeResponse
-   err := envelope.Unmarshal(data)
-   if err != nil {
-      return err
-   }
-   data = envelope.
-      Body.
-      AcquireLicenseResponse.
-      AcquireLicenseResult.
-      Response.
-      LicenseResponse.
-      Licenses.
-      License
-   err = l.decode(data)
-   if err != nil {
-      return err
-   }
-   if !bytes.Equal(l.EccKey.Value, signEncrypt.public()) {
-      return errors.New("license response is not for this device")
-   }
-   err = l.ContentKey.decrypt(signEncrypt[0], l.AuxKeys)
-   if err != nil {
-      return err
-   }
-   return l.verify(data)
-}
 
 func (l *License) decode(data []byte) error {
    n := copy(l.Magic[:], data)
