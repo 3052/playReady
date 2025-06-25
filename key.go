@@ -332,7 +332,7 @@ type ContentKey struct {
    Key        [16]byte
 }
 
-func elGamalDecrypt(data []byte, key *ecdsa.PrivateKey) []byte {
+func elGamalDecrypt(data []byte, key *ecdsa.PrivateKey) (*big.Int, *big.Int) {
    curve := elliptic.P256()
    // Unmarshal C1 component
    c1X := new(big.Int).SetBytes(data[:32])
@@ -346,14 +346,14 @@ func elGamalDecrypt(data []byte, key *ecdsa.PrivateKey) []byte {
    sY.Neg(sY)
    sY.Mod(sY, curve.Params().P)
    // Recover message point: M = C2 - s
-   mX, mY := curve.Add(c2X, c2Y, sX, sY)
-   return append(mX.Bytes(), mY.Bytes()...)
+   return curve.Add(c2X, c2Y, sX, sY)
 }
 
 func (c *ContentKey) decrypt(key *ecdsa.PrivateKey, aux *AuxKeys) error {
    switch c.CipherType {
    case 3:
-      decrypted := elGamalDecrypt(c.Value, key) // len 64
+      messageX, _ := elGamalDecrypt(c.Value, key)
+      decrypted := messageX.Bytes()
       n := copy(c.Integrity[:], decrypted)
       decrypted = decrypted[n:]
       copy(c.Key[:], decrypted)
@@ -367,7 +367,8 @@ func (c *ContentKey) decrypt(key *ecdsa.PrivateKey, aux *AuxKeys) error {
 func (c *ContentKey) scalable(key *ecdsa.PrivateKey, aux *AuxKeys) error {
    rootKeyInfo, leafKeys := c.Value[:144], c.Value[144:]
    rootKey := rootKeyInfo[128:]
-   decrypted := elGamalDecrypt(rootKeyInfo[:128], key) // len 64
+   messageX, _ := elGamalDecrypt(rootKeyInfo[:128], key)
+   decrypted := messageX.Bytes()
    var (
       ci [16]byte
       ck [16]byte

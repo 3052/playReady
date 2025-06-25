@@ -19,17 +19,17 @@ var key_tests = []struct {
    {
       key:    "ee0d569c019057569eaf28b988c206f6",
       kid_wv: "01038786b77fb6ca14eb864155de730e", // L1
-      url:    "https://busy.any-any.prd.api.discomax.com/drm-proxy/any/drm-proxy/drm/license/play-ready?drmKeyVersion=1&auth=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHBpcmF0aW9uVGltZSI6IjIwMjUtMDYtMjVUMTA6MzE6MzAuNjQ0MTU0MTRaIiwiZWRpdElkIjoiMDZhMzgzOTctODYyZC00NDE5LWJlODQtMDY0MTkzOTgyNWU3IiwiYXBwQnVuZGxlIjoiIiwicGxhdGZvcm0iOiIiLCJ1c2VySWQiOiJVU0VSSUQ6Ym9sdDowZDQ1Y2NmOC1iNGEyLTQxNDctYmJlYi1jN2JjYjE0MGYzODIiLCJwcm9maWxlSWQiOiJQUk9GSUxFSUQ0YmU0Njk0MS0wM2E1LTQ3ZTUtYjQxNC1lOWQ5NWMzOWQyMTYiLCJkZXZpY2VJZCI6IiEiLCJzc2FpIjp0cnVlLCJzdHJlYW1UeXBlIjoidm9kIiwiaGVhcnRiZWF0RW5hYmxlZCI6ZmFsc2V9.ct7q0YmeZUcdWzlCuv2Znhj-tVtIo3uZjqoh2pgBcsc&x-wbd-tenant=beam&x-wbd-user-home-market=emea",
+      url:    "https://busy.any-any.prd.api.discomax.com/drm-proxy/any/drm-proxy/drm/license/play-ready?drmKeyVersion=1&auth=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHBpcmF0aW9uVGltZSI6IjIwMjUtMDYtMjVUMTc6NTU6NDcuNjE1Mzc3ODk0WiIsImVkaXRJZCI6IjA2YTM4Mzk3LTg2MmQtNDQxOS1iZTg0LTA2NDE5Mzk4MjVlNyIsImFwcEJ1bmRsZSI6IiIsInBsYXRmb3JtIjoiIiwidXNlcklkIjoiVVNFUklEOmJvbHQ6MGQ0NWNjZjgtYjRhMi00MTQ3LWJiZWItYzdiY2IxNDBmMzgyIiwicHJvZmlsZUlkIjoiUFJPRklMRUlENGJlNDY5NDEtMDNhNS00N2U1LWI0MTQtZTlkOTVjMzlkMjE2IiwiZGV2aWNlSWQiOiIhIiwic3NhaSI6dHJ1ZSwic3RyZWFtVHlwZSI6InZvZCIsImhlYXJ0YmVhdEVuYWJsZWQiOmZhbHNlfQ.js2Vq3SdVtFDLN1VWuvUbZDLjzNRL3BIhd0mrjwLqKE&x-wbd-tenant=beam&x-wbd-user-home-market=emea",
    },
    {
       key:    "12b5853e5a54a79ab84aae29d8079283",
       kid_wv: "20613c35d9cc4c1fa9b668182eb8fc77",
-      url:    "https://hulu.playback.edge.bamgrid.com/playready-hulu/v1/hulu/vod/obtain-license-legacy/61556664?deejay_device_id=166&nonce=323467442&signature=1750847769_4167f68b65a5c62f5dcac5931237a04156f785cf",
+      url:    "https://hulu.playback.edge.bamgrid.com/playready-hulu/v1/hulu/vod/obtain-license-legacy/61556664?deejay_device_id=166&nonce=323467442&signature=1750888648_7e8f489ccadbe8646dee1ef592995c3dba4c27c6",
    },
    {
       key:    "ab82952e8b567a2359393201e4dde4b4",
       kid_wv: "318f7ece69afcfe3e96de31be6b77272",
-      url:    "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=5fcf4fae-e0de-4b5c-a6ca-5ae67cb5d02d",
+      url:    "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=48328319-1bab-4165-9bf5-82704b5ece6e",
    },
    {
       key:    "00000000000000000000000000000000",
