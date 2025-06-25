@@ -1,6 +1,6 @@
 package apps
 
-var details = map[string][]app{
+var Details = map[string][]app{
    "100M+ Downloads": {
       {
          playReady: "clearKey",
@@ -20,14 +20,15 @@ var details = map[string][]app{
    },
    "50M+ Downloads": {
       {
-         playReady: "sign up now",
-         title:     "Hulu: Stream TV shows & movies",
-         url:       "play.google.com/store/apps/details?id=com.hulu.plus",
-      },
-      {
          playReady: "there was an error loading the video",
          title:     "Plex: Stream Movies & TV",
          url:       "play.google.com/store/apps/details?id=com.plexapp.android",
+      },
+/////////////////////////////////////////////////////////////////////////////////
+      {
+         playReady: "sign up now",
+         title:     "Hulu: Stream TV shows & movies",
+         url:       "play.google.com/store/apps/details?id=com.hulu.plus",
       },
    },
    "10M+ Downloads": {
