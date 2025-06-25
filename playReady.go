@@ -61,18 +61,6 @@ func (c *CertificateInfo) ftlv(Flag, Type uint16) *Ftlv {
    return newFtlv(Flag, Type, c.encode())
 }
 
-// It returns the number of bytes consumed.
-func (c *CertFeatures) decode(data []byte) int {
-   c.Entries = binary.BigEndian.Uint32(data)
-   n := 4
-   c.Features = make([]uint32, c.Entries)
-   for i := range c.Entries {
-      c.Features[i] = binary.BigEndian.Uint32(data[n:])
-      n += 4
-   }
-   return n
-}
-
 func newFtlv(Flag, Type uint16, Value []byte) *Ftlv {
    return &Ftlv{
       Flag:   Flag,
