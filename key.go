@@ -13,6 +13,31 @@ import (
    "slices"
 )
 
+type ContentKey struct {
+   KeyId      [16]byte
+   KeyType    uint16
+   CipherType uint16
+   Length     uint16
+   Value      []byte
+   
+   Integrity  [16]byte
+   Key        [16]byte
+}
+
+func (c *ContentKey) decrypt(key *ecdsa.PrivateKey, aux *AuxKeys) error {
+   switch c.CipherType {
+   case 3:
+      decrypted := elGamalDecrypt(c.Value, key)
+      n := copy(c.Integrity[:], decrypted)
+      decrypted = decrypted[n:]
+      copy(c.Key[:], decrypted)
+      return nil
+   case 6:
+      return c.scalable(key, aux)
+   }
+   return errors.New("cannot decrypt key")
+}
+
 func (k *KeyInfo) New(signEncryptKey []byte) {
    k.Entries = 2 // required
    k.Keys = make([]KeyData, 2)
@@ -204,20 +229,6 @@ func (c *CertFeatures) size() int {
    return n
 }
 
-func (c *ContentKey) decrypt(key *ecdsa.PrivateKey, aux *AuxKeys) error {
-   switch c.CipherType {
-   case 3:
-      decrypted := elGamalDecrypt(c.Value, key)
-      n := copy(c.Integrity[:], decrypted)
-      decrypted = decrypted[n:]
-      copy(c.Key[:], decrypted)
-      return nil
-   case 6:
-      return c.scalable(key, aux)
-   }
-   return errors.New("cannot decrypt key")
-}
-
 func (c *ContentKey) scalable(key *ecdsa.PrivateKey, aux *AuxKeys) error {
    rootKeyInfo, leafKeys := c.Value[:144], c.Value[144:]
    rootKey := rootKeyInfo[128:]
@@ -395,17 +406,4 @@ func (c *ContentKey) decode(data []byte) {
 type xmlKey struct {
    PublicKey ecdsa.PublicKey
    X         [32]byte
-}
-
-///
-
-type ContentKey struct {
-   KeyId      [16]byte
-   KeyType    uint16
-   CipherType uint16
-   Length     uint16
-   Value      []byte
-   
-   Integrity  [16]byte
-   Key        [16]byte
 }

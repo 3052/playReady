@@ -10,18 +10,6 @@ import (
    "github.com/emmansun/gmsm/cbcmac"
 )
 
-func (a *AuxKeys) decode(data []byte) {
-   a.Count = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   a.Keys = make([]AuxKey, a.Count)
-   for i := range a.Count {
-      var key AuxKey
-      n := key.decode(data)
-      a.Keys[i] = key
-      data = data[n:]
-   }
-}
-
 func (c *CertificateInfo) New(securityLevel uint32, digest []byte) {
    copy(c.Digest[:], digest)
    // required, Max uint32, effectively never expires
@@ -41,22 +29,6 @@ func (c *CertificateInfo) encode() []byte {
    return append(data, c.ClientId[:]...)
 }
 
-func (c *CertificateInfo) decode(data []byte) {
-   n := copy(c.CertificateId[:], data)
-   data = data[n:]
-   c.SecurityLevel = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   c.Flags = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   c.InfoType = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   n = copy(c.Digest[:], data)
-   data = data[n:]
-   c.Expiry = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   copy(c.ClientId[:], data)
-}
-
 func (c *CertificateInfo) ftlv(Flag, Type uint16) *Ftlv {
    return newFtlv(Flag, Type, c.encode())
 }
@@ -68,18 +40,6 @@ func newFtlv(Flag, Type uint16, Value []byte) *Ftlv {
       Length: 8 + uint32(len(Value)),
       Value:  Value,
    }
-}
-
-func (f *Ftlv) decode(data []byte) (int, error) {
-   f.Flag = binary.BigEndian.Uint16(data)
-   n := 2
-   f.Type = binary.BigEndian.Uint16(data[n:])
-   n += 2
-   f.Length = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   f.Value = data[n:f.Length]
-   n += len(f.Value)
-   return n, nil
 }
 
 func (f *Ftlv) size() int {
@@ -113,14 +73,6 @@ func (l *LicenseSignature) size() int {
    return n
 }
 
-func (l *LicenseSignature) decode(data []byte) {
-   l.Type = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   l.Length = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   l.Data = data
-}
-
 type xmrType uint16
 
 const (
@@ -139,9 +91,9 @@ const (
    issueDateEntryType                      xmrType = 19
    meteringEntryType                       xmrType = 22
    gracePeriodEntryType                    xmrType = 26
-   sourceIDEntryType                       xmrType = 34
-   restrictedSourceIDEntryType             xmrType = 40
-   domainIDEntryType                       xmrType = 41
+   sourceIdEntryType                       xmrType = 34
+   restrictedSourceIdEntryType             xmrType = 40
+   domainIdEntryType                       xmrType = 41
    deviceKeyEntryType                      xmrType = 42
    policyMetadataEntryType                 xmrType = 44
    optimizedContentKeyEntryType            xmrType = 45
@@ -152,7 +104,7 @@ const (
    embeddingBehaviorEntryType              xmrType = 51
    securityLevelEntryType                  xmrType = 52
    moveEnablerEntryType                    xmrType = 55
-   uplinkKIDEntryType                      xmrType = 59
+   uplinkKidEntryType                      xmrType = 59
    copyPoliciesContainerEntryType          xmrType = 60
    copyCountEntryType                      xmrType = 61
    removalDateEntryType                    xmrType = 80
@@ -247,50 +199,50 @@ func (l *License) decode(data []byte) error {
    data = data[2:]
    l.Version = binary.BigEndian.Uint16(data)
    data = data[2:]
-   n = copy(l.RightsID[:], data)
+   n = copy(l.RightsId[:], data)
    data = data[n:]
-   var outer Ftlv
-   _, err := outer.decode(data) // Type 1
+   var value1 Ftlv
+   _, err := value1.decode(data) // Type 1
    if err != nil {
       return err
    }
-   for len(outer.Value) >= 1 {
-      var inner Ftlv
-      n, err = inner.decode(outer.Value)
+   for len(value1.Value) >= 1 {
+      var value2 Ftlv
+      n, err = value2.decode(value1.Value)
       if err != nil {
          return err
       }
-      outer.Value = outer.Value[n:]
-      switch xmrType(inner.Type) {
+      value1.Value = value1.Value[n:]
+      switch xmrType(value2.Type) {
       case globalPolicyContainerEntryType: // 2
          // Rakuten
       case playbackPolicyContainerEntryType: // 4
          // Rakuten
       case keyMaterialContainerEntryType: // 9
-         for len(inner.Value) >= 1 {
-            var key Ftlv
-            n, err = key.decode(inner.Value)
+         for len(value2.Value) >= 1 {
+            var value3 Ftlv
+            n, err = value3.decode(value2.Value)
             if err != nil {
                return err
             }
-            inner.Value = inner.Value[n:]
-            switch xmrType(key.Type) {
+            value2.Value = value2.Value[n:]
+            switch xmrType(value3.Type) {
             case contentKeyEntryType: // 10
                l.ContentKey = &ContentKey{}
-               l.ContentKey.decode(key.Value)
+               l.ContentKey.decode(value3.Value)
             case deviceKeyEntryType: // 42
                l.EccKey = &EccKey{}
-               l.EccKey.decode(key.Value)
+               l.EccKey.decode(value3.Value)
             case auxKeyEntryType: // 81
                l.AuxKeys = &AuxKeys{}
-               l.AuxKeys.decode(key.Value)
+               l.AuxKeys.decode(value3.Value)
             default:
                return errors.New("Ftlv.type")
             }
          }
       case signatureEntryType: // 11
          l.Signature = &LicenseSignature{}
-         l.Signature.decode(inner.Value)
+         l.Signature.decode(value2.Value)
       default:
          return errors.New("Ftlv.type")
       }
@@ -298,32 +250,27 @@ func (l *License) decode(data []byte) error {
    return nil
 }
 
-func (a *AuxKey) decode(data []byte) int {
-   a.Location = binary.BigEndian.Uint32(data)
-   n := 4
-   n += copy(a.Key[:], data[n:])
-   return n
-}
-
 type License struct {
    Magic      [4]byte           // 0
    Offset     uint16            // 1
    Version    uint16            // 2
-   RightsID   [16]byte          // 3
+   RightsId   [16]byte          // 3
    ContentKey *ContentKey       // 4.9.10
    EccKey     *EccKey           // 4.9.42
    AuxKeys    *AuxKeys          // 4.9.81
    Signature  *LicenseSignature // 4.11
 }
 
-type AuxKeys struct {
-   Count uint16
-   Keys  []AuxKey
-}
-
-type AuxKey struct {
-   Location uint32
-   Key      [16]byte
+func (f *Ftlv) decode(data []byte) (int, error) {
+   f.Flag = binary.BigEndian.Uint16(data)
+   n := 2
+   f.Type = binary.BigEndian.Uint16(data[n:])
+   n += 2
+   f.Length = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   f.Value = data[n:f.Length]
+   n += len(f.Value)
+   return n, nil
 }
 
 type Ftlv struct {
@@ -333,10 +280,63 @@ type Ftlv struct {
    Value  []byte
 }
 
+func (a *AuxKeys) decode(data []byte) {
+   a.Count = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   a.Keys = make([]AuxKey, a.Count)
+   for i := range a.Count {
+      var key AuxKey
+      n := key.decode(data)
+      a.Keys[i] = key
+      data = data[n:]
+   }
+}
+
+type AuxKeys struct {
+   Count uint16
+   Keys  []AuxKey
+}
+
+func (a *AuxKey) decode(data []byte) int {
+   a.Location = binary.BigEndian.Uint32(data)
+   n := 4
+   n += copy(a.Key[:], data[n:])
+   return n
+}
+
+type AuxKey struct {
+   Location uint32
+   Key      [16]byte
+}
+
+func (l *LicenseSignature) decode(data []byte) {
+   l.Type = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   l.Length = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   l.Data = data
+}
+
 type LicenseSignature struct {
    Type   uint16
    Length uint16
    Data   []byte
+}
+
+func (c *CertificateInfo) decode(data []byte) {
+   n := copy(c.CertificateId[:], data)
+   data = data[n:]
+   c.SecurityLevel = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   c.Flags = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   c.InfoType = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   n = copy(c.Digest[:], data)
+   data = data[n:]
+   c.Expiry = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   copy(c.ClientId[:], data)
 }
 
 type CertificateInfo struct {
