@@ -15,6 +15,35 @@ import (
    "slices"
 )
 
+func (c *CertSignature) decode(data []byte) error {
+   c.SignatureType = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   c.SignatureLength = binary.BigEndian.Uint16(data)
+   if c.SignatureLength != 64 {
+      return errors.New("signature length invalid")
+   }
+   data = data[2:]
+   c.Signature = data[:c.SignatureLength]
+   data = data[c.SignatureLength:]
+   c.IssuerLength = binary.BigEndian.Uint32(data)
+   if c.IssuerLength != 512 {
+      return errors.New("issuer length invalid")
+   }
+   data = data[4:]
+   c.IssuerKey = data[:c.IssuerLength/8]
+   return nil
+}
+
+type CertSignature struct {
+   SignatureType   uint16
+   SignatureLength uint16
+   // The actual signature bytes
+   Signature    []byte
+   IssuerLength uint32
+   // The public key of the issuer that signed this certificate
+   IssuerKey []byte
+}
+
 func (c *CertSignature) New(signature, modelKey []byte) error {
    c.SignatureType = 1 // required
    c.SignatureLength = 64
@@ -49,6 +78,62 @@ func (c *CertSignature) size() int {
    n += 4  // issuerLength
    n += 64 // issuerKey
    return n
+}
+
+func (c *Certificate) decode(data []byte) (int, error) {
+   // Copy the magic bytes and check for "CERT" signature.
+   n := copy(c.Magic[:], data)
+   if string(c.Magic[:]) != "CERT" {
+      return 0, errors.New("failed to find cert magic")
+   }
+   // Decode Version, Length, and LengthToSignature fields.
+   c.Version = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   c.Length = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   c.LengthToSignature = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   for n < int(c.Length) {
+      var value Ftlv
+      bytesReadFromFtlv, err := value.decode(data[n:])
+      if err != nil {
+         return 0, err
+      }
+      switch value.Type {
+      case objTypeBasic: // 0x0001
+         c.Info = &CertificateInfo{}
+         c.Info.decode(value.Value)
+      case objTypeFeature: // 0x0005
+         c.Features = &value
+      case objTypeKey: // 0x0006
+         c.KeyInfo = &KeyInfo{}
+         c.KeyInfo.decode(value.Value)
+      case objTypeManufacturer: // 0x0007
+         c.Manufacturer = &value
+      case objTypeSignature: // 0x0008
+         c.Signature = &CertSignature{}
+         err := c.Signature.decode(value.Value)
+         if err != nil {
+            return 0, err
+         }
+      default:
+         return 0, errors.New("Ftlv.Type")
+      }
+      n += bytesReadFromFtlv
+   }
+   return n, nil // Return total bytes consumed and nil for no error
+}
+
+type Certificate struct {
+   Magic             [4]byte          // bytes 0 - 3
+   Version           uint32           // bytes 4 - 7
+   Length            uint32           // bytes 8 - 11
+   LengthToSignature uint32           // bytes 12 - 15
+   Info              *CertificateInfo // type 1
+   Features          *Ftlv            // type 5
+   KeyInfo           *KeyInfo         // type 6
+   Manufacturer      *Ftlv            // type 7
+   Signature         *CertSignature   // type 8
 }
 
 func (c *Certificate) Append(data []byte) []byte {
@@ -293,89 +378,4 @@ type Chain struct {
    Flags        uint32
    CertCount    uint32
    Certificates []Certificate
-}
-
-func (c *Certificate) decode(data []byte) (int, error) {
-   // Copy the magic bytes and check for "CERT" signature.
-   n := copy(c.Magic[:], data)
-   if string(c.Magic[:]) != "CERT" {
-      return 0, errors.New("failed to find cert magic")
-   }
-   // Decode Version, Length, and LengthToSignature fields.
-   c.Version = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   c.Length = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   c.LengthToSignature = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   for n < int(c.Length) {
-      var value Ftlv
-      bytesReadFromFtlv, err := value.decode(data[n:])
-      if err != nil {
-         return 0, err
-      }
-      switch value.Type {
-      case objTypeBasic: // 0x0001
-         c.Info = &CertificateInfo{}
-         c.Info.decode(value.Value)
-      case objTypeFeature: // 0x0005
-         c.Features = &value
-      case objTypeKey: // 0x0006
-         c.KeyInfo = &KeyInfo{}
-         c.KeyInfo.decode(value.Value)
-      case objTypeManufacturer: // 0x0007
-         c.Manufacturer = &value
-      case objTypeSignature: // 0x0008
-         c.Signature = &CertSignature{}
-         err := c.Signature.decode(value.Value)
-         if err != nil {
-            return 0, err
-         }
-      default:
-         return 0, errors.New("Ftlv.Type")
-      }
-      n += bytesReadFromFtlv
-   }
-   return n, nil // Return total bytes consumed and nil for no error
-}
-
-type Certificate struct {
-   Magic             [4]byte          // bytes 0 - 3
-   Version           uint32           // bytes 4 - 7
-   Length            uint32           // bytes 8 - 11
-   LengthToSignature uint32           // bytes 12 - 15
-   Info              *CertificateInfo // type 1
-   Features          *Ftlv            // type 5
-   KeyInfo           *KeyInfo         // type 6
-   Manufacturer      *Ftlv            // type 7
-   Signature         *CertSignature   // type 8
-}
-
-func (c *CertSignature) decode(data []byte) error {
-   c.SignatureType = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   c.SignatureLength = binary.BigEndian.Uint16(data)
-   if c.SignatureLength != 64 {
-      return errors.New("signature length invalid")
-   }
-   data = data[2:]
-   c.Signature = data[:c.SignatureLength]
-   data = data[c.SignatureLength:]
-   c.IssuerLength = binary.BigEndian.Uint32(data)
-   if c.IssuerLength != 512 {
-      return errors.New("issuer length invalid")
-   }
-   data = data[4:]
-   c.IssuerKey = data[:c.IssuerLength/8]
-   return nil
-}
-
-type CertSignature struct {
-   SignatureType   uint16
-   SignatureLength uint16
-   // The actual signature bytes
-   Signature    []byte
-   IssuerLength uint32
-   // The public key of the issuer that signed this certificate
-   IssuerKey []byte
 }
