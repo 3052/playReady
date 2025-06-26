@@ -14,28 +14,95 @@ import (
 var key_tests = []struct {
    key    string
    kid_wv string
-   url    string
+   url    func() (string, error)
 }{
    {
-      key:    "ee0d569c019057569eaf28b988c206f6",
-      kid_wv: "01038786b77fb6ca14eb864155de730e", // L1
-      url:    "https://busy.any-any.prd.api.discomax.com/drm-proxy/any/drm-proxy/drm/license/play-ready?drmKeyVersion=1&auth=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHBpcmF0aW9uVGltZSI6IjIwMjUtMDYtMjVUMTc6NTU6NDcuNjE1Mzc3ODk0WiIsImVkaXRJZCI6IjA2YTM4Mzk3LTg2MmQtNDQxOS1iZTg0LTA2NDE5Mzk4MjVlNyIsImFwcEJ1bmRsZSI6IiIsInBsYXRmb3JtIjoiIiwidXNlcklkIjoiVVNFUklEOmJvbHQ6MGQ0NWNjZjgtYjRhMi00MTQ3LWJiZWItYzdiY2IxNDBmMzgyIiwicHJvZmlsZUlkIjoiUFJPRklMRUlENGJlNDY5NDEtMDNhNS00N2U1LWI0MTQtZTlkOTVjMzlkMjE2IiwiZGV2aWNlSWQiOiIhIiwic3NhaSI6dHJ1ZSwic3RyZWFtVHlwZSI6InZvZCIsImhlYXJ0YmVhdEVuYWJsZWQiOmZhbHNlfQ.js2Vq3SdVtFDLN1VWuvUbZDLjzNRL3BIhd0mrjwLqKE&x-wbd-tenant=beam&x-wbd-user-home-market=emea",
+      key:    "67376174a357f3ec9c1466055de9551d",
+      // below is FHD (1920x1080), UHD needs SL3000
+      kid_wv: "010521b274da1acbbd3c6f124a238c67",
+      url: func() (string, error) {
+         home, err := os.UserHomeDir()
+         if err != nil {
+            return "", err
+         }
+         data, err := os.ReadFile(home + "/media/max/PlayReady")
+         if err != nil {
+            return "", err
+         }
+         return string(data), nil
+      },
    },
    {
       key:    "12b5853e5a54a79ab84aae29d8079283",
       kid_wv: "20613c35d9cc4c1fa9b668182eb8fc77",
-      url:    "https://hulu.playback.edge.bamgrid.com/playready-hulu/v1/hulu/vod/obtain-license-legacy/61556664?deejay_device_id=166&nonce=323467442&signature=1750888648_7e8f489ccadbe8646dee1ef592995c3dba4c27c6",
+      url: func() (string, error) {
+         home, err := os.UserHomeDir()
+         if err != nil {
+            return "", err
+         }
+         data, err := os.ReadFile(home + "/media/hulu/DashPrServer")
+         if err != nil {
+            return "", err
+         }
+         return string(data), nil
+      },
    },
    {
       key:    "ab82952e8b567a2359393201e4dde4b4",
       kid_wv: "318f7ece69afcfe3e96de31be6b77272",
-      url:    "https://prod-playready.rakuten.tv/v1/licensing/pr?uuid=48328319-1bab-4165-9bf5-82704b5ece6e",
+      url: func() (string, error) {
+         home, err := os.UserHomeDir()
+         if err != nil {
+            return "", err
+         }
+         data, err := os.ReadFile(home + "/media/rakuten/Pr")
+         if err != nil {
+            return "", err
+         }
+         return string(data), nil
+      },
    },
    {
       key:    "00000000000000000000000000000000",
       kid_wv: "10000000000000000000000000000000",
-      url:    "https://test.playready.microsoft.com/service/rightsmanager.asmx?cfg=ck:AAAAAAAAAAAAAAAAAAAAAA==,ckt:aescbc",
+      url: func() (string, error) {
+         return "https://test.playready.microsoft.com/service/rightsmanager.asmx?cfg=ck:AAAAAAAAAAAAAAAAAAAAAA==,ckt:aescbc", nil
+      },
    },
+}
+
+func TestLeaf(t *testing.T) {
+   data, err := os.ReadFile(SL2000.dir + SL2000.g1)
+   if err != nil {
+      t.Fatal(err)
+   }
+   var certificate Chain
+   err = certificate.Decode(data)
+   if err != nil {
+      t.Fatal(err)
+   }
+   data, err = os.ReadFile(SL2000.dir + SL2000.z1)
+   if err != nil {
+      t.Fatal(err)
+   }
+   var z1 EcKey
+   z1.Decode(data)
+   signEncryptKey, err := Fill('B').Key()
+   if err != nil {
+      t.Fatal(err)
+   }
+   err = certificate.Leaf(&z1, signEncryptKey)
+   if err != nil {
+      t.Fatal(err)
+   }
+   err = write_file(SL2000.dir+"certificate", certificate.Encode())
+   if err != nil {
+      t.Fatal(err)
+   }
+   err = write_file(SL2000.dir+"signEncryptKey", signEncryptKey.Private())
+   if err != nil {
+      t.Fatal(err)
+   }
 }
 
 func TestKey(t *testing.T) {
@@ -56,7 +123,11 @@ func TestKey(t *testing.T) {
    var signEncryptKey EcKey
    signEncryptKey.Decode(data)
    for _, test := range key_tests {
-      log.Print(test.url)
+      url, err := test.url()
+      if err != nil {
+         t.Fatal(err)
+      }
+      log.Print(url)
       kid, err := hex.DecodeString(test.kid_wv)
       if err != nil {
          t.Fatal(err)
@@ -66,7 +137,7 @@ func TestKey(t *testing.T) {
       if err != nil {
          t.Fatal(err)
       }
-      data, err = post(test.url, data)
+      data, err = post(url, data)
       if err != nil {
          t.Fatal(err)
       }
@@ -115,38 +186,4 @@ var SL2000 = struct {
    dir: "ignore/",
    g1:  "g1",
    z1:  "z1",
-}
-
-func TestLeaf(t *testing.T) {
-   data, err := os.ReadFile(SL2000.dir + SL2000.g1)
-   if err != nil {
-      t.Fatal(err)
-   }
-   var certificate Chain
-   err = certificate.Decode(data)
-   if err != nil {
-      t.Fatal(err)
-   }
-   data, err = os.ReadFile(SL2000.dir + SL2000.z1)
-   if err != nil {
-      t.Fatal(err)
-   }
-   var z1 EcKey
-   z1.Decode(data)
-   signEncryptKey, err := Fill('B').Key()
-   if err != nil {
-      t.Fatal(err)
-   }
-   err = certificate.Leaf(&z1, signEncryptKey)
-   if err != nil {
-      t.Fatal(err)
-   }
-   err = write_file(SL2000.dir+"certificate", certificate.Encode())
-   if err != nil {
-      t.Fatal(err)
-   }
-   err = write_file(SL2000.dir+"signEncryptKey", signEncryptKey.Private())
-   if err != nil {
-      t.Fatal(err)
-   }
 }

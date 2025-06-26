@@ -24,7 +24,7 @@ var Details = map[string][]app{
          title:     "Plex: Stream Movies & TV",
          url:       "play.google.com/store/apps/details?id=com.plexapp.android",
       },
-/////////////////////////////////////////////////////////////////////////////////
+      /////////////////////////////////////////////////////////////////////////////////
       {
          playReady: "sign up now",
          title:     "Hulu: Stream TV shows & movies",

@@ -13,6 +13,15 @@ import (
    "slices"
 )
 
+// they downgrade certs from the cert digest (hash of the signing key)
+func (f Fill) Key() (*EcKey, error) {
+   key, err := ecdsa.GenerateKey(elliptic.P256(), f)
+   if err != nil {
+      return nil, err
+   }
+   return &EcKey{key}, nil
+}
+
 func (k *KeyInfo) New(signEncryptKey []byte) {
    k.Entries = 2 // required
    k.Keys = make([]KeyData, 2)
@@ -199,15 +208,6 @@ func (e *EcKey) public() []byte {
    return append(e[0].PublicKey.X.Bytes(), e[0].PublicKey.Y.Bytes()...)
 }
 
-// they downgrade certs from the cert digest (hash of the signing key)
-func (f Fill) Key() (*EcKey, error) {
-   key, err := ecdsa.GenerateKey(elliptic.P256(), f)
-   if err != nil {
-      return nil, err
-   }
-   return &EcKey{key}, nil
-}
-
 func (k *KeyData) Append(data []byte) []byte {
    data = binary.BigEndian.AppendUint16(data, k.KeyType)
    data = binary.BigEndian.AppendUint16(data, k.Length)
@@ -327,9 +327,9 @@ type ContentKey struct {
    CipherType uint16
    Length     uint16
    Value      []byte
-   
-   Integrity  [16]byte
-   Key        [16]byte
+
+   Integrity [16]byte
+   Key       [16]byte
 }
 
 func elGamalDecrypt(data []byte, key *ecdsa.PrivateKey) (*big.Int, *big.Int) {

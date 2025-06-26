@@ -10,6 +10,25 @@ import (
    "github.com/emmansun/gmsm/cbcmac"
 )
 
+type CertificateInfo struct {
+   CertificateId [16]byte
+   SecurityLevel uint32
+   Flags         uint32
+   InfoType      uint32
+   Digest        [32]byte
+   Expiry        uint32
+   ClientId      [16]byte // Client ID (can be used for license binding)
+}
+
+func (c *CertificateInfo) New(securityLevel uint32, digest []byte) {
+   copy(c.Digest[:], digest)
+   // required, Max uint32, effectively never expires
+   c.Expiry = 4294967295
+   // required
+   c.InfoType = 2
+   c.SecurityLevel = securityLevel
+}
+
 func (l *License) Decrypt(signEncrypt EcKey, data []byte) error {
    var envelope xml.EnvelopeResponse
    err := envelope.Unmarshal(data)
@@ -50,15 +69,6 @@ func (l *License) verify(data []byte) error {
       return errors.New("failed to decrypt the keys")
    }
    return nil
-}
-
-func (c *CertificateInfo) New(securityLevel uint32, digest []byte) {
-   copy(c.Digest[:], digest)
-   // required, Max uint32, effectively never expires
-   c.Expiry = 4294967295
-   // required
-   c.InfoType = 2
-   c.SecurityLevel = securityLevel
 }
 
 func (c *CertificateInfo) encode() []byte {
@@ -339,12 +349,3 @@ func (c *CertificateInfo) decode(data []byte) {
    copy(c.ClientId[:], data)
 }
 
-type CertificateInfo struct {
-   CertificateId [16]byte
-   SecurityLevel uint32
-   Flags         uint32
-   InfoType      uint32
-   Digest        [32]byte
-   Expiry        uint32
-   ClientId      [16]byte // Client ID (can be used for license binding)
-}
