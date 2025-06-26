@@ -13,10 +13,7 @@ import (
 func (l *License) verify(data []byte) error {
    signature := new(Ftlv).size() + l.Signature.size()
    data = data[:len(data)-signature]
-   //block, err := aes.NewCipher(l.ContentKey.Integrity[:])
-   
-   block, err := aes.NewCipher(l.ContentKey.Value[:16])
-   
+   block, err := aes.NewCipher(l.ContentKey.integrity())
    if err != nil {
       return err
    }
