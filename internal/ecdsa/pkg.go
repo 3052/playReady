@@ -2,159 +2,142 @@ package ecdsa
 
 // https://pkg.go.dev/search?limit=100&q=ecdsa
 
-var Pkg = []struct{
-   note string
-   url string
+var Pkg = []struct {
+   issue string
+   note  string
+   url   string
 }{
    {
       note: "D deprecated",
-      url: "pkg.go.dev/crypto/ecdsa",
+      url:  "pkg.go.dev/crypto/ecdsa",
    },
    {
       note: "secp256k1 is not compatible with secp256r1",
-      url: "pkg.go.dev/github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa",
+      url:  "pkg.go.dev/github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa",
    },
    {
       note: "github.com/btcsuite/btcd/blob/master/btcec/go.sum",
-      url: "pkg.go.dev/github.com/btcsuite/btcd/btcec/v2/ecdsa",
+      url:  "pkg.go.dev/github.com/btcsuite/btcd/btcec/v2/ecdsa",
    },
    {
       note: "github.com/cosmos/cosmos-sdk/blob/main/go.sum",
-      url: "pkg.go.dev/github.com/cosmos/cosmos-sdk/crypto/keys/secp256r1",
+      url:  "pkg.go.dev/github.com/cosmos/cosmos-sdk/crypto/keys/secp256r1",
    },
    {
       note: "github.com/nspcc-dev/neofs-sdk-go/blob/master/go.sum",
-      url: "pkg.go.dev/github.com/nspcc-dev/neofs-sdk-go/crypto/ecdsa",
+      url:  "pkg.go.dev/github.com/nspcc-dev/neofs-sdk-go/crypto/ecdsa",
    },
    {
       note: "github.com/renproject/id/blob/master/go.sum",
-      url: "pkg.go.dev/github.com/renproject/id",
+      url:  "pkg.go.dev/github.com/renproject/id",
    },
    {
       note: "github.com/hellobchain/newcryptosm/blob/main/go.sum",
-      url: "pkg.go.dev/github.com/hellobchain/newcryptosm/ecdsa",
+      url:  "pkg.go.dev/github.com/hellobchain/newcryptosm/ecdsa",
    },
    {
       note: "secp256k1 is not compatible with secp256r1",
-      url: "pkg.go.dev/github.com/dustinxie/ecc",
+      url:  "pkg.go.dev/github.com/dustinxie/ecc",
    },
    {
       note: "github.com/bnb-chain/tss-lib/blob/master/go.sum",
-      url: "pkg.go.dev/github.com/bnb-chain/tss-lib/v2/ecdsa/keygen",
+      url:  "pkg.go.dev/github.com/bnb-chain/tss-lib/v2/ecdsa/keygen",
    },
    {
       note: "github.com/Consensys/gnark-crypto/blob/master/go.sum",
-      url: "pkg.go.dev/github.com/consensys/gnark-crypto/ecc",
+      url:  "pkg.go.dev/github.com/consensys/gnark-crypto/ecc",
    },
    {
       note: "github.com/ltcsuite/ltcd/blob/master/btcec/go.sum",
-      url: "pkg.go.dev/github.com/ltcsuite/ltcd/btcec/v2/ecdsa",
+      url:  "pkg.go.dev/github.com/ltcsuite/ltcd/btcec/v2/ecdsa",
    },
    {
       note: "github.com/epicchainlabs/epicchain-sdk-go/blob/main/go.sum",
-      url: "pkg.go.dev/github.com/epicchainlabs/epicchain-sdk-go/crypto/ecdsa",
+      url:  "pkg.go.dev/github.com/epicchainlabs/epicchain-sdk-go/crypto/ecdsa",
+   },
+   {
+      note: "github.com/Consensys/gnark/blob/master/go.sum",
+      url:  "pkg.go.dev/github.com/consensys/gnark/std/signature/ecdsa",
+   },
+   {
+      note: "github.com/PaddlePaddle/PaddleDTX/blob/master/crypto/go.sum",
+      url:  "pkg.go.dev/github.com/PaddlePaddle/PaddleDTX/crypto/core/ecdsa",
+   },
+   {
+      note: "github.com/taurushq-io/multi-party-sig/blob/main/go.sum",
+      url:  "pkg.go.dev/github.com/taurusgroup/multi-party-sig/pkg/ecdsa",
+   },
+   {
+      note: "github.com/TrueCloudLab/frostfs-sdk-go/blob/master/go.sum",
+      url:  "pkg.go.dev/github.com/TrueCloudLab/frostfs-sdk-go/crypto/ecdsa",
+   },
+   {
+      note: "github.com/kubernetes/dashboard/blob/master/modules/common/certificates/go.sum",
+      url:  "pkg.go.dev/github.com/kubernetes/dashboard/src/app/backend/cert/ecdsa",
+   },
+   {
+      note: "404 github.com/MrLinnea/EEE",
+      url:  "pkg.go.dev/github.com/MrLinnea/EEE/btcec/v2/ecdsa",
+   },
+   {
+      note: "github.com/privacybydesign/gabi/blob/master/go.sum",
+      url:  "pkg.go.dev/github.com/privacybydesign/gabi/signed",
+   },
+   {
+      note: "git.frostfs.info/TrueCloudLab/frostfs-sdk-go/src/branch/master/go.sum",
+      url:  "pkg.go.dev/git.frostfs.info/TrueCloudLab/frostfs-sdk-go/crypto/ecdsa",
+   },
+   {
+      note: "github.com/libsv/go-bk/blob/master/go.sum",
+      url:  "pkg.go.dev/github.com/libsv/go-bk/envelope",
+   },
+   {
+      note: "github.com/OffchainLabs/prysm/blob/develop/go.sum",
+      url:  "pkg.go.dev/github.com/prysmaticlabs/prysm/v5/crypto/ecdsa",
+   },
+   {
+      note: "github.com/muirglacier/id/blob/master/go.sum",
+      url:  "pkg.go.dev/github.com/muirglacier/id",
+   },
+   {
+      issue: "github.com/ProtonMail/go-crypto/issues/289",
+      note: "openpgp/internal/ecc: deprecated items",
+      url:  "pkg.go.dev/github.com/ProtonMail/go-crypto/openpgp/ecdsa",
+   },
+   {
+      note: "github.com/meshplus/bitxhub-kit/blob/master/go.sum",
+      url: "pkg.go.dev/github.com/meshplus/bitxhub-kit/crypto/asym/ecdsa",
+   },
+   {
+      note: "requires crypto/ecdsa",
+      url: "pkg.go.dev/github.com/common-fate/httpsig/alg_ecdsa",
+   },
+   {
+      note: "secp256r1",
+      issue: "github.com/primefactor-io/ecc/issues/1",
+      url: "pkg.go.dev/github.com/primefactor-io/ecc/pkg/ecdsa",
+   },
+   {
+      note: "requires crypto/elliptic.Curve.ScalarBaseMult",
+      url: "pkg.go.dev/github.com/FISCO-BCOS/crypto/ecdsa",
+   },
+   {
+      note: "secp256k1 only",
+      url: "pkg.go.dev/github.com/EXCCoin/exccd/dcrec",
+   },
+   {
+      note: "secp256k1 only",
+      url: "pkg.go.dev/github.com/Decred-Next/dcrnd/dcrec",
+   },
+   {
+      note: "secp256k1 only",
+      url: "pkg.go.dev/github.com/sebitt27/dcrd/dcrec",
+   },
+   {
+      note: "PASS github.com/starkbank/ecdsa-go/blob/master/go.mod",
+      url: "pkg.go.dev/github.com/starkbank/ecdsa-go/v2/ellipticcurve/ecdsa",
    },
    /*
-   ecdsa (github.com/consensys/gnark/std/signature/ecdsa)
-   Package ecdsa implements ECDSA signature verification over any elliptic curve.
-
-   ecdsa (github.com/PaddlePaddle/PaddleDTX/crypto/core/ecdsa)
-   Imported by 25
-   | v0.0.0-...-fd327ab published on Aug 22, 2024 | Apache-2.0
-
-   ecdsa (github.com/taurusgroup/multi-party-sig/pkg/ecdsa)
-   GO-2024-3288
-   Imported by 24
-   | v0.7.0-alpha-2025-01-28 published on Jan 28, 2025 | Apache-2.0
-
-   frostfsecdsa (github.com/TrueCloudLab/frostfs-sdk-go/crypto/ecdsa)
-   Package frostfsecdsa collects ECDSA primitives for FrostFS cryptography.
-   Imported by 11
-   | v0.0.0-...-5e759bf published on Mar 1, 2023 | Apache-2.0
-
-   ecdsa (github.com/kubernetes/dashboard/src/app/backend/cert/ecdsa)
-   Imported by 52
-   | v1.10.1 published on Dec 21, 2018 | Apache-2.0
-
-   ecdsa (github.com/MrLinnea/EEE/btcec/v2/ecdsa)
-   Imported by 20
-   | v2.0.0-...-28fbc43 published on Sep 9, 2023 | ISC
-
-   signed (github.com/privacybydesign/gabi/signed)
-   Package signed contains (1) convenience functions for ECDSA private and public key handling, and for signing and verifying byte slices with ECDSA; (2) functions for marshaling structs to signed bytes, and verifying and unmarshaling signed bytes back to structs.
-   Imported by 9
-   | v0.0.0-...-202feaa published on Feb 22, 2024 | BSD-3-Clause
-
-   frostfsecdsa (git.frostfs.info/TrueCloudLab/frostfs-sdk-go/crypto/ecdsa)
-   Package frostfsecdsa collects ECDSA primitives for FrostFS cryptography.
-   Imported by 9
-   | v0.0.0-...-81815db published on Jun 16, 2025 | Apache-2.0
-
-   envelope (github.com/libsv/go-bk/envelope)
-   Package envelope supports the JSON Envelope Spec It can be found here https://github.com/bitcoin-sv-specs/brfc-misc/tree/master/jsonenvelope Standard for serialising a JSON document in order to have consistency when ECDSA signing the document.
-   Imported by 15
-   | v0.1.6 published on Dec 15, 2021 | ISC
-
-   ecdsa (github.com/prysmaticlabs/prysm/v5/crypto/ecdsa)
-   Imported by 1
-   | v5.3.3 published on Apr 9, 2025 | GPL-3.0
-   Other major versions: v4, v3
-
-   id (github.com/muirglacier/id)
-   Imported by 14
-   | v0.4.5 published on Dec 11, 2021 | MIT
-
-   ecdsa (github.com/ProtonMail/go-crypto/openpgp/ecdsa)
-   Package ecdsa implements ECDSA signature, suitable for OpenPGP, as specified in RFC 6637, section 5.
-   Imported by 5
-   | v1.3.0 published on May 22, 2025 | BSD-3-Clause
-   Other major versions: v2
-
-   ecdsa (github.com/meshplus/bitxhub-kit/crypto/asym/ecdsa)
-   Imported by 13
-   | v1.28.0 published on Jan 19, 2023 | LGPL-3.0
-   Other packages in module github.com/meshplus/bitxhub-kit:
-   crypto/asym/ecdsa/secp256k1
-
-   alg_ecdsa (github.com/common-fate/httpsig/alg_ecdsa)
-   Package alg_ecdsa provides a signers and verifiers for ecdsa-p256-sha256 and ecdsa-p384-sha384
-   Imported by 4
-   | v0.2.1 published on Nov 12, 2024 | MIT
-
-   ecdsa (github.com/primefactor-io/ecc/pkg/ecdsa)
-   Package ecdsa implements the Elliptic Curve Digital Signature Algorithm (ECDSA) as well as its adaptor variant as described in section "5.1 ECDSA-based Adaptor Signature" of the paper https://eprint.iacr.org/2020/476.pdf.
-   Imported by 4
-   | v0.0.0-...-59dd02a published on May 11, 2025 | Apache-2.0
-
-   ecdsa (github.com/FISCO-BCOS/crypto/ecdsa)
-   Package ecdsa implements the Elliptic Curve Digital Signature Algorithm, as defined in FIPS 186-3.
-   Imported by 12
-   | v0.0.0-...-bd8ab0b published on Feb 2, 2020 | BSD-3-Clause
-
-   ecdsa (github.com/EXCCoin/exccd/dcrec/secp256k1/v4/ecdsa)
-   Package ecdsa provides secp256k1-optimized ECDSA signing and verification.
-   Imported by 4
-   | v4.0.0-...-f9146c5 published on Jun 20, 2024 | ISC
-
-   ecdsa (github.com/Decred-Next/dcrnd/dcrec/secp256k1/version4/v8/ecdsa)
-   Package ecdsa provides secp256k1-optimized ECDSA signing and verification.
-   Imported by 3
-   | v8.0.12 published on Jun 27, 2022 | ISC
-
-   ecdsa (github.com/sebitt27/dcrd/dcrec/secp256k1/v4/ecdsa)
-   Package ecdsa provides secp256k1-optimized ECDSA signing and verification.
-   Imported by 3
-   | v4.0.0-...-e8e7bc6 published on Oct 30, 2023 | ISC
-
-   privatekey (github.com/starkbank/ecdsa-go/v2/ellipticcurve/privatekey)
-   Imported by 8
-   | v2.0.0 published on Jan 20, 2023 | MIT
-   Other packages in module github.com/starkbank/ecdsa-go/v2:
-   ellipticcurve/ecdsa
-   ellipticcurve/signature
-   ellipticcurve/curve
-   ellipticcurve/publickey
-
    signing (github.com/sodiumlabs/tss-lib/ecdsa/signing)
    Imported by 7
    | v0.0.0-...-80b9cc1 published on Mar 19, 2023 | MIT
