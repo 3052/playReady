@@ -12,8 +12,6 @@ import (
    "slices"
 )
 
-type EcKey [1]*ecdsa.PrivateKey
-
 type Fill byte
 
 func (f Fill) Read(data []byte) (int, error) {
@@ -21,24 +19,6 @@ func (f Fill) Read(data []byte) (int, error) {
       data[index] = byte(f)
    }
    return len(data), nil
-}
-
-func (e *EcKey) Decode(data []byte) {
-   var public ecdsa.PublicKey
-   public.Curve = elliptic.P256()
-   public.X, public.Y = public.Curve.ScalarBaseMult(data)
-   var private ecdsa.PrivateKey
-   private.D = new(big.Int).SetBytes(data)
-   private.PublicKey = public
-   e[0] = &private
-}
-
-func sign(key *ecdsa.PrivateKey, hash []byte) ([]byte, error) {
-   r, s, err := ecdsa.Sign(Fill('A'), key, hash)
-   if err != nil {
-      return nil, err
-   }
-   return append(r.Bytes(), s.Bytes()...), nil
 }
 
 type xmlKey struct {
@@ -69,15 +49,33 @@ func (e *EcKey) public() []byte {
    return append(e[0].PublicKey.X.Bytes(), e[0].PublicKey.Y.Bytes()...)
 }
 
-///
-
-// they downgrade certs from the cert digest (hash of the signing key)
-func (f Fill) Key() (*EcKey, error) {
-   key, err := ecdsa.GenerateKey(elliptic.P256(), f)
+func sign(key *ecdsa.PrivateKey, hash []byte) ([]byte, error) {
+   r, s, err := ecdsa.Sign(Fill('A'), key, hash)
    if err != nil {
       return nil, err
    }
-   return &EcKey{key}, nil
+   return append(r.Bytes(), s.Bytes()...), nil
+}
+
+func (e *EcKey) Decode(data []byte) {
+   var public ecdsa.PublicKey
+   public.Curve = elliptic.P256()
+   public.X, public.Y = public.Curve.ScalarBaseMult(data)
+   e[0].D = new(big.Int).SetBytes(data)
+   e[0].PublicKey = public
+}
+
+type EcKey [1]ecdsa.PrivateKey
+
+///
+
+// they downgrade certs from the cert digest (hash of the signing key)
+func (f Fill) Key() *EcKey {
+   var data [32]byte
+   f.Read(data[:])
+   var key EcKey
+   key.Decode(data[:])
+   return &key
 }
 
 func (c *Certificate) verify(pubKey []byte) bool {

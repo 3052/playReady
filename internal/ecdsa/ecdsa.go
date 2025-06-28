@@ -6,6 +6,12 @@ import (
    "math/big"
 )
 
+func func0(data []byte) (*big.Int, *big.Int) {
+   x := new(big.Int).SetBytes(data[:32])
+   y := new(big.Int).SetBytes(data[32:])
+   return x, y
+}
+
 // wikipedia.org/wiki/Elliptic_Curve_Digital_Signature_Algorithm
 func func1() ([]byte, error) {
    var (
@@ -39,10 +45,4 @@ func (f filler) Read(data []byte) (int, error) {
       data[index] = byte(f)
    }
    return len(data), nil
-}
-
-func func0(data []byte) (*big.Int, *big.Int) {
-   x := new(big.Int).SetBytes(data[:32])
-   y := new(big.Int).SetBytes(data[32:])
-   return x, y
 }

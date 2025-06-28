@@ -11,6 +11,92 @@ import (
    "testing"
 )
 
+func TestKey(t *testing.T) {
+   log.SetFlags(log.Ltime)
+   data, err := os.ReadFile(SL2000.dir + "certificate")
+   if err != nil {
+      t.Fatal(err)
+   }
+   var certificate Chain
+   err = certificate.Decode(data)
+   if err != nil {
+      t.Fatal(err)
+   }
+   data, err = os.ReadFile(SL2000.dir + "signEncryptKey")
+   if err != nil {
+      t.Fatal(err)
+   }
+   var signEncryptKey EcKey
+   signEncryptKey.Decode(data)
+   home, err := os.UserHomeDir()
+   if err != nil {
+      t.Fatal(err)
+   }
+   for _, test := range key_tests {
+      url, err := test.url(home)
+      if err != nil {
+         t.Fatal(err)
+      }
+      log.Print(url)
+      kid, err := hex.DecodeString(test.kid_wv)
+      if err != nil {
+         t.Fatal(err)
+      }
+      UuidOrGuid(kid)
+      data, err = certificate.RequestBody(&signEncryptKey, kid)
+      if err != nil {
+         t.Fatal(err)
+      }
+      data, err = post(url, data)
+      if err != nil {
+         t.Fatal(err)
+      }
+      var license1 License
+      err = license1.Decrypt(&signEncryptKey, data)
+      if err != nil {
+         t.Fatal(err)
+      }
+      content := license1.ContentKey
+      UuidOrGuid(content.KeyId[:])
+      if hex.EncodeToString(content.KeyId[:]) != test.kid_wv {
+         t.Fatal(".KeyId")
+      }
+      if hex.EncodeToString(content.Key()) != test.key {
+         t.Fatal(".Key")
+      }
+   }
+}
+
+func post(url string, body []byte) ([]byte, error) {
+   resp, err := http.Post(url, "text/xml", bytes.NewReader(body))
+   if err != nil {
+      return nil, err
+   }
+   defer resp.Body.Close()
+   body, err = io.ReadAll(resp.Body)
+   if err != nil {
+      return nil, err
+   }
+   if resp.StatusCode != http.StatusOK {
+      return nil, errors.New(string(body))
+   }
+   return body, nil
+}
+
+func write_file(name string, data []byte) error {
+   log.Println("WriteFile", name)
+   return os.WriteFile(name, data, os.ModePerm)
+}
+
+var SL2000 = struct {
+   dir string
+   g1  string
+   z1  string
+}{
+   dir: "ignore/",
+   g1:  "g1",
+   z1:  "z1",
+}
 func TestLeaf(t *testing.T) {
    data, err := os.ReadFile(SL2000.dir + SL2000.g1)
    if err != nil {
@@ -27,10 +113,7 @@ func TestLeaf(t *testing.T) {
    }
    var z1 EcKey
    z1.Decode(data)
-   signEncryptKey, err := Fill('B').Key()
-   if err != nil {
-      t.Fatal(err)
-   }
+   signEncryptKey := Fill('B').Key()
    err = certificate.Leaf(&z1, signEncryptKey)
    if err != nil {
       t.Fatal(err)
@@ -91,90 +174,4 @@ var key_tests = []struct {
          return "https://test.playready.microsoft.com/service/rightsmanager.asmx?cfg=ck:AAAAAAAAAAAAAAAAAAAAAA==,ckt:aescbc", nil
       },
    },
-}
-func TestKey(t *testing.T) {
-   log.SetFlags(log.Ltime)
-   data, err := os.ReadFile(SL2000.dir + "certificate")
-   if err != nil {
-      t.Fatal(err)
-   }
-   var certificate Chain
-   err = certificate.Decode(data)
-   if err != nil {
-      t.Fatal(err)
-   }
-   data, err = os.ReadFile(SL2000.dir + "signEncryptKey")
-   if err != nil {
-      t.Fatal(err)
-   }
-   var signEncryptKey EcKey
-   signEncryptKey.Decode(data)
-   home, err := os.UserHomeDir()
-   if err != nil {
-      t.Fatal(err)
-   }
-   for _, test := range key_tests {
-      url, err := test.url(home)
-      if err != nil {
-         t.Fatal(err)
-      }
-      log.Print(url)
-      kid, err := hex.DecodeString(test.kid_wv)
-      if err != nil {
-         t.Fatal(err)
-      }
-      UuidOrGuid(kid)
-      data, err = certificate.RequestBody(signEncryptKey, kid)
-      if err != nil {
-         t.Fatal(err)
-      }
-      data, err = post(url, data)
-      if err != nil {
-         t.Fatal(err)
-      }
-      var license1 License
-      err = license1.Decrypt(signEncryptKey, data)
-      if err != nil {
-         t.Fatal(err)
-      }
-      content := license1.ContentKey
-      UuidOrGuid(content.KeyId[:])
-      if hex.EncodeToString(content.KeyId[:]) != test.kid_wv {
-         t.Fatal(".KeyId")
-      }
-      if hex.EncodeToString(content.Key()) != test.key {
-         t.Fatal(".Key")
-      }
-   }
-}
-
-func post(url string, body []byte) ([]byte, error) {
-   resp, err := http.Post(url, "text/xml", bytes.NewReader(body))
-   if err != nil {
-      return nil, err
-   }
-   defer resp.Body.Close()
-   body, err = io.ReadAll(resp.Body)
-   if err != nil {
-      return nil, err
-   }
-   if resp.StatusCode != http.StatusOK {
-      return nil, errors.New(string(body))
-   }
-   return body, nil
-}
-
-func write_file(name string, data []byte) error {
-   log.Println("WriteFile", name)
-   return os.WriteFile(name, data, os.ModePerm)
-}
-
-var SL2000 = struct {
-   dir string
-   g1  string
-   z1  string
-}{
-   dir: "ignore/",
-   g1:  "g1",
-   z1:  "z1",
 }

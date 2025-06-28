@@ -9,6 +9,34 @@ import (
    "github.com/emmansun/gmsm/cbcmac"
 )
 
+func (l *License) Decrypt(signEncrypt *EcKey, data []byte) error {
+   var envelope xml.EnvelopeResponse
+   err := envelope.Unmarshal(data)
+   if err != nil {
+      return err
+   }
+   data = envelope.
+      Body.
+      AcquireLicenseResponse.
+      AcquireLicenseResult.
+      Response.
+      LicenseResponse.
+      Licenses.
+      License
+   err = l.decode(data)
+   if err != nil {
+      return err
+   }
+   if !bytes.Equal(l.EccKey.Value, signEncrypt.public()) {
+      return errors.New("license response is not for this device")
+   }
+   err = l.ContentKey.decrypt(&signEncrypt[0], l.AuxKeys)
+   if err != nil {
+      return err
+   }
+   return l.verify(data)
+}
+
 type CertificateInfo struct {
    CertificateId [16]byte
    SecurityLevel uint32
@@ -302,32 +330,3 @@ func (c *CertificateInfo) New(securityLevel uint32, digest []byte) {
    c.InfoType = 2
    c.SecurityLevel = securityLevel
 }
-
-func (l *License) Decrypt(signEncrypt EcKey, data []byte) error {
-   var envelope xml.EnvelopeResponse
-   err := envelope.Unmarshal(data)
-   if err != nil {
-      return err
-   }
-   data = envelope.
-      Body.
-      AcquireLicenseResponse.
-      AcquireLicenseResult.
-      Response.
-      LicenseResponse.
-      Licenses.
-      License
-   err = l.decode(data)
-   if err != nil {
-      return err
-   }
-   if !bytes.Equal(l.EccKey.Value, signEncrypt.public()) {
-      return errors.New("license response is not for this device")
-   }
-   err = l.ContentKey.decrypt(signEncrypt[0], l.AuxKeys)
-   if err != nil {
-      return err
-   }
-   return l.verify(data)
-}
-
