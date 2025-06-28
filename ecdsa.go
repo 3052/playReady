@@ -31,7 +31,7 @@ func (x *xmlKey) aesKey() []byte {
 }
 
 // Private returns the private key bytes.
-func (e EcKey) Private() []byte {
+func (e *EcKey) Private() []byte {
    return e[0].D.Bytes()
 }
 
@@ -67,8 +67,6 @@ func (f Filler) Read(data []byte) (int, error) {
    return len(data), nil
 }
 
-///
-
 // they downgrade certs from the cert digest (hash of the signing key)
 func (e *EcKey) Fill(fill Filler) {
    var data [32]byte
@@ -76,11 +74,20 @@ func (e *EcKey) Fill(fill Filler) {
    e.Decode(data[:])
 }
 
+func elGamalKeyGeneration() *ecdsa.PublicKey {
+   data, _ := hex.DecodeString(wmrmPublicKey)
+   var key ecdsa.PublicKey
+   key.X = new(big.Int).SetBytes(data[:32])
+   key.Y = new(big.Int).SetBytes(data[32:])
+   return &key
+}
+
+///
+
 func (c *Certificate) verify(pubKey []byte) bool {
    if !bytes.Equal(c.Signature.IssuerKey, pubKey) {
       return false
    }
-   // Reconstruct the ECDSA public key from the byte slice.
    publicKey := ecdsa.PublicKey{
       Curve: elliptic.P256(), // Assuming P256 curve
       X:     new(big.Int).SetBytes(pubKey[:32]),
@@ -93,14 +100,6 @@ func (c *Certificate) verify(pubKey []byte) bool {
    r := new(big.Int).SetBytes(signature[:32])
    s := new(big.Int).SetBytes(signature[32:])
    return ecdsa.Verify(&publicKey, signatureDigest[:], r, s)
-}
-
-func elGamalKeyGeneration() *ecdsa.PublicKey {
-   data, _ := hex.DecodeString(wmrmPublicKey)
-   var key ecdsa.PublicKey
-   key.X = new(big.Int).SetBytes(data[:32])
-   key.Y = new(big.Int).SetBytes(data[32:])
-   return &key
 }
 
 func elGamalEncrypt(data, key *ecdsa.PublicKey) []byte {

@@ -6,20 +6,20 @@ import (
    "testing"
 )
 
-func Test1(t *testing.T) {
-   data, err := func1()
+func TestSign(t *testing.T) {
+   r, s, x, y, err := sign()
    if err != nil {
       t.Fatal(err)
    }
-   fmt.Printf("%x\n", data)
+   fmt.Println(verify(r, s, x, y))
 }
 
-func Test0(t *testing.T) {
+func TestPublic(t *testing.T) {
    data, err := hex.DecodeString(wmrmPublicKey)
    if err != nil {
       t.Fatal(err)
    }
-   x, y := func0(data)
+   x, y := public(data)
    fmt.Print(x, "\n", y, "\n")
 }
 
