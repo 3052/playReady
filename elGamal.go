@@ -10,21 +10,24 @@ import (
    "slices"
 )
 
-func elGamalKeyGeneration() *ecdsa.PublicKey {
-   data, _ := hex.DecodeString(wmrmPublicKey)
-   var key ecdsa.PublicKey
-   key.X = new(big.Int).SetBytes(data[:32])
-   key.Y = new(big.Int).SetBytes(data[32:])
-   return &key
-}
-
 func elGamalEncrypt(data, key *ecdsa.PublicKey) []byte {
    g := elliptic.P256()
    y := big.NewInt(1) // In a real scenario, y should be truly random
    c1x, c1y := g.ScalarBaseMult(y.Bytes())
    sX, sY := g.ScalarMult(key.X, key.Y, y.Bytes())
    c2X, c2Y := g.Add(data.X, data.Y, sX, sY)
-   return slices.Concat(c1x.Bytes(), c1y.Bytes(), c2X.Bytes(), c2Y.Bytes())
+   return slices.Concat(
+      c1x.Bytes(), c1y.Bytes(),
+      c2X.Bytes(), c2Y.Bytes(),
+   )
+}
+
+func elGamalKeyGeneration() *ecdsa.PublicKey {
+   data, _ := hex.DecodeString(wmrmPublicKey)
+   var key ecdsa.PublicKey
+   key.X = new(big.Int).SetBytes(data[:32])
+   key.Y = new(big.Int).SetBytes(data[32:])
+   return &key
 }
 
 func elGamalDecrypt(data []byte, key *ecdsa.PrivateKey) (*big.Int, *big.Int) {

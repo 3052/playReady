@@ -9,6 +9,24 @@ import (
    "math/big"
 )
 
+func (x *xmlKey) New() {
+   x.PublicKey.X, x.PublicKey.Y = elliptic.P256().ScalarBaseMult([]byte{1})
+   x.PublicKey.X.FillBytes(x.X[:])
+}
+
+func (x *xmlKey) aesIv() []byte {
+   return x.X[:16]
+}
+
+func (x *xmlKey) aesKey() []byte {
+   return x.X[16:]
+}
+
+type xmlKey struct {
+   PublicKey ecdsa.PublicKey
+   X         [32]byte
+}
+
 type ContentKey struct {
    KeyId      [16]byte
    KeyType    uint16
@@ -140,23 +158,6 @@ func (k *KeyInfo) size() int {
    return n
 }
 
-func (x *xmlKey) New() {
-   x.PublicKey.X, x.PublicKey.Y = elliptic.P256().ScalarBaseMult([]byte{1})
-   x.PublicKey.X.FillBytes(x.X[:])
-}
-
-func (x *xmlKey) aesIv() []byte {
-   return x.X[:16]
-}
-
-func (x *xmlKey) aesKey() []byte {
-   return x.X[16:]
-}
-
-type xmlKey struct {
-   PublicKey ecdsa.PublicKey
-   X         [32]byte
-}
 // Constants for object types within the certificate structure.
 const (
    objTypeBasic            = 0x0001
@@ -264,4 +265,3 @@ func (c *ContentKey) decode(data []byte) {
 func (c *ContentKey) integrity() []byte {
    return c.Value[:16]
 }
-
