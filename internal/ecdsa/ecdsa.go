@@ -15,8 +15,14 @@ func func1() ([]byte, error) {
    fill.Read(data[:])
    var public ecdsa.PublicKey
    public.Curve = elliptic.P256()
-   public.X, public.Y = public.Curve.ScalarBaseMult(data[:])
    var private ecdsa.PrivateKey
+   //////////////////////////////////////////////////////////////////////////////
+   // the following line is deprecated
+   // August 2025 we will have this
+   // pkg.go.dev/crypto/ecdsa@go1.25rc1#ParseRawPrivateKey
+   // but until then we need something else
+   public.X, public.Y = public.Curve.ScalarBaseMult(data[:])
+   //////////////////////////////////////////////////////////////////////////////
    private.D = new(big.Int).SetBytes(data[:])
    private.PublicKey = public
    r, s, err := ecdsa.Sign(fill, &private, data[:])

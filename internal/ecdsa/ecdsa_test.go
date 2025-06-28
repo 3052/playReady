@@ -7,10 +7,11 @@ import (
 )
 
 func Test1(t *testing.T) {
-   _, err := func1()
+   data, err := func1()
    if err != nil {
       t.Fatal(err)
    }
+   fmt.Printf("%x\n", data)
 }
 
 func Test0(t *testing.T) {

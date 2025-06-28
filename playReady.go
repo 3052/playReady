@@ -9,6 +9,16 @@ import (
    "github.com/emmansun/gmsm/cbcmac"
 )
 
+type CertificateInfo struct {
+   CertificateId [16]byte
+   SecurityLevel uint32
+   Flags         uint32
+   InfoType      uint32
+   Digest        [32]byte
+   Expiry        uint32
+   ClientId      [16]byte // Client ID (can be used for license binding)
+}
+
 func (l *License) verify(data []byte) error {
    signature := new(Ftlv).size() + l.Signature.size()
    data = data[:len(data)-signature]
@@ -282,16 +292,6 @@ func (c *CertificateInfo) decode(data []byte) {
    c.Expiry = binary.BigEndian.Uint32(data)
    data = data[4:]
    copy(c.ClientId[:], data)
-}
-
-type CertificateInfo struct {
-   CertificateId [16]byte
-   SecurityLevel uint32
-   Flags         uint32
-   InfoType      uint32
-   Digest        [32]byte
-   Expiry        uint32
-   ClientId      [16]byte // Client ID (can be used for license binding)
 }
 
 func (c *CertificateInfo) New(securityLevel uint32, digest []byte) {
