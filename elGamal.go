@@ -10,6 +10,16 @@ import (
    "slices"
 )
 
+const wmrmPublicKey = "C8B6AF16EE941AADAA5389B4AF2C10E356BE42AF175EF3FACE93254E7B0B3D9B982B27B5CB2341326E56AA857DBFD5C634CE2CF9EA74FCA8F2AF5957EFEEA562"
+
+func elGamalKeyGeneration() *ecdsa.PublicKey {
+   data, _ := hex.DecodeString(wmrmPublicKey)
+   var key ecdsa.PublicKey
+   key.X = new(big.Int).SetBytes(data[:32])
+   key.Y = new(big.Int).SetBytes(data[32:])
+   return &key
+}
+
 func elGamalEncrypt(data, key *ecdsa.PublicKey) []byte {
    g := elliptic.P256()
    y := big.NewInt(1) // In a real scenario, y should be truly random
@@ -20,14 +30,6 @@ func elGamalEncrypt(data, key *ecdsa.PublicKey) []byte {
       c1x.Bytes(), c1y.Bytes(),
       c2X.Bytes(), c2Y.Bytes(),
    )
-}
-
-func elGamalKeyGeneration() *ecdsa.PublicKey {
-   data, _ := hex.DecodeString(wmrmPublicKey)
-   var key ecdsa.PublicKey
-   key.X = new(big.Int).SetBytes(data[:32])
-   key.Y = new(big.Int).SetBytes(data[32:])
-   return &key
 }
 
 func elGamalDecrypt(data []byte, key *ecdsa.PrivateKey) (*big.Int, *big.Int) {

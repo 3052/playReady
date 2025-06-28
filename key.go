@@ -179,8 +179,6 @@ const (
    objTypeSecurityVersion2 = 0x0011
 )
 
-const wmrmPublicKey = "C8B6AF16EE941AADAA5389B4AF2C10E356BE42AF175EF3FACE93254E7B0B3D9B982B27B5CB2341326E56AA857DBFD5C634CE2CF9EA74FCA8F2AF5957EFEEA562"
-
 const magicConstantZero = "7ee9ed4af773224f00b8ea7efb027cbb"
 
 // xorKey performs XOR operation on two byte slices.
