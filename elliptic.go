@@ -2,13 +2,34 @@ package playReady
 
 import (
    "41.neocities.org/playReady/xml"
+   "bytes"
    "crypto/ecdsa"
    "crypto/elliptic"
+   "crypto/sha256"
    "encoding/hex"
    "errors"
    "math/big"
    "slices"
 )
+
+func (c *Certificate) verify(pubKey []byte) bool {
+   if !bytes.Equal(c.Signature.IssuerKey, pubKey) {
+      return false
+   }
+   // Reconstruct the ECDSA public key from the byte slice.
+   publicKey := ecdsa.PublicKey{
+      Curve: elliptic.P256(), // Assuming P256 curve
+      X:     new(big.Int).SetBytes(pubKey[:32]),
+      Y:     new(big.Int).SetBytes(pubKey[32:]),
+   }
+   data := c.Append(nil)
+   data = data[:c.LengthToSignature]
+   signatureDigest := sha256.Sum256(data)
+   signature := c.Signature.Signature
+   r := new(big.Int).SetBytes(signature[:32])
+   s := new(big.Int).SetBytes(signature[32:])
+   return ecdsa.Verify(&publicKey, signatureDigest[:], r, s)
+}
 
 const wmrmPublicKey = "C8B6AF16EE941AADAA5389B4AF2C10E356BE42AF175EF3FACE93254E7B0B3D9B982B27B5CB2341326E56AA857DBFD5C634CE2CF9EA74FCA8F2AF5957EFEEA562"
 

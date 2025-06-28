@@ -5,13 +5,10 @@ import (
    "bytes"
    "crypto/aes"
    "crypto/cipher"
-   "crypto/ecdsa"
-   "crypto/elliptic"
    "crypto/sha256"
    "encoding/binary"
    "errors"
    "github.com/emmansun/gmsm/padding"
-   "math/big"
    "slices"
 )
 
@@ -182,25 +179,6 @@ func (c *Certificate) size() (uint32, uint32) {
    n1 += new(Ftlv).size()
    n1 += c.Signature.size()
    return uint32(n), uint32(n1)
-}
-
-func (c *Certificate) verify(pubKey []byte) bool {
-   if !bytes.Equal(c.Signature.IssuerKey, pubKey) {
-      return false
-   }
-   // Reconstruct the ECDSA public key from the byte slice.
-   publicKey := ecdsa.PublicKey{
-      Curve: elliptic.P256(), // Assuming P256 curve
-      X:     new(big.Int).SetBytes(pubKey[:32]),
-      Y:     new(big.Int).SetBytes(pubKey[32:]),
-   }
-   data := c.Append(nil)
-   data = data[:c.LengthToSignature]
-   signatureDigest := sha256.Sum256(data)
-   signature := c.Signature.Signature
-   r := new(big.Int).SetBytes(signature[:32])
-   s := new(big.Int).SetBytes(signature[32:])
-   return ecdsa.Verify(&publicKey, signatureDigest[:], r, s)
 }
 
 func (c *Chain) verify() bool {
