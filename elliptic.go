@@ -12,6 +12,74 @@ import (
    "slices"
 )
 
+type EcKey [1]*ecdsa.PrivateKey
+
+type Fill byte
+
+func (f Fill) Read(data []byte) (int, error) {
+   for index := range data {
+      data[index] = byte(f)
+   }
+   return len(data), nil
+}
+
+func (e *EcKey) Decode(data []byte) {
+   var public ecdsa.PublicKey
+   public.Curve = elliptic.P256()
+   public.X, public.Y = public.Curve.ScalarBaseMult(data)
+   var private ecdsa.PrivateKey
+   private.D = new(big.Int).SetBytes(data)
+   private.PublicKey = public
+   e[0] = &private
+}
+
+func sign(key *ecdsa.PrivateKey, hash []byte) ([]byte, error) {
+   r, s, err := ecdsa.Sign(Fill('A'), key, hash)
+   if err != nil {
+      return nil, err
+   }
+   return append(r.Bytes(), s.Bytes()...), nil
+}
+
+type xmlKey struct {
+   PublicKey ecdsa.PublicKey
+   X         [32]byte
+}
+
+func (x *xmlKey) New() {
+   x.PublicKey.X, x.PublicKey.Y = elliptic.P256().ScalarBaseMult([]byte{1})
+   x.PublicKey.X.FillBytes(x.X[:])
+}
+
+func (x *xmlKey) aesIv() []byte {
+   return x.X[:16]
+}
+
+func (x *xmlKey) aesKey() []byte {
+   return x.X[16:]
+}
+
+// Private returns the private key bytes.
+func (e EcKey) Private() []byte {
+   return e[0].D.Bytes()
+}
+
+// PublicBytes returns the public key bytes.
+func (e *EcKey) public() []byte {
+   return append(e[0].PublicKey.X.Bytes(), e[0].PublicKey.Y.Bytes()...)
+}
+
+///
+
+// they downgrade certs from the cert digest (hash of the signing key)
+func (f Fill) Key() (*EcKey, error) {
+   key, err := ecdsa.GenerateKey(elliptic.P256(), f)
+   if err != nil {
+      return nil, err
+   }
+   return &EcKey{key}, nil
+}
+
 func (c *Certificate) verify(pubKey []byte) bool {
    if !bytes.Equal(c.Signature.IssuerKey, pubKey) {
       return false
@@ -30,8 +98,6 @@ func (c *Certificate) verify(pubKey []byte) bool {
    s := new(big.Int).SetBytes(signature[32:])
    return ecdsa.Verify(&publicKey, signatureDigest[:], r, s)
 }
-
-const wmrmPublicKey = "C8B6AF16EE941AADAA5389B4AF2C10E356BE42AF175EF3FACE93254E7B0B3D9B982B27B5CB2341326E56AA857DBFD5C634CE2CF9EA74FCA8F2AF5957EFEEA562"
 
 func elGamalKeyGeneration() *ecdsa.PublicKey {
    data, _ := hex.DecodeString(wmrmPublicKey)

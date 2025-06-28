@@ -4,7 +4,6 @@ import (
    "41.neocities.org/playReady/xml"
    "bytes"
    "crypto/aes"
-   "crypto/ecdsa"
    "encoding/binary"
    "errors"
    "github.com/emmansun/gmsm/cbcmac"
@@ -127,14 +126,6 @@ const (
    playbackUnknownContainerEntryType       xmrType = 65534
 )
 
-func sign(key *ecdsa.PrivateKey, hash []byte) ([]byte, error) {
-   r, s, err := ecdsa.Sign(Fill('A'), key, hash)
-   if err != nil {
-      return nil, err
-   }
-   return append(r.Bytes(), s.Bytes()...), nil
-}
-
 func UuidOrGuid(data []byte) {
    // Data1 (first 4 bytes) - swap endianness in place
    data[0], data[3] = data[3], data[0]
@@ -145,15 +136,6 @@ func UuidOrGuid(data []byte) {
    data[6], data[7] = data[7], data[6]
    // Data4 (last 8 bytes) - no change needed, so no operation here
 }
-
-func (f Fill) Read(data []byte) (int, error) {
-   for index := range data {
-      data[index] = byte(f)
-   }
-   return len(data), nil
-}
-
-type Fill byte
 
 func (l *License) decode(data []byte) error {
    n := copy(l.Magic[:], data)

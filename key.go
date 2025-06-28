@@ -2,30 +2,11 @@ package playReady
 
 import (
    "crypto/aes"
-   "crypto/ecdsa"
-   "crypto/elliptic"
    "encoding/binary"
    "github.com/emmansun/gmsm/cipher"
-   "math/big"
 )
 
-func (x *xmlKey) New() {
-   x.PublicKey.X, x.PublicKey.Y = elliptic.P256().ScalarBaseMult([]byte{1})
-   x.PublicKey.X.FillBytes(x.X[:])
-}
-
-func (x *xmlKey) aesIv() []byte {
-   return x.X[:16]
-}
-
-func (x *xmlKey) aesKey() []byte {
-   return x.X[16:]
-}
-
-type xmlKey struct {
-   PublicKey ecdsa.PublicKey
-   X         [32]byte
-}
+const wmrmPublicKey = "C8B6AF16EE941AADAA5389B4AF2C10E356BE42AF175EF3FACE93254E7B0B3D9B982B27B5CB2341326E56AA857DBFD5C634CE2CF9EA74FCA8F2AF5957EFEEA562"
 
 type ContentKey struct {
    KeyId      [16]byte
@@ -33,28 +14,6 @@ type ContentKey struct {
    CipherType uint16
    Length     uint16
    Value      []byte
-}
-
-type EcKey [1]*ecdsa.PrivateKey
-
-func (e *EcKey) Decode(data []byte) {
-   var public ecdsa.PublicKey
-   public.Curve = elliptic.P256()
-   public.X, public.Y = public.Curve.ScalarBaseMult(data)
-   var private ecdsa.PrivateKey
-   private.D = new(big.Int).SetBytes(data)
-   private.PublicKey = public
-   e[0] = &private
-}
-
-// Private returns the private key bytes.
-func (e EcKey) Private() []byte {
-   return e[0].D.Bytes()
-}
-
-// PublicBytes returns the public key bytes.
-func (e *EcKey) public() []byte {
-   return append(e[0].PublicKey.X.Bytes(), e[0].PublicKey.Y.Bytes()...)
 }
 
 func (e *EccKey) decode(data []byte) {
@@ -69,15 +28,6 @@ type EccKey struct {
    Curve  uint16
    Length uint16
    Value  []byte
-}
-
-// they downgrade certs from the cert digest (hash of the signing key)
-func (f Fill) Key() (*EcKey, error) {
-   key, err := ecdsa.GenerateKey(elliptic.P256(), f)
-   if err != nil {
-      return nil, err
-   }
-   return &EcKey{key}, nil
 }
 
 func (k *KeyData) decode(data []byte) int {
