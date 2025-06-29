@@ -162,14 +162,6 @@ func (c *ContentKey) scalable(key *big.Int, aux *AuxKeys) error {
    return nil
 }
 
-func sign(key *ecdsa.PrivateKey, hash []byte) ([]byte, error) {
-   r, s, err := ecdsa.Sign(Filler('A'), key, hash)
-   if err != nil {
-      return nil, err
-   }
-   return append(r.Bytes(), s.Bytes()...), nil
-}
-
 func (c *Certificate) verify(pubKey []byte) bool {
    if !bytes.Equal(c.Signature.IssuerKey, pubKey) {
       return false
@@ -192,6 +184,14 @@ func (x *xmlKey) New() {
    param := elliptic.P256().Params()
    x.X, x.Y = param.Gx, param.Gy
    x.X.FillBytes(x.RawX[:])
+}
+
+func sign(key *ecdsa.PrivateKey, hash []byte) ([]byte, error) {
+   r, s, err := ecdsa.Sign(Filler('A'), key, hash)
+   if err != nil {
+      return nil, err
+   }
+   return append(r.Bytes(), s.Bytes()...), nil
 }
 
 func (e *EcKey) Decode(data []byte) {
