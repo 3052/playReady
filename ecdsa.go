@@ -2,15 +2,21 @@ package playReady
 
 import (
    "41.neocities.org/playReady/xml"
-   //"bytes"
    "crypto/ecdsa"
    "crypto/elliptic"
-   //"crypto/sha256"
+   "crypto/sha256"
    "encoding/hex"
    "errors"
    "math/big"
    "slices"
+   "github.com/starkbank/ecdsa-go/v2/ellipticcurve/privatekey"
+   ecdsa2 "github.com/starkbank/ecdsa-go/v2/ellipticcurve/ecdsa"
 )
+
+func Sign2(key *privatekey.PrivateKey, hash []byte) ([]byte, error) {
+   data := ecdsa2.Sign(string(hash), key)
+   return append(data.R.Bytes(), data.S.Bytes()...), nil
+}
 
 func sign(key *ecdsa.PrivateKey, hash []byte) ([]byte, error) {
    r, s, err := ecdsa.Sign(Filler('A'), key, hash)
@@ -18,6 +24,59 @@ func sign(key *ecdsa.PrivateKey, hash []byte) ([]byte, error) {
       return nil, err
    }
    return append(r.Bytes(), s.Bytes()...), nil
+}
+
+func (c *Chain) RequestBody(
+   signEncrypt *ecdsa.PrivateKey,
+   signEncrypt2 *privatekey.PrivateKey,
+   kid []byte,
+) ([]byte, error) {
+   var key xmlKey
+   key.New()
+   cipherData, err := c.cipherData(&key)
+   if err != nil {
+      return nil, err
+   }
+   la := newLa(&key, cipherData, kid)
+   laData, err := la.Marshal()
+   if err != nil {
+      return nil, err
+   }
+   laDigest := sha256.Sum256(laData)
+   signedInfo := xml.SignedInfo{
+      XmlNs: "http://www.w3.org/2000/09/xmldsig#",
+      Reference: xml.Reference{
+         Uri:         "#SignedData",
+         DigestValue: laDigest[:],
+      },
+   }
+   signedData, err := signedInfo.Marshal()
+   if err != nil {
+      return nil, err
+   }
+   signature, err := Sign2(signEncrypt2, signedData)
+   if err != nil {
+      return nil, err
+   }
+   envelope := xml.Envelope{
+      Soap: "http://schemas.xmlsoap.org/soap/envelope/",
+      Body: xml.Body{
+         AcquireLicense: &xml.AcquireLicense{
+            XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols",
+            Challenge: xml.Challenge{
+               Challenge: xml.InnerChallenge{
+                  XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols/messages",
+                  La:    la,
+                  Signature: xml.Signature{
+                     SignedInfo:     signedInfo,
+                     SignatureValue: signature,
+                  },
+               },
+            },
+         },
+      },
+   }
+   return envelope.Marshal()
 }
 
 // they downgrade certs from the cert digest (hash of the signing key)

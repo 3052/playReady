@@ -12,6 +12,21 @@ import (
    "math/big"
 )
 
+func sign() (r, s, x, y *big.Int) {
+   var (
+      fill filler = '!'
+      secret [32]byte
+   )
+   fill.Read(secret[:])
+   var private privatekey.PrivateKey
+   private.Curve = curve.Prime256v1
+   private.Secret = new(big.Int).SetBytes(secret[:])
+   hash := sha256.Sum256([]byte("hello world"))
+   sig := ecdsa.Sign(string(hash[:]), &private)
+   public := private.PublicKey()
+   return &sig.R, &sig.S, public.Point.X, public.Point.Y
+}
+
 func encrypt(m, h *publickey.PublicKey) (c1, c2 *point.Point) {
    // generator g
    g := curve.Prime256v1
@@ -39,21 +54,6 @@ func verify(r, s, x, y *big.Int) bool {
          },
       },
    )
-}
-
-func sign() (r, s, x, y *big.Int) {
-   var (
-      fill filler = '!'
-      secret [32]byte
-   )
-   fill.Read(secret[:])
-   var private privatekey.PrivateKey
-   private.Curve = curve.Prime256v1
-   private.Secret = new(big.Int).SetBytes(secret[:])
-   hash := sha256.Sum256([]byte("hello world"))
-   sig := ecdsa.Sign(string(hash[:]), &private)
-   public := private.PublicKey()
-   return &sig.R, &sig.S, public.Point.X, public.Point.Y
 }
 
 type filler byte

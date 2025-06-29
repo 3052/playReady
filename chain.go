@@ -5,81 +5,20 @@ import (
    "bytes"
    "crypto/aes"
    "crypto/cipher"
-   "crypto/ecdsa"
    "crypto/sha256"
    "encoding/binary"
    "errors"
    "github.com/emmansun/gmsm/padding"
    "github.com/starkbank/ecdsa-go/v2/ellipticcurve/point"
+   "github.com/starkbank/ecdsa-go/v2/ellipticcurve/privatekey"
    "slices"
 )
 
-func (c *Chain) RequestBody(
-   signEncrypt *ecdsa.PrivateKey,
-   kid []byte,
-) ([]byte, error) {
-   var key xmlKey
-   key.New()
-   cipherData, err := c.cipherData(&key)
-   if err != nil {
-      return nil, err
-   }
-   la := newLa(&key, cipherData, kid)
-   laData, err := la.Marshal()
-   if err != nil {
-      return nil, err
-   }
-   laDigest := sha256.Sum256(laData)
-   signedInfo := xml.SignedInfo{
-      XmlNs: "http://www.w3.org/2000/09/xmldsig#",
-      Reference: xml.Reference{
-         Uri:         "#SignedData",
-         DigestValue: laDigest[:],
-      },
-   }
-   signedData, err := signedInfo.Marshal()
-   if err != nil {
-      return nil, err
-   }
-   signedDigest := sha256.Sum256(signedData)
-   signature, err := sign(signEncrypt, signedDigest[:])
-   if err != nil {
-      return nil, err
-   }
-   envelope := xml.Envelope{
-      Soap: "http://schemas.xmlsoap.org/soap/envelope/",
-      Body: xml.Body{
-         AcquireLicense: &xml.AcquireLicense{
-            XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols",
-            Challenge: xml.Challenge{
-               Challenge: xml.InnerChallenge{
-                  XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols/messages",
-                  La:    la,
-                  Signature: xml.Signature{
-                     SignedInfo:     signedInfo,
-                     SignatureValue: signature,
-                  },
-               },
-            },
-         },
-      },
-   }
-   return envelope.Marshal()
-}
-
-func (c *Chain) verify() bool {
-   //modelBase := c.Certificates[c.CertCount-1].Signature.IssuerKey
-   for i := len(c.Certificates) - 1; i >= 0; i-- {
-      //valid := c.Certificates[i].verify(modelBase[:])
-      //if !valid {
-      //   return false
-      //}
-      //modelBase = c.Certificates[i].KeyInfo.Keys[0].PublicKey[:]
-   }
-   return true
-}
-
-func (c *Chain) Leaf(modelKey *EcKey, signEncryptKey *point.Point) error {
+func (c *Chain) Leaf(
+   modelKey *EcKey,
+   modelKey2 *privatekey.PrivateKey,
+   signEncryptKey *point.Point,
+) error {
    if !bytes.Equal(
       c.Certificates[0].KeyInfo.Keys[0].PublicKey[:], modelKey.public(),
    ) {
@@ -125,6 +64,18 @@ func (c *Chain) Leaf(modelKey *EcKey, signEncryptKey *point.Point) error {
    c.Certificates = slices.Insert(c.Certificates, 0, cert)
    c.Length += cert.Length
    return nil
+}
+
+func (c *Chain) verify() bool {
+   //modelBase := c.Certificates[c.CertCount-1].Signature.IssuerKey
+   for i := len(c.Certificates) - 1; i >= 0; i-- {
+      //valid := c.Certificates[i].verify(modelBase[:])
+      //if !valid {
+      //   return false
+      //}
+      //modelBase = c.Certificates[i].KeyInfo.Keys[0].PublicKey[:]
+   }
+   return true
 }
 
 func (c *Chain) cipherData(key *xmlKey) ([]byte, error) {
