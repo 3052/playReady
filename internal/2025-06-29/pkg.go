@@ -137,90 +137,55 @@ var Pkg = []struct {
       note: "PASS github.com/starkbank/ecdsa-go/blob/master/go.mod",
       url: "pkg.go.dev/github.com/starkbank/ecdsa-go/v2/ellipticcurve/ecdsa",
    },
+   {
+      note: "github.com/sodiumlabs/tss-lib",
+      url: "pkg.go.dev/github.com/sodiumlabs/tss-lib",
+   },
+   {
+      note: "weird",
+      url: "pkg.go.dev/github.com/zeta-chain/tss-lib/ecdsa/signing",
+   },
+   {
+      note: "weird",
+      url: "pkg.go.dev/github.com/ordinox/thorchain-tss-lib/ecdsa/signing",
+   },
+   {
+      note: "github.com/xuperchain/crypto/blob/master/go.sum",
+      url: "pkg.go.dev/github.com/xuperchain/crypto",
+   },
+   {
+      note: "gitlab.com/thorchain/tss/tss-lib/-/blob/master/go.sum",
+      url: "pkg.go.dev/gitlab.com/thorchain/tss/tss-lib/ecdsa/signing",
+   },
+   {
+      note: "fucking stupid",
+      url: "pkg.go.dev/github.com/tink-crypto/tink-go/v2/signature/ecdsa",
+   },
+   {
+      note: "secp256k1 only",
+      url: "pkg.go.dev/github.com/multicash/mcxd/mcxec",
+   },
+   {
+      note: "secp256k1 only",
+      url: "pkg.go.dev/github.com/Decred-Next/dcrnd/dcrec",
+   },
+   {
+      note: "github.com/AVecsi/pq-gabi/blob/master/go.sum",
+      url: "pkg.go.dev/github.com/AVecsi/pq-gabi/signed",
+   },
+   {
+      note: "github.com/libp2p/go-libp2p/blob/master/go.sum",
+      url: "pkg.go.dev/github.com/libp2p/go-libp2p/core/crypto",
+   },
+   {
+      note: "uses crypto/ecdsa",
+      url: "pkg.go.dev/github.com/libs4go/crypto/ecdsa",
+   },
+   {
+      note: "github.com/Layr-Labs/eigensdk-go/blob/dev/go.sum",
+      url: "pkg.go.dev/github.com/Layr-Labs/eigensdk-go/crypto/ecdsa",
+   },
    /*
-   signing (github.com/sodiumlabs/tss-lib/ecdsa/signing)
-   Imported by 7
-   | v0.0.0-...-80b9cc1 published on Mar 19, 2023 | MIT
-   Other packages in module github.com/sodiumlabs/tss-lib:
-   ecdsa/keygen
-
-   keygen (github.com/zeta-chain/tss-lib/ecdsa/keygen)
-   Imported by 7
-   | v0.1.7 published on Oct 27, 2023 | MIT
-   Other packages in module github.com/zeta-chain/tss-lib:
-   ecdsa/signing
-
-   keygen (github.com/ordinox/thorchain-tss-lib/ecdsa/keygen)
-   Imported by 7
-   | v0.0.0-...-f2ec0f2 published on Jun 16, 2024 | MIT
-   Other packages in module github.com/ordinox/thorchain-tss-lib:
-   ecdsa/signing
-
-   sign (github.com/xuperchain/crypto/core/sign)
-   Package ecdsa implements the Elliptic Curve Digital Signature Algorithm, as defined in FIPS 186-3.
-   Imported by 7
-   | v0.0.0-...-ea90456 published on Jul 28, 2023 | Apache-2.0
-   Other packages in module github.com/xuperchain/crypto:
-   gm/sign
-
-   keygen (gitlab.com/thorchain/tss/tss-lib/ecdsa/keygen)
-   Imported by 7
-   | v0.2.0 published on Feb 8, 2024 | MIT
-   Other packages in module gitlab.com/thorchain/tss/tss-lib:
-   ecdsa/signing
-
-   ecdsa_go_proto (github.com/tink-crypto/tink-go/v2/proto/ecdsa_go_proto)
-   Imported by 6
-   | v2.4.0 published on Apr 2, 2025 | Apache-2.0
-   Other packages in module github.com/tink-crypto/tink-go/v2:
-   signature/ecdsa
-   proto/jwt_ecdsa_go_proto
-
-   ecdsa (github.com/multicash/mcxd/mcxec/secp256k1/v4/ecdsa)
-   Package ecdsa provides secp256k1-optimized ECDSA signing and verification.
-   Imported by 2
-   | v4.0.0-...-14ed8ac published on Feb 25, 2021 | ISC
-
-   ecdsa (github.com/Decred-Next/dcrnd/dcrec/secp256k1/version3/v8/ecdsa)
-   Package ecdsa provides secp256k1-optimized ECDSA signing and verification.
-   Imported by 2
-   | v8.0.12 published on Jun 27, 2022 | ISC
-
-   jwtkey (github.com/stellar/go/exp/support/jwtkey)
-   Package jwtkey provides utility functions for generating, serializing and deserializing JWT ECDSA keys.
-   Imported by 5
-   | v0.0.0-...-032c5f9 published on 1 day ago | Apache-2.0
-
-   ecdsa_go_proto (github.com/google/tink/go/proto/ecdsa_go_proto)
-   Imported by 5
-   | v1.7.0 published on Aug 10, 2022 | Apache-2.0
-
-   signed (github.com/AVecsi/pq-gabi/signed)
-   Package signed contains (1) convenience functions for ECDSA private and public key handling, and for signing and verifying byte slices with ECDSA; (2) functions for marshaling structs to signed bytes, and verifying and unmarshaling signed bytes back to structs.
-   Imported by 2
-   | v0.0.0-...-fc34f82 published on Jun 16, 2025 | BSD-3-Clause
-
-   set_ecdsa (github.com/theupdateframework/go-tuf/pkg/deprecated/set_ecdsa)
-   Imported by 4
-   | v0.7.0 published on Nov 28, 2023 | BSD-3-Clause
-
-   ecdsa (github.com/OffchainLabs/prysm/v6/crypto/ecdsa)
-   Imported by 4
-   | v6.0.4 published on Jun 2, 2025 | GPL-3.0
-
-   certsetup (github.com/wostzone/hubserve-go/pkg/certsetup)
-   Package certsetup with server side creation of self signed certificate chain using ECDSA Credits: https://gist.github.com/shaneutt/5e1995295cff6721c89a71d13a71c251 keys
-   Imported by 4
-   | v0.0.0-...-4ab42d6 published on Nov 7, 2021 | MIT
-
-   ecdsa (github.com/libs4go/crypto/ecdsa)
-   Imported by 4
-   | v0.0.1 published on Sep 9, 2021 | MIT
-
-   ecdsa (github.com/Layr-Labs/eigensdk-go/crypto/ecdsa)
-   Imported by 39
-   | v0.3.0 published on Mar 19, 2025 | UNKNOWN
-
    ecdsa (github.com/rohautl/go-crypto/openpgp/ecdsa)
    Package ecdsa implements ECDSA signature, suitable for OpenPGP, as specified in RFC 6637, section 5.
    Imported by 1
