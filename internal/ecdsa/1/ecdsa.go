@@ -12,6 +12,20 @@ import (
    "math/big"
 )
 
+func encrypt(m, h *publickey.PublicKey) (c1, c2 *point.Point) {
+   // generator g
+   g := curve.Prime256v1
+   // choose an integer y
+   y := big.NewInt(1)
+   // compute s = h * y
+   s := math.Multiply(h.Point, y, h.Curve.N, h.Curve.A, h.Curve.P)
+   // compute c1 = g * y
+   c1v := math.Multiply(g.G, y, g.N, g.A, g.P)
+   // compute c2 = m + s
+   c2v := math.Add(m.Point, s, g.A, g.P)
+   return &c1v, &c2v
+}
+
 func sign() (r, s, x, y *big.Int) {
    var (
       fill filler = '!'
@@ -25,20 +39,6 @@ func sign() (r, s, x, y *big.Int) {
    sig := ecdsa.Sign(string(hash[:]), &private)
    public := private.PublicKey()
    return &sig.R, &sig.S, public.Point.X, public.Point.Y
-}
-
-func encrypt(m, h *publickey.PublicKey) (c1, c2 *point.Point) {
-   // generator g
-   g := curve.Prime256v1
-   // choose an integer y
-   y := big.NewInt(1)
-   // compute s = h * y
-   s := math.Multiply(h.Point, y, h.Curve.N, h.Curve.A, h.Curve.P)
-   // compute c1 = g * y
-   c1v := math.Multiply(g.G, y, g.N, g.A, g.P)
-   // compute c2 = m + s
-   c2v := math.Add(m.Point, s, g.A, g.P)
-   return &c1v, &c2v
 }
 
 func verify(r, s, x, y *big.Int) bool {

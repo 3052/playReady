@@ -2,15 +2,37 @@ package playReady
 
 import (
    "41.neocities.org/playReady/xml"
-   "crypto/elliptic"
    "crypto/sha256"
    "encoding/hex"
    "errors"
+   "github.com/starkbank/ecdsa-go/v2/ellipticcurve/curve"
+   "github.com/starkbank/ecdsa-go/v2/ellipticcurve/ecdsa"
+   "github.com/starkbank/ecdsa-go/v2/ellipticcurve/math"
+   "github.com/starkbank/ecdsa-go/v2/ellipticcurve/point"
+   "github.com/starkbank/ecdsa-go/v2/ellipticcurve/privatekey"
    "math/big"
    "slices"
-   "github.com/starkbank/ecdsa-go/v2/ellipticcurve/privatekey"
-   "github.com/starkbank/ecdsa-go/v2/ellipticcurve/ecdsa"
 )
+
+func elGamalDecrypt(data []byte, key *big.Int) (*big.Int, *big.Int) {
+   // Unmarshal C1 component
+   c1X := new(big.Int).SetBytes(data[:32])
+   c1Y := new(big.Int).SetBytes(data[32:64])
+   C1 := point.Point{X: c1X, Y: c1Y}
+   // Unmarshal C2 component
+   c2X := new(big.Int).SetBytes(data[64:96])
+   c2Y := new(big.Int).SetBytes(data[96:])
+   C2 := point.Point{X: c2X, Y: c2Y}
+   g1 := curve.Prime256v1
+   // Calculate shared secret s = C1^x
+   S := math.Multiply(C1, key, g1.N, g1.A, g1.P)
+   // Invert the point for subtraction
+   S.Y.Neg(S.Y)
+   S.Y.Mod(S.Y, g1.P)
+   // Recover message point: M = C2 - s
+   M := math.Add(C2, S, g1.A, g1.P)
+   return M.X, M.Y
+}
 
 //func (c *Certificate) verify(pubKey []byte) bool {
 //   if !bytes.Equal(c.Signature.IssuerKey, pubKey) {
@@ -30,7 +52,33 @@ import (
 //   return ecdsa.Verify(&publicKey, signatureDigest[:], r, s)
 //}
 
+func elGamalEncrypt(data, key *xmlKey) []byte {
+   g := curve.Prime256v1
+   m := point.Point{X: data.X, Y: data.Y}
+   s := point.Point{X: key.X, Y: key.Y}
+   C2 := math.Add(m, s, g.A, g.P)
+   return slices.Concat(
+      g.G.X.Bytes(),
+      g.G.Y.Bytes(),
+      C2.X.Bytes(),
+      C2.Y.Bytes(),
+   )
+}
+
+func (x *xmlKey) New() {
+   point := curve.Prime256v1.G
+   x.X, x.Y = point.X, point.Y
+   x.X.FillBytes(x.RawX[:])
+}
+
+type xmlKey struct {
+   X *big.Int
+   Y *big.Int
+   RawX [32]byte
+}
+
 func Sign2(key *privatekey.PrivateKey, hash []byte) ([]byte, error) {
+   // SIGN DOES SHA-256 ITSELF
    data := ecdsa.Sign(string(hash), key)
    return append(data.R.Bytes(), data.S.Bytes()...), nil
 }
@@ -151,12 +199,6 @@ func (f Filler) Read(data []byte) (int, error) {
    return len(data), nil
 }
 
-type xmlKey struct {
-   X *big.Int
-   Y *big.Int
-   RawX [32]byte
-}
-
 func (x *xmlKey) aesIv() []byte {
    return x.RawX[:16]
 }
@@ -216,36 +258,4 @@ func (c *ContentKey) scalable(key *big.Int, aux *AuxKeys) error {
       return err
    }
    return nil
-}
-
-func (x *xmlKey) New() {
-   param := elliptic.P256().Params()
-   x.X, x.Y = param.Gx, param.Gy
-   x.X.FillBytes(x.RawX[:])
-}
-
-func elGamalDecrypt(data []byte, key *big.Int) (*big.Int, *big.Int) {
-   curve := elliptic.P256()
-   // Unmarshal C1 component
-   c1X := new(big.Int).SetBytes(data[:32])
-   c1Y := new(big.Int).SetBytes(data[32:64])
-   // Unmarshal C2 component
-   c2X := new(big.Int).SetBytes(data[64:96])
-   c2Y := new(big.Int).SetBytes(data[96:])
-   // Calculate shared secret s = C1^x
-   sX, sY := curve.ScalarMult(c1X, c1Y, key.Bytes())
-   // Invert the point for subtraction
-   sY.Neg(sY)
-   sY.Mod(sY, curve.Params().P)
-   // Recover message point: M = C2 - s
-   return curve.Add(c2X, c2Y, sX, sY)
-}
-
-func elGamalEncrypt(data, key *xmlKey) []byte {
-   curve := elliptic.P256()
-   param := curve.Params()
-   c2X, c2Y := curve.Add(data.X, data.Y, key.X, key.Y)
-   return slices.Concat(
-      param.Gx.Bytes(), param.Gy.Bytes(), c2X.Bytes(), c2Y.Bytes(),
-   )
 }
