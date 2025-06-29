@@ -8,12 +8,6 @@ import (
    "math/big"
 )
 
-type xmlKey struct {
-   X *big.Int
-   Y *big.Int
-   RawX [32]byte
-}
-
 func newLa(m *xmlKey, cipherData, kid []byte) *xml.La {
    return &xml.La{
       XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/protocols",
@@ -61,12 +55,58 @@ func newLa(m *xmlKey, cipherData, kid []byte) *xml.La {
    }
 }
 
-func elGamalKeyGeneration() *xmlKey {
-   data, _ := hex.DecodeString(wmrmPublicKey)
-   var key xmlKey
-   key.X = new(big.Int).SetBytes(data[:32])
-   key.Y = new(big.Int).SetBytes(data[32:])
-   return &key
+func (a *AuxKey) decode(data []byte) int {
+   a.Location = binary.BigEndian.Uint32(data)
+   n := 4
+   n += copy(a.Key[:], data[n:])
+   return n
+}
+
+type AuxKey struct {
+   Location uint32
+   Key      [16]byte
+}
+
+func (a *AuxKeys) decode(data []byte) {
+   a.Count = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   a.Keys = make([]AuxKey, a.Count)
+   for i := range a.Count {
+      var key AuxKey
+      n := key.decode(data)
+      a.Keys[i] = key
+      data = data[n:]
+   }
+}
+
+type AuxKeys struct {
+   Count uint16
+   Keys  []AuxKey
+}
+
+func (c *CertificateInfo) decode(data []byte) {
+   n := copy(c.CertificateId[:], data)
+   data = data[n:]
+   c.SecurityLevel = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   c.Flags = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   c.InfoType = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   n = copy(c.Digest[:], data)
+   data = data[n:]
+   c.Expiry = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   copy(c.ClientId[:], data)
+}
+
+func (c *CertificateInfo) New(securityLevel uint32, digest []byte) {
+   copy(c.Digest[:], digest)
+   // required, Max uint32, effectively never expires
+   c.Expiry = 4294967295
+   // required
+   c.InfoType = 2
+   c.SecurityLevel = securityLevel
 }
 
 type Filler byte
@@ -77,6 +117,55 @@ func (f Filler) Read(data []byte) (int, error) {
    }
    return len(data), nil
 }
+
+func (f *Ftlv) decode(data []byte) (int, error) {
+   f.Flag = binary.BigEndian.Uint16(data)
+   n := 2
+   f.Type = binary.BigEndian.Uint16(data[n:])
+   n += 2
+   f.Length = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   f.Value = data[n:f.Length]
+   n += len(f.Value)
+   return n, nil
+}
+
+type Ftlv struct {
+   Flag   uint16 // this can be 0 or 1
+   Type   uint16
+   Length uint32
+   Value  []byte
+}
+
+func (l *LicenseSignature) decode(data []byte) {
+   l.Type = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   l.Length = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   l.Data = data
+}
+
+type LicenseSignature struct {
+   Type   uint16
+   Length uint16
+   Data   []byte
+}
+
+type xmlKey struct {
+   X *big.Int
+   Y *big.Int
+   RawX [32]byte
+}
+
+func elGamalKeyGeneration() *xmlKey {
+   data, _ := hex.DecodeString(wmrmPublicKey)
+   var key xmlKey
+   key.X = new(big.Int).SetBytes(data[:32])
+   key.Y = new(big.Int).SetBytes(data[32:])
+   return &key
+}
+
+///
 
 func (x *xmlKey) aesIv() []byte {
    return x.RawX[:16]
@@ -757,91 +846,4 @@ type License struct {
    EccKey     *EccKey           // 4.9.42
    AuxKeys    *AuxKeys          // 4.9.81
    Signature  *LicenseSignature // 4.11
-}
-
-func (f *Ftlv) decode(data []byte) (int, error) {
-   f.Flag = binary.BigEndian.Uint16(data)
-   n := 2
-   f.Type = binary.BigEndian.Uint16(data[n:])
-   n += 2
-   f.Length = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   f.Value = data[n:f.Length]
-   n += len(f.Value)
-   return n, nil
-}
-
-type Ftlv struct {
-   Flag   uint16 // this can be 0 or 1
-   Type   uint16
-   Length uint32
-   Value  []byte
-}
-
-func (a *AuxKeys) decode(data []byte) {
-   a.Count = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   a.Keys = make([]AuxKey, a.Count)
-   for i := range a.Count {
-      var key AuxKey
-      n := key.decode(data)
-      a.Keys[i] = key
-      data = data[n:]
-   }
-}
-
-type AuxKeys struct {
-   Count uint16
-   Keys  []AuxKey
-}
-
-func (a *AuxKey) decode(data []byte) int {
-   a.Location = binary.BigEndian.Uint32(data)
-   n := 4
-   n += copy(a.Key[:], data[n:])
-   return n
-}
-
-type AuxKey struct {
-   Location uint32
-   Key      [16]byte
-}
-
-func (l *LicenseSignature) decode(data []byte) {
-   l.Type = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   l.Length = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   l.Data = data
-}
-
-type LicenseSignature struct {
-   Type   uint16
-   Length uint16
-   Data   []byte
-}
-
-func (c *CertificateInfo) decode(data []byte) {
-   n := copy(c.CertificateId[:], data)
-   data = data[n:]
-   c.SecurityLevel = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   c.Flags = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   c.InfoType = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   n = copy(c.Digest[:], data)
-   data = data[n:]
-   c.Expiry = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   copy(c.ClientId[:], data)
-}
-
-func (c *CertificateInfo) New(securityLevel uint32, digest []byte) {
-   copy(c.Digest[:], digest)
-   // required, Max uint32, effectively never expires
-   c.Expiry = 4294967295
-   // required
-   c.InfoType = 2
-   c.SecurityLevel = securityLevel
 }

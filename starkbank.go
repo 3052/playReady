@@ -16,16 +16,6 @@ import (
    "slices"
 )
 
-func elGamalEncrypt(data, key *xmlKey) []byte {
-   g := curve.Prime256v1
-   m := point.Point{X: data.X, Y: data.Y}
-   s := point.Point{X: key.X, Y: key.Y}
-   C2 := math.Add(m, s, g.A, g.P)
-   return slices.Concat(
-      g.G.X.Bytes(), g.G.Y.Bytes(), C2.X.Bytes(), C2.Y.Bytes(),
-   )
-}
-
 func (c *Certificate) verify(pubKey []byte) bool {
    if !bytes.Equal(c.Signature.IssuerKey, pubKey) {
       return false
@@ -42,10 +32,27 @@ func (c *Certificate) verify(pubKey []byte) bool {
    sign := c.Signature.Signature
    r := new(big.Int).SetBytes(sign[:32])
    s := new(big.Int).SetBytes(sign[32:])
+   // VERIFY DOES SHA-256 ITSELF
    return ecdsa.Verify(
       string(message),
       signature.Signature{R: *r, S: *s},
       &publicKey,
+   )
+}
+
+func Sign2(key *privatekey.PrivateKey, hash []byte) ([]byte, error) {
+   // SIGN DOES SHA-256 ITSELF
+   data := ecdsa.Sign(string(hash), key)
+   return append(data.R.Bytes(), data.S.Bytes()...), nil
+}
+
+func elGamalEncrypt(data, key *xmlKey) []byte {
+   g := curve.Prime256v1
+   m := point.Point{X: data.X, Y: data.Y}
+   s := point.Point{X: key.X, Y: key.Y}
+   C2 := math.Add(m, s, g.A, g.P)
+   return slices.Concat(
+      g.G.X.Bytes(), g.G.Y.Bytes(), C2.X.Bytes(), C2.Y.Bytes(),
    )
 }
 
@@ -73,12 +80,6 @@ func (x *xmlKey) New() {
    point := curve.Prime256v1.G
    x.X, x.Y = point.X, point.Y
    x.X.FillBytes(x.RawX[:])
-}
-
-func Sign2(key *privatekey.PrivateKey, hash []byte) ([]byte, error) {
-   // SIGN DOES SHA-256 ITSELF
-   data := ecdsa.Sign(string(hash), key)
-   return append(data.R.Bytes(), data.S.Bytes()...), nil
 }
 
 func (c *Chain) RequestBody(
