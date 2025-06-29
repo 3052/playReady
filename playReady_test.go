@@ -14,46 +14,6 @@ import (
    "math/big"
 )
 
-func TestLeaf(t *testing.T) {
-   data, err := os.ReadFile(SL2000.dir + SL2000.g1)
-   if err != nil {
-      t.Fatal(err)
-   }
-   var certificate Chain
-   err = certificate.Decode(data)
-   if err != nil {
-      t.Fatal(err)
-   }
-   data, err = os.ReadFile(SL2000.dir + SL2000.z1)
-   if err != nil {
-      t.Fatal(err)
-   }
-   var z1 EcKey
-   z1.Decode(data)
-   
-   var z2 privatekey.PrivateKey
-   z2.Curve = curve.Prime256v1
-   z2.Secret = new(big.Int).SetBytes(data)
-   
-   var signEncryptKey privatekey.PrivateKey
-   Filler('B').Read(data)
-   signEncryptKey.Curve = curve.Prime256v1
-   signEncryptKey.Secret = new(big.Int).SetBytes(data)
-   public := signEncryptKey.PublicKey()
-   err = certificate.Leaf(&z1, &z2, &public.Point)
-   if err != nil {
-      t.Fatal(err)
-   }
-   err = write_file(SL2000.dir+"certificate", certificate.Encode())
-   if err != nil {
-      t.Fatal(err)
-   }
-   err = write_file(SL2000.dir+"signEncryptKey", signEncryptKey.Secret.Bytes())
-   if err != nil {
-      t.Fatal(err)
-   }
-}
-
 func TestKey(t *testing.T) {
    log.SetFlags(log.Ltime)
    data, err := os.ReadFile(SL2000.dir + "certificate")
@@ -74,8 +34,8 @@ func TestKey(t *testing.T) {
       t.Fatal(err)
    }
    
-   var signEncryptKey EcKey
-   signEncryptKey.Decode(data)
+   //var signEncryptKey EcKey
+   //signEncryptKey.Decode(data)
    
    var signEncryptKey2 privatekey.PrivateKey
    signEncryptKey2.Curve = curve.Prime256v1
@@ -93,7 +53,6 @@ func TestKey(t *testing.T) {
       }
       UuidOrGuid(kid)
       data, err = certificate.RequestBody(
-         &signEncryptKey[0],
          &signEncryptKey2,
          kid,
       )
@@ -197,5 +156,49 @@ var key_tests = []struct {
          return "https://test.playready.microsoft.com/service/rightsmanager.asmx?cfg=ck:AAAAAAAAAAAAAAAAAAAAAA==,ckt:aescbc", nil
       },
    },
+}
+
+func TestLeaf(t *testing.T) {
+   data, err := os.ReadFile(SL2000.dir + SL2000.g1)
+   if err != nil {
+      t.Fatal(err)
+   }
+   var certificate Chain
+   err = certificate.Decode(data)
+   if err != nil {
+      t.Fatal(err)
+   }
+   data, err = os.ReadFile(SL2000.dir + SL2000.z1)
+   if err != nil {
+      t.Fatal(err)
+   }
+   //var z1 EcKey
+   //z1.Decode(data)
+   
+   var z2 privatekey.PrivateKey
+   z2.Curve = curve.Prime256v1
+   z2.Secret = new(big.Int).SetBytes(data)
+   
+   var signEncryptKey privatekey.PrivateKey
+   // they downgrade certs from the cert digest (hash of the signing key)
+   Filler('B').Read(data)
+   signEncryptKey.Curve = curve.Prime256v1
+   signEncryptKey.Secret = new(big.Int).SetBytes(data)
+   public := signEncryptKey.PublicKey()
+   err = certificate.Leaf(
+      //&z1,
+      &z2, &public.Point,
+   )
+   if err != nil {
+      t.Fatal(err)
+   }
+   err = write_file(SL2000.dir+"certificate", certificate.Encode())
+   if err != nil {
+      t.Fatal(err)
+   }
+   err = write_file(SL2000.dir+"signEncryptKey", signEncryptKey.Secret.Bytes())
+   if err != nil {
+      t.Fatal(err)
+   }
 }
 

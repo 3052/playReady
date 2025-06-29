@@ -2,7 +2,6 @@ package playReady
 
 import (
    "41.neocities.org/playReady/xml"
-   "crypto/ecdsa"
    "crypto/elliptic"
    "crypto/sha256"
    "encoding/hex"
@@ -10,24 +9,33 @@ import (
    "math/big"
    "slices"
    "github.com/starkbank/ecdsa-go/v2/ellipticcurve/privatekey"
-   ecdsa2 "github.com/starkbank/ecdsa-go/v2/ellipticcurve/ecdsa"
+   "github.com/starkbank/ecdsa-go/v2/ellipticcurve/ecdsa"
 )
 
+//func (c *Certificate) verify(pubKey []byte) bool {
+//   if !bytes.Equal(c.Signature.IssuerKey, pubKey) {
+//      return false
+//   }
+//   publicKey := ecdsa.PublicKey{
+//      Curve: elliptic.P256(), // Assuming P256 curve
+//      X:     new(big.Int).SetBytes(pubKey[:32]),
+//      Y:     new(big.Int).SetBytes(pubKey[32:]),
+//   }
+//   data := c.Append(nil)
+//   data = data[:c.LengthToSignature]
+//   signatureDigest := sha256.Sum256(data)
+//   signature := c.Signature.Signature
+//   r := new(big.Int).SetBytes(signature[:32])
+//   s := new(big.Int).SetBytes(signature[32:])
+//   return ecdsa.Verify(&publicKey, signatureDigest[:], r, s)
+//}
+
 func Sign2(key *privatekey.PrivateKey, hash []byte) ([]byte, error) {
-   data := ecdsa2.Sign(string(hash), key)
+   data := ecdsa.Sign(string(hash), key)
    return append(data.R.Bytes(), data.S.Bytes()...), nil
 }
 
-func sign(key *ecdsa.PrivateKey, hash []byte) ([]byte, error) {
-   r, s, err := ecdsa.Sign(Filler('A'), key, hash)
-   if err != nil {
-      return nil, err
-   }
-   return append(r.Bytes(), s.Bytes()...), nil
-}
-
 func (c *Chain) RequestBody(
-   signEncrypt *ecdsa.PrivateKey,
    signEncrypt2 *privatekey.PrivateKey,
    kid []byte,
 ) ([]byte, error) {
@@ -77,21 +85,6 @@ func (c *Chain) RequestBody(
       },
    }
    return envelope.Marshal()
-}
-
-// they downgrade certs from the cert digest (hash of the signing key)
-func (e *EcKey) Fill(fill Filler) {
-   var data [32]byte
-   fill.Read(data[:])
-   e.Decode(data[:])
-}
-
-func (e *EcKey) Decode(data []byte) {
-   var public ecdsa.PublicKey
-   public.Curve = elliptic.P256()
-   public.X, public.Y = public.Curve.ScalarBaseMult(data)
-   e[0].D = new(big.Int).SetBytes(data)
-   e[0].PublicKey = public
 }
 
 func newLa(m *xmlKey, cipherData, kid []byte) *xml.La {
@@ -158,16 +151,6 @@ func (f Filler) Read(data []byte) (int, error) {
    return len(data), nil
 }
 
-// Private returns the private key bytes.
-func (e *EcKey) Private() []byte {
-   return e[0].D.Bytes()
-}
-
-// PublicBytes returns the public key bytes.
-func (e *EcKey) public() []byte {
-   return append(e[0].PublicKey.X.Bytes(), e[0].PublicKey.Y.Bytes()...)
-}
-
 type xmlKey struct {
    X *big.Int
    Y *big.Int
@@ -193,8 +176,6 @@ func (c *ContentKey) decrypt(key *big.Int, aux *AuxKeys) error {
    }
    return errors.New("cannot decrypt key")
 }
-
-type EcKey [1]ecdsa.PrivateKey
 
 func (c *ContentKey) scalable(key *big.Int, aux *AuxKeys) error {
    rootKeyInfo, leafKeys := c.Value[:144], c.Value[144:]
@@ -236,24 +217,6 @@ func (c *ContentKey) scalable(key *big.Int, aux *AuxKeys) error {
    }
    return nil
 }
-
-//func (c *Certificate) verify(pubKey []byte) bool {
-//   if !bytes.Equal(c.Signature.IssuerKey, pubKey) {
-//      return false
-//   }
-//   publicKey := ecdsa.PublicKey{
-//      Curve: elliptic.P256(), // Assuming P256 curve
-//      X:     new(big.Int).SetBytes(pubKey[:32]),
-//      Y:     new(big.Int).SetBytes(pubKey[32:]),
-//   }
-//   data := c.Append(nil)
-//   data = data[:c.LengthToSignature]
-//   signatureDigest := sha256.Sum256(data)
-//   signature := c.Signature.Signature
-//   r := new(big.Int).SetBytes(signature[:32])
-//   s := new(big.Int).SetBytes(signature[32:])
-//   return ecdsa.Verify(&publicKey, signatureDigest[:], r, s)
-//}
 
 func (x *xmlKey) New() {
    param := elliptic.P256().Params()

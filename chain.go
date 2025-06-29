@@ -15,12 +15,15 @@ import (
 )
 
 func (c *Chain) Leaf(
-   modelKey *EcKey,
    modelKey2 *privatekey.PrivateKey,
    signEncryptKey *point.Point,
 ) error {
    if !bytes.Equal(
-      c.Certificates[0].KeyInfo.Keys[0].PublicKey[:], modelKey.public(),
+      c.Certificates[0].KeyInfo.Keys[0].PublicKey[:],
+      func() []byte {
+         p := modelKey2.PublicKey().Point
+         return append(p.X.Bytes(), p.Y.Bytes()...)
+      }(),
    ) {
       return errors.New("zgpriv not for cert")
    }
@@ -49,13 +52,18 @@ func (c *Chain) Leaf(
    )
    {
       cert.LengthToSignature, cert.Length = cert.size()
-      sum := sha256.Sum256(cert.Append(nil))
-      signature, err := sign(&modelKey[0], sum[:])
+      signature, err := Sign2(modelKey2, cert.Append(nil))
       if err != nil {
          return err
       }
       cert.Signature = &CertSignature{}
-      err = cert.Signature.New(signature, modelKey.public())
+      err = cert.Signature.New(
+         signature,
+         func() []byte {
+            p := modelKey2.PublicKey().Point
+            return append(p.X.Bytes(), p.Y.Bytes()...)
+         }(),
+      )
       if err != nil {
          return err
       }
