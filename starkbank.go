@@ -16,6 +16,16 @@ import (
    "slices"
 )
 
+func elGamalEncrypt(msg, pub *xmlKey) []byte {
+   g := curve.Prime256v1
+   m := point.Point{X: msg.X, Y: msg.Y}
+   s := point.Point{X: pub.X, Y: pub.Y}
+   C2 := math.Add(m, s, g.A, g.P)
+   return slices.Concat(
+      g.G.X.Bytes(), g.G.Y.Bytes(), C2.X.Bytes(), C2.Y.Bytes(),
+   )
+}
+
 func elGamalDecrypt(data []byte, key *big.Int) (*big.Int, *big.Int) {
    // Unmarshal C1 component
    c1X := new(big.Int).SetBytes(data[:32])
@@ -64,16 +74,6 @@ func Sign2(key *privatekey.PrivateKey, hash []byte) ([]byte, error) {
    // SIGN DOES SHA-256 ITSELF
    data := ecdsa.Sign(string(hash), key)
    return append(data.R.Bytes(), data.S.Bytes()...), nil
-}
-
-func elGamalEncrypt(data, key *xmlKey) []byte {
-   g := curve.Prime256v1
-   m := point.Point{X: data.X, Y: data.Y}
-   s := point.Point{X: key.X, Y: key.Y}
-   C2 := math.Add(m, s, g.A, g.P)
-   return slices.Concat(
-      g.G.X.Bytes(), g.G.Y.Bytes(), C2.X.Bytes(), C2.Y.Bytes(),
-   )
 }
 
 func (x *xmlKey) New() {

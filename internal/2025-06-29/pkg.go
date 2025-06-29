@@ -185,79 +185,25 @@ var Pkg = []struct {
       note: "github.com/Layr-Labs/eigensdk-go/blob/dev/go.sum",
       url: "pkg.go.dev/github.com/Layr-Labs/eigensdk-go/crypto/ecdsa",
    },
+   {
+      note: "fucking stupid",
+      url: "pkg.go.dev/github.com/sonr-io/multi-party-sig/pkg/ecdsa",
+   },
+   {
+      note: "git.chainmaker.org.cn/chainmaker/common/-/blob/master/go.sum",
+      url: "pkg.go.dev/chainmaker.org/chainmaker/common/v3/crypto/asym/ecdsa",
+   },
+   {
+      note: "ScalarBaseMult is deprecated",
+      issue: "github.com/cloudflare/pat-go/issues/61",
+      url: "pkg.go.dev/github.com/cloudflare/pat-go/ecdsa",
+   },
+   {
+      note: "crypto/ecdsa need way to generate PrivateKey from bytes",
+      issue: "github.com/runZeroInc/excrypto/issues/37",
+      url: "pkg.go.dev/github.com/runZeroInc/excrypto/crypto/ecdsa",
+   },
    /*
-   ecdsa (github.com/rohautl/go-crypto/openpgp/ecdsa)
-   Package ecdsa implements ECDSA signature, suitable for OpenPGP, as specified in RFC 6637, section 5.
-   Imported by 1
-   | v0.0.0-...-e7fc477 published on Sep 26, 2022 | BSD-3-Clause
-
-   ecdsa (github.com/moolekkari/go-crypto/openpgp/ecdsa)
-   Package ecdsa implements ECDSA signature, suitable for OpenPGP, as specified in RFC 6637, section 5.
-   Imported by 1
-   | v0.0.0-...-4b32916 published on Dec 12, 2024 | BSD-3-Clause
-
-   ecdsa (github.com/hdfchain/hdfd/dcrec/secp256k1/v3/ecdsa)
-   Package ecdsa provides secp256k1-optimized ECDSA signing and verification.
-   Imported by 1
-   | v3.0.0-...-3464dac published on Oct 8, 2020 | ISC
-
-   ecdsa (github.com/amitkgupta/go-smarthealthcards/v2/ecdsa)
-   Package ecdsa loads an ECDSA P-256 private key (*crypto/ecdsa.PrivateKey) from string representations of its key parameters.
-   Imported by 1
-   | v2.0.1 published on Dec 5, 2021 | MIT
-   Other major versions: v1
-   Other packages in module github.com/amitkgupta/go-smarthealthcards/v2:
-   jws
-
-   ecdsa (github.com/bb-Ricardo/go-crypto/openpgp/ecdsa)
-   Package ecdsa implements ECDSA signature, suitable for OpenPGP, as specified in RFC 6637, section 5.
-   Imported by 1
-   | v0.0.0-...-bb554c2 published on Dec 12, 2022 | BSD-3-Clause
-
-   abi (github.com/keep-network/keep-core/pkg/chain/ethereum/ecdsa/gen/abi)
-   Imported by 3
-   | v1.21.0 published on Feb 1, 2024 | MIT
-   Other packages in module github.com/keep-network/keep-core:
-   pkg/chain/ethereum/ecdsa/gen/contract
-   pkg/chain/ethereum/ecdsa/gen
-   pkg/chain/ethereum/ecdsa/gen/cmd
-
-   secp256k1 (github.com/ltcsuite/secp256k1)
-   Imported by 3
-   | v0.1.1 published on May 5, 2025 | MIT
-
-   ecdsa (github.com/tinyverse-web3/btcd/btcec/v2/ecdsa)
-   Imported by 3
-   | v2.3.4 published on Aug 21, 2024 | ISC
-
-   ecdsa (github.com/sonr-io/multi-party-sig/pkg/ecdsa)
-   Imported by 3
-   | v0.7.0 published on Jun 13, 2022 | Apache-2.0
-
-   secp256k1 (github.com/ltcmweb/secp256k1)
-   Imported by 3
-   | v0.1.1 published on Sep 1, 2024 | MIT
-
-   ecdsa (chainmaker.org/chainmaker/common/v2/crypto/asym/ecdsa)
-   nolint
-   Imported by 3
-   | v2.4.0 published on May 28, 2025 | Apache-2.0
-
-   ecdsa (github.com/cloudflare/pat-go/ecdsa)
-   Package ecdsa implements the Elliptic Curve Digital Signature Algorithm, as defined in FIPS 186-3.
-   Imported by 1
-   | v0.0.0-...-555c9a4 published on Jun 11, 2025 | BSD-3-Clause
-
-   ecdsa (github.com/relab/hotstuff/crypto/ecdsa)
-   Package ecdsa provides a crypto implementation for HotStuff using Go's 'crypto/ecdsa' package.
-   Imported by 1
-   | v0.4.0 published on Dec 6, 2021 | MIT
-
-   ecdsa (github.com/runZeroInc/excrypto/crypto/ecdsa)
-   Package ecdsa implements the Elliptic Curve Digital Signature Algorithm, as defined in FIPS 186-4 and SEC 1, Version 2.0.
-   Imported by 1
-   | v0.0.0-...-064c2a8 published on May 21, 2025 | Apache-2.0, BSD-3-Clause, GooglePatentsFile, MIT
-
    key (github.com/svicknesh/key/v2)
    Imported by 2
    | v2.1.3 published on 4 days ago | MIT
@@ -312,11 +258,6 @@ var Pkg = []struct {
    Imported by 4
    | v0.0.0-...-0abe6a2 published on Sep 19, 2019 | BSD-3-Clause
 
-   sign (github.com/ORBAT/Peerdoc/pkg/crypto/sign)
-   package sign provides a standardized interface for cryptographic signatures and a default implementation with ECDSA with the secp256k1 curve.
-   Imported by 4
-   | v0.0.0-...-2f646e5 published on Mar 11, 2019 | MIT
-
    keep-ecdsa (github.com/keep-network/keep-ecdsa)
    command
    Imported by 0
@@ -336,11 +277,6 @@ var Pkg = []struct {
    Imported by 3
    | v0.0.0-...-3ecc070 published on Jan 31, 2024 | MIT
 
-   ecdsa (ec.mleku.dev/v2/ecdsa)
-   Package ecdsa provides secp256k1-optimized ECDSA signing and verification.
-   Imported by 0
-   | v2.3.5 published on Jul 27, 2024 | ISC
-
    jwkgen (github.com/glamorouscub/jwkgen)
    command
    Imported by 0
@@ -355,16 +291,6 @@ var Pkg = []struct {
    command
    Imported by 0
    | v0.0.0-...-9cb2e34 published on May 6, 2025 | MIT
-
-   ecdsa (realy.mleku.dev/ec/ecdsa)
-   Package ecdsa provides secp256k1-optimized ECDSA signing and verification.
-   Imported by 0
-   | v1.14.3 published on Apr 15, 2025 | ISC, Unlicense
-
-   ecdsa (mleku.net/g/m/pkg/ec/ecdsa)
-   Package ecdsa provides secp256k1-optimized ECDSA signing and verification.
-   Imported by 0
-   | v0.0.6 published on Jun 10, 2024 | CC0-1.0, ISC
 
    ecdsa (github.com/aakash4dev/gnark2/std/signature/ecdsa)
    Package ecdsa implements ECDSA signature verification over any elliptic curve.
@@ -393,11 +319,6 @@ var Pkg = []struct {
    Imported by 0
    | v0.0.0-...-ae8e47d published on Mar 25, 2023 | Apache-2.0
 
-   ecdsa (realy.lol/ec/ecdsa)
-   Package ecdsa provides secp256k1-optimized ECDSA signing and verification.
-   Imported by 0
-   | v1.19.0 published on May 24, 2025 | ISC, Unlicense
-
    jwkgen (github.com/frostyrest/jwkgen)
    command
    Imported by 0
@@ -415,11 +336,6 @@ var Pkg = []struct {
    ecc/bw6-633/ecdsa
    +4 more
 
-   ecdsa (github.com/Hubmakerlabs/replicatr/pkg/ec/ecdsa)
-   Package ecdsa provides secp256k1-optimized ECDSA signing and verification.
-   Imported by 0
-   | v1.2.17 published on Jul 9, 2024 | GPL-2.0, ISC
-
    ecdsa (github.com/RonanThoraval/gnark/std/signature/ecdsa)
    Package ecdsa implements ECDSA signature verification over any elliptic curve.
    Imported by 0
@@ -430,35 +346,15 @@ var Pkg = []struct {
    Imported by 0
    | v0.2.0 published on Nov 15, 2024 | MIT
 
-   ecdsa (mleku.online/git/ec/ecdsa)
-   Package ecdsa provides secp256k1-optimized ECDSA signing and verification.
-   Imported by 0
-   | v1.0.7 published on Feb 16, 2024 | ISC
-
    ecdsa (github.com/common-library/go/security/crypto/ecdsa)
    Package ecdsa provides ecdsa crypto related implementations.
    Imported by 0
    | v1.2.2 published on May 5, 2025 | Apache-2.0
 
-   ecdsa (relay.mleku.dev/ec/ecdsa)
-   Package ecdsa provides secp256k1-optimized ECDSA signing and verification.
-   Imported by 0
-   | v0.0.0-...-d6038a4 published on Apr 21, 2025 | CC0-1.0, ISC
-
-   ecdsa (go.gnd.pw/crypto/openpgp/ecdsa)
-   Package ecdsa implements ECDSA signature, suitable for OpenPGP, as specified in RFC 6637, section 5.
-   Imported by 0
-   | v0.0.0-...-86ae774 published on Nov 18, 2023 | BSD-3-Clause
-
    ecdsa (github.com/pierreleocadie/SecuraChain/pkg/ecdsa)
    Package ecdsa provides utilities for generating and managing ECDSA key pairs.
    Imported by 0
    | v1.0.0-release published on May 19, 2024 | MIT
-
-   ecdsa (mleku.net/ec/ecdsa)
-   Package ecdsa provides secp256k1-optimized ECDSA signing and verification.
-   Imported by 0
-   | v1.0.11 published on Jun 2, 2024 | ISC
 
    ecdsa (github.com/ldclabs/cose/key/ecdsa)
    Package ecdsa implements signature algorithm ECDSA for COSE as defined in RFC9053.
