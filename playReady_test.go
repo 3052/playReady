@@ -52,7 +52,7 @@ func TestKey(t *testing.T) {
          t.Fatal(err)
       }
       UuidOrGuid(kid)
-      data, err = certificate.RequestBody(&signEncryptKey, kid)
+      data, err = certificate.RequestBody(&signEncryptKey[0], kid)
       if err != nil {
          t.Fatal(err)
       }
@@ -61,7 +61,7 @@ func TestKey(t *testing.T) {
          t.Fatal(err)
       }
       var license1 License
-      err = license1.Decrypt1(&signEncryptKey2, data)
+      err = license1.Decrypt(&signEncryptKey2, data)
       if err != nil {
          t.Fatal(err)
       }

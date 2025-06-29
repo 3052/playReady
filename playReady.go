@@ -8,13 +8,11 @@ import (
    "errors"
    "github.com/emmansun/gmsm/cbcmac"
    "github.com/starkbank/ecdsa-go/v2/ellipticcurve/privatekey"
-   "log"
 )
 
-func (l *License) Decrypt1(
+func (l *License) Decrypt(
    signEncrypt *privatekey.PrivateKey, data []byte,
 ) error {
-   log.Printf("%x\n", signEncrypt.Secret)
    var envelope xml.EnvelopeResponse
    err := envelope.Unmarshal(data)
    if err != nil {
@@ -42,35 +40,6 @@ func (l *License) Decrypt1(
       return errors.New("license response is not for this device")
    }
    err = l.ContentKey.decrypt(signEncrypt.Secret, l.AuxKeys)
-   if err != nil {
-      return err
-   }
-   return l.verify(data)
-}
-
-func (l *License) Decrypt0(signEncrypt *EcKey, data []byte) error {
-   log.Printf("%x\n", signEncrypt[0].D)
-   var envelope xml.EnvelopeResponse
-   err := envelope.Unmarshal(data)
-   if err != nil {
-      return err
-   }
-   data = envelope.
-      Body.
-      AcquireLicenseResponse.
-      AcquireLicenseResult.
-      Response.
-      LicenseResponse.
-      Licenses.
-      License
-   err = l.decode(data)
-   if err != nil {
-      return err
-   }
-   if !bytes.Equal(l.EccKey.Value, signEncrypt.public()) {
-      return errors.New("license response is not for this device")
-   }
-   err = l.ContentKey.decrypt(signEncrypt[0].D, l.AuxKeys)
    if err != nil {
       return err
    }
