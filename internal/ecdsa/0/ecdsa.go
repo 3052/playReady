@@ -7,6 +7,15 @@ import (
    "math/big"
 )
 
+func elGamalEncrypt(data, key *ecdsa.PublicKey) (c1x, c1y, c2x, c2y *big.Int) {
+   y := big.NewInt(1) // In a real scenario, y should be truly random
+   curve := elliptic.P256()
+   c1x, c1y = curve.ScalarBaseMult(y.Bytes())
+   sX, sY := curve.ScalarMult(key.X, key.Y, y.Bytes())
+   c2x, c2y = curve.Add(data.X, data.Y, sX, sY)
+   return
+}
+
 func sign() (r, s, x, y *big.Int, err error) {
    var (
       fill filler = '!'

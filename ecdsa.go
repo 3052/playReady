@@ -12,97 +12,62 @@ import (
    "slices"
 )
 
-type xmlKey struct {
-   PublicKey ecdsa.PublicKey
-   X         [32]byte
-}
-
-func (x *xmlKey) New() {
-   x.PublicKey.X, x.PublicKey.Y = elliptic.P256().ScalarBaseMult([]byte{1})
-   x.PublicKey.X.FillBytes(x.X[:])
-}
-
-func (x *xmlKey) aesIv() []byte {
-   return x.X[:16]
-}
-
-func (x *xmlKey) aesKey() []byte {
-   return x.X[16:]
-}
-
-// Private returns the private key bytes.
-func (e *EcKey) Private() []byte {
-   return e[0].D.Bytes()
-}
-
-// PublicBytes returns the public key bytes.
-func (e *EcKey) public() []byte {
-   return append(e[0].PublicKey.X.Bytes(), e[0].PublicKey.Y.Bytes()...)
-}
-
-func (e *EcKey) Decode(data []byte) {
-   var public ecdsa.PublicKey
-   public.Curve = elliptic.P256()
-   public.X, public.Y = public.Curve.ScalarBaseMult(data)
-   e[0].D = new(big.Int).SetBytes(data)
-   e[0].PublicKey = public
-}
-
-type EcKey [1]ecdsa.PrivateKey
-
-func sign(key *ecdsa.PrivateKey, hash []byte) ([]byte, error) {
-   r, s, err := ecdsa.Sign(Filler('A'), key, hash)
-   if err != nil {
-      return nil, err
+func newLa(m *xmlKey, cipherData, kid []byte) *xml.La {
+   return &xml.La{
+      XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/protocols",
+      Id:      "SignedData",
+      Version: "1",
+      ContentHeader: xml.ContentHeader{
+         WrmHeader: xml.WrmHeader{
+            XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/PlayReadyHeader",
+            Version: "4.0.0.0",
+            Data: xml.WrmHeaderData{
+               ProtectInfo: xml.ProtectInfo{
+                  KeyLen: "16",
+                  AlgId:  "AESCTR",
+               },
+               Kid: kid,
+            },
+         },
+      },
+      EncryptedData: xml.EncryptedData{
+         XmlNs: "http://www.w3.org/2001/04/xmlenc#",
+         Type:  "http://www.w3.org/2001/04/xmlenc#Element",
+         EncryptionMethod: xml.Algorithm{
+            Algorithm: "http://www.w3.org/2001/04/xmlenc#aes128-cbc",
+         },
+         KeyInfo: xml.KeyInfo{
+            XmlNs: "http://www.w3.org/2000/09/xmldsig#",
+            EncryptedKey: xml.EncryptedKey{
+               XmlNs: "http://www.w3.org/2001/04/xmlenc#",
+               EncryptionMethod: xml.Algorithm{
+                  Algorithm: "http://schemas.microsoft.com/DRM/2007/03/protocols#ecc256",
+               },
+               KeyInfo: xml.EncryptedKeyInfo{
+                  XmlNs:   "http://www.w3.org/2000/09/xmldsig#",
+                  KeyName: "WMRMServer",
+               },
+               CipherData: xml.CipherData{
+                  CipherValue: elGamalEncrypt(m, elGamalKeyGeneration()),
+               },
+            },
+         },
+         CipherData: xml.CipherData{
+            CipherValue: cipherData,
+         },
+      },
    }
-   return append(r.Bytes(), s.Bytes()...), nil
 }
 
-type Filler byte
-
-func (f Filler) Read(data []byte) (int, error) {
-   for index := range data {
-      data[index] = byte(f)
-   }
-   return len(data), nil
-}
-
-// they downgrade certs from the cert digest (hash of the signing key)
-func (e *EcKey) Fill(fill Filler) {
-   var data [32]byte
-   fill.Read(data[:])
-   e.Decode(data[:])
-}
-
-func elGamalKeyGeneration() *ecdsa.PublicKey {
+func elGamalKeyGeneration() *xmlKey {
    data, _ := hex.DecodeString(wmrmPublicKey)
-   var key ecdsa.PublicKey
+   var key xmlKey
    key.X = new(big.Int).SetBytes(data[:32])
    key.Y = new(big.Int).SetBytes(data[32:])
    return &key
 }
 
-///
-
-func (c *Certificate) verify(pubKey []byte) bool {
-   if !bytes.Equal(c.Signature.IssuerKey, pubKey) {
-      return false
-   }
-   publicKey := ecdsa.PublicKey{
-      Curve: elliptic.P256(), // Assuming P256 curve
-      X:     new(big.Int).SetBytes(pubKey[:32]),
-      Y:     new(big.Int).SetBytes(pubKey[32:]),
-   }
-   data := c.Append(nil)
-   data = data[:c.LengthToSignature]
-   signatureDigest := sha256.Sum256(data)
-   signature := c.Signature.Signature
-   r := new(big.Int).SetBytes(signature[:32])
-   s := new(big.Int).SetBytes(signature[32:])
-   return ecdsa.Verify(&publicKey, signatureDigest[:], r, s)
-}
-
-func elGamalEncrypt(data, key *ecdsa.PublicKey) []byte {
+func elGamalEncrypt(data *xmlKey, key *xmlKey) []byte {
    g := elliptic.P256()
    y := big.NewInt(1) // In a real scenario, y should be truly random
    c1x, c1y := g.ScalarBaseMult(y.Bytes())
@@ -129,6 +94,86 @@ func elGamalDecrypt(data []byte, key *ecdsa.PrivateKey) (*big.Int, *big.Int) {
    sY.Mod(sY, curve.Params().P)
    // Recover message point: M = C2 - s
    return curve.Add(c2X, c2Y, sX, sY)
+}
+type Filler byte
+
+func (f Filler) Read(data []byte) (int, error) {
+   for index := range data {
+      data[index] = byte(f)
+   }
+   return len(data), nil
+}
+
+// they downgrade certs from the cert digest (hash of the signing key)
+func (e *EcKey) Fill(fill Filler) {
+   var data [32]byte
+   fill.Read(data[:])
+   e.Decode(data[:])
+}
+
+// Private returns the private key bytes.
+func (e *EcKey) Private() []byte {
+   return e[0].D.Bytes()
+}
+
+// PublicBytes returns the public key bytes.
+func (e *EcKey) public() []byte {
+   return append(e[0].PublicKey.X.Bytes(), e[0].PublicKey.Y.Bytes()...)
+}
+
+type xmlKey struct {
+   X *big.Int
+   Y *big.Int
+   RawX [32]byte
+}
+
+func (x *xmlKey) New() {
+   x.X, x.Y = elliptic.P256().ScalarBaseMult([]byte{1})
+   x.X.FillBytes(x.RawX[:])
+}
+
+func (x *xmlKey) aesIv() []byte {
+   return x.RawX[:16]
+}
+
+func (x *xmlKey) aesKey() []byte {
+   return x.RawX[16:]
+}
+
+func (e *EcKey) Decode(data []byte) {
+   var public ecdsa.PublicKey
+   public.Curve = elliptic.P256()
+   public.X, public.Y = public.Curve.ScalarBaseMult(data)
+   e[0].D = new(big.Int).SetBytes(data)
+   e[0].PublicKey = public
+}
+
+type EcKey [1]ecdsa.PrivateKey
+
+func sign(key *ecdsa.PrivateKey, hash []byte) ([]byte, error) {
+   r, s, err := ecdsa.Sign(Filler('A'), key, hash)
+   if err != nil {
+      return nil, err
+   }
+   return append(r.Bytes(), s.Bytes()...), nil
+}
+
+func (c *Certificate) verify(pubKey []byte) bool {
+   if !bytes.Equal(c.Signature.IssuerKey, pubKey) {
+      return false
+   }
+   publicKey := ecdsa.PublicKey{
+      Curve: elliptic.P256(), // Assuming P256 curve
+      X:     new(big.Int).SetBytes(pubKey[:32]),
+      Y:     new(big.Int).SetBytes(pubKey[32:]),
+   }
+   data := c.Append(nil)
+   data = data[:c.LengthToSignature]
+   signatureDigest := sha256.Sum256(data)
+   signature := c.Signature.Signature
+   r := new(big.Int).SetBytes(signature[:32])
+   s := new(big.Int).SetBytes(signature[32:])
+   return ecdsa.Verify(&publicKey, signatureDigest[:], r, s)
 }
 
 func (c *ContentKey) decrypt(key *ecdsa.PrivateKey, aux *AuxKeys) error {
@@ -184,49 +229,3 @@ func (c *ContentKey) scalable(key *ecdsa.PrivateKey, aux *AuxKeys) error {
    return nil
 }
 
-func newLa(m *ecdsa.PublicKey, cipherData, kid []byte) *xml.La {
-   return &xml.La{
-      XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/protocols",
-      Id:      "SignedData",
-      Version: "1",
-      ContentHeader: xml.ContentHeader{
-         WrmHeader: xml.WrmHeader{
-            XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/PlayReadyHeader",
-            Version: "4.0.0.0",
-            Data: xml.WrmHeaderData{
-               ProtectInfo: xml.ProtectInfo{
-                  KeyLen: "16",
-                  AlgId:  "AESCTR",
-               },
-               Kid: kid,
-            },
-         },
-      },
-      EncryptedData: xml.EncryptedData{
-         XmlNs: "http://www.w3.org/2001/04/xmlenc#",
-         Type:  "http://www.w3.org/2001/04/xmlenc#Element",
-         EncryptionMethod: xml.Algorithm{
-            Algorithm: "http://www.w3.org/2001/04/xmlenc#aes128-cbc",
-         },
-         KeyInfo: xml.KeyInfo{
-            XmlNs: "http://www.w3.org/2000/09/xmldsig#",
-            EncryptedKey: xml.EncryptedKey{
-               XmlNs: "http://www.w3.org/2001/04/xmlenc#",
-               EncryptionMethod: xml.Algorithm{
-                  Algorithm: "http://schemas.microsoft.com/DRM/2007/03/protocols#ecc256",
-               },
-               KeyInfo: xml.EncryptedKeyInfo{
-                  XmlNs:   "http://www.w3.org/2000/09/xmldsig#",
-                  KeyName: "WMRMServer",
-               },
-               CipherData: xml.CipherData{
-                  CipherValue: elGamalEncrypt(m, elGamalKeyGeneration()),
-               },
-            },
-         },
-         CipherData: xml.CipherData{
-            CipherValue: cipherData,
-         },
-      },
-   }
-}

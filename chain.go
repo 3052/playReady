@@ -19,7 +19,7 @@ func (c *Chain) RequestBody(signEncrypt *EcKey, kid []byte) ([]byte, error) {
    if err != nil {
       return nil, err
    }
-   la := newLa(&key.PublicKey, cipherData, kid)
+   la := newLa(&key, cipherData, kid)
    laData, err := la.Marshal()
    if err != nil {
       return nil, err

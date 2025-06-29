@@ -4,12 +4,27 @@ import (
    "crypto/sha256"
    "github.com/starkbank/ecdsa-go/v2/ellipticcurve/curve"
    "github.com/starkbank/ecdsa-go/v2/ellipticcurve/ecdsa"
+   "github.com/starkbank/ecdsa-go/v2/ellipticcurve/math"
    "github.com/starkbank/ecdsa-go/v2/ellipticcurve/point"
    "github.com/starkbank/ecdsa-go/v2/ellipticcurve/privatekey"
    "github.com/starkbank/ecdsa-go/v2/ellipticcurve/publickey"
    "github.com/starkbank/ecdsa-go/v2/ellipticcurve/signature"
    "math/big"
 )
+
+func encrypt(m, h *publickey.PublicKey) (c1, c2 *point.Point) {
+   // generator g
+   g := curve.Prime256v1
+   // choose an integer y
+   y := big.NewInt(1)
+   // compute s = h * y
+   s := math.Multiply(h.Point, y, h.Curve.N, h.Curve.A, h.Curve.P)
+   // compute c1 = g * y
+   c1v := math.Multiply(g.G, y, g.N, g.A, g.P)
+   // compute c2 = m + s
+   c2v := math.Add(m.Point, s, g.A, g.P)
+   return &c1v, &c2v
+}
 
 func verify(r, s, x, y *big.Int) bool {
    hash := sha256.Sum256([]byte("hello world"))
