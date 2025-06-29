@@ -20,6 +20,16 @@ import (
    "slices"
 )
 
+func elGamalEncrypt(data, key *xmlKey) []byte {
+   g := curve.Prime256v1
+   m := point.Point{X: data.X, Y: data.Y}
+   s := point.Point{X: key.X, Y: key.Y}
+   C2 := math.Add(m, s, g.A, g.P)
+   return slices.Concat(
+      g.G.X.Bytes(), g.G.Y.Bytes(), C2.X.Bytes(), C2.Y.Bytes(),
+   )
+}
+
 func (c *Certificate) verify(pubKey []byte) bool {
    if !bytes.Equal(c.Signature.IssuerKey, pubKey) {
       return false
@@ -61,19 +71,6 @@ func elGamalDecrypt(data []byte, key *big.Int) (*big.Int, *big.Int) {
    // Recover message point: M = C2 - s
    M := math.Add(C2, S, g1.A, g1.P)
    return M.X, M.Y
-}
-
-func elGamalEncrypt(data, key *xmlKey) []byte {
-   g := curve.Prime256v1
-   m := point.Point{X: data.X, Y: data.Y}
-   s := point.Point{X: key.X, Y: key.Y}
-   C2 := math.Add(m, s, g.A, g.P)
-   return slices.Concat(
-      g.G.X.Bytes(),
-      g.G.Y.Bytes(),
-      C2.X.Bytes(),
-      C2.Y.Bytes(),
-   )
 }
 
 func (x *xmlKey) New() {
