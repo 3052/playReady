@@ -203,105 +203,58 @@ var Pkg = []struct {
       issue: "github.com/runZeroInc/excrypto/issues/37",
       url: "pkg.go.dev/github.com/runZeroInc/excrypto/crypto/ecdsa",
    },
+   {
+      note: "ECDSA key from bytes",
+      issue: "github.com/svicknesh/key/issues/1",
+      url: "pkg.go.dev/github.com/svicknesh/key/v2",
+   },
+   {
+      note: "ecdsa: need way to generate PrivateKey from bytes",
+      issue: "github.com/A1andNS/newCrypto/issues/1",
+      url: "https://pkg.go.dev/github.com/A1andNS/newCrypto/ecdsa",
+   },
+   {
+      note: "weird",
+      url: "pkg.go.dev/github.com/okx/threshold-lib/tss/ecdsa/sign",
+   },
+   {
+      note: "github.com/flokiorg/go-flokicoin/blob/main/go.sum",
+      url: "pkg.go.dev/github.com/flokiorg/go-flokicoin/crypto/ecdsa",
+   },
+   {
+      note: "no sign",
+      url: "pkg.go.dev/github.com/0xPellNetwork/pelldvs-libs/crypto/ecdsa",
+   },
+   {
+      note: "github.com/opzlabs/cosmos-sdk-terra3/blob/main/go.sum",
+      url: "pkg.go.dev/github.com/opzlabs/cosmos-sdk-v0.46.13-terra.3/crypto/keys/secp256r1",
+   },
+   {
+      note: "no sign",
+      url: "pkg.go.dev/gitlab.com/alephledger/threshold-ecdsa/pkg",
+   },
+   {
+      note: "old",
+      url: "pkg.go.dev/github.com/GM-Publicchain/gm/plugin/crypto/ecdsa",
+   },
+   {
+      note: "archived",
+      url: "pkg.go.dev/github.com/keep-network/keep-ecdsa/pkg/ecdsa",
+   },
+   {
+      note: "go.mod",
+      issue: "github.com/PutinCoinPUT/ppcd/issues/1",
+      url: "pkg.go.dev/github.com/PutinCoinPUT/ppcd/btcec/ecdsa",
+   },
+   {
+      note: "EccFrog512CK2 elliptic curve",
+      url: "github.com/shovon/go-eccfrog512ck2/ecc/ecdsa",
+   },
+   {
+      note: "publish",
+      url: "github.com/shovon/elliptic-curve-pointless/issues/1",
+   },
    /*
-   key (github.com/svicknesh/key/v2)
-   Imported by 2
-   | v2.1.3 published on 4 days ago | MIT
-   Other major versions: v1
-
-   ecdsa (github.com/A1andNS/newCrypto/ecdsa)
-   Package ecdsa implements the Elliptic Curve Digital Signature Algorithm, as defined in FIPS 186-3.
-   Imported by 2
-   | v0.0.0-...-3d4b386 published on Jan 10, 2025 | BSD-3-Clause
-
-   tokenauth (github.com/gobuffalo/mw-tokenauth)
-   Package tokenauth provides jwt token authorisation middleware supports HMAC, RSA, ECDSA, RSAPSS EdDSA algorithms uses github.com/golang-jwt/jwt/v4 for jwt implementation
-   Imported by 2
-   | v1.0.2 published on Feb 15, 2023 | MIT
-
-   keygen (github.com/okx/threshold-lib/tss/ecdsa/keygen)
-   Imported by 2
-   | v1.0.1 published on Aug 28, 2023 | Apache-2.0
-   Other packages in module github.com/okx/threshold-lib:
-   tss/ecdsa/sign
-
-   ecdsa (github.com/sonrhq/sonr/crypto/signatures/ecdsa)
-   Imported by 2
-   | v0.16.1 published on Mar 10, 2024 | GPL-3.0
-
-   ecdsa (github.com/flokiorg/go-flokicoin/crypto/ecdsa)
-   Imported by 2
-   | v0.25.6-dev published on May 2, 2025 | ISC
-
-   ecdsa (github.com/0xPellNetwork/pelldvs-libs/crypto/ecdsa)
-   Imported by 2
-   | v0.2.2 published on Jun 13, 2025 | Apache-2.0
-
-   secp256r1 (github.com/opzlabs/cosmos-sdk-v0.46.13-terra.3/crypto/keys/secp256r1)
-   Package secp256r1 implements Cosmos-SDK compatible ECDSA public and private key.
-   Imported by 2
-   | v0.1.3 published on Sep 18, 2023 | Apache-2.0
-
-   curve (gitlab.com/alephledger/threshold-ecdsa/pkg/curve)
-   Imported by 4
-   | v0.0.0-...-abd57cf published on Mar 5, 2021 | Apache-2.0
-   Other packages in module gitlab.com/alephledger/threshold-ecdsa:
-   pkg/crypto/commitment
-   pkg/sync
-   pkg/crypto
-   pkg/arith
-   pkg/crypto/zkpok
-   +1 more
-
-
-   ecdsa (github.com/GM-Publicchain/gm/plugin/crypto/ecdsa)
-   Imported by 4
-   | v0.0.0-...-0abe6a2 published on Sep 19, 2019 | BSD-3-Clause
-
-   keep-ecdsa (github.com/keep-network/keep-ecdsa)
-   command
-   Imported by 0
-   | v1.8.2 published on Sep 14, 2022 | MIT
-   Other packages in module github.com/keep-network/keep-ecdsa:
-   pkg/ecdsa
-   pkg/chain
-   pkg/client
-   pkg/ecdsa/tss
-
-   ecdsa (gopkg.in/zhevron/jwt.v1/ecdsa)
-   Package ecdsa provides ECDSA signing methods for JWT.
-   Imported by 1
-   | v1.0.0-...-79c4aa1 published on Apr 15, 2015 | MIT
-
-   ecdsa (github.com/PutinCoinPUT/ppcd/btcec/ecdsa)
-   Imported by 3
-   | v0.0.0-...-3ecc070 published on Jan 31, 2024 | MIT
-
-   jwkgen (github.com/glamorouscub/jwkgen)
-   command
-   Imported by 0
-   | v0.0.0-...-d06e9d8 published on Feb 27, 2025 | MIT
-
-   ecdsa (github.com/shovon/go-eccfrog512ck2/ecc/ecdsa)
-   Package ecdsa provides helpers for signing and verifying signatures using the ECDSA cryptographic scheme, operated on the EccFrog512ck2 family of curves.
-   Imported by 0
-   | v0.1.0 published on Jun 18, 2025 | MIT
-
-   jwkgen (github.com/necessaryeros/jwkgen)
-   command
-   Imported by 0
-   | v0.0.0-...-9cb2e34 published on May 6, 2025 | MIT
-
-   ecdsa (github.com/aakash4dev/gnark2/std/signature/ecdsa)
-   Package ecdsa implements ECDSA signature verification over any elliptic curve.
-   Imported by 0
-   | v0.0.0-...-70ee9f5 published on Dec 19, 2023 | Apache-2.0
-
-   jwkgen (github.com/rakutentech/jwkgen)
-   command
-   Imported by 0
-   | v1.4.8 published on Jul 15, 2024 | MIT
-
    ecdsa (github.com/armortal/webcrypto-go/algorithms/ecdsa)
    Package ecdsa implements ECDSA operations as described in the specifications at §23 (https://www.w3.org/TR/WebCryptoAPI/#ecdsa).
    Imported by 0
@@ -318,11 +271,6 @@ var Pkg = []struct {
    Package ecdsa implements ECDSA signature verification over any elliptic curve.
    Imported by 0
    | v0.0.0-...-ae8e47d published on Mar 25, 2023 | Apache-2.0
-
-   jwkgen (github.com/frostyrest/jwkgen)
-   command
-   Imported by 0
-   | v0.0.0-...-36f70b0 published on May 18, 2025 | MIT
 
    ecdsa (github.com/Overclock-Validator/gnark-crypto/ecc/bls12-377/ecdsa)
    Package ecdsa provides ECDSA signature scheme on the bls12-377 curve.
