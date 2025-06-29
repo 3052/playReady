@@ -76,23 +76,16 @@ func TestLeaf(t *testing.T) {
    if err != nil {
       t.Fatal(err)
    }
-   //var z1 EcKey
-   //z1.Decode(data)
-   
    var z2 privatekey.PrivateKey
    z2.Curve = curve.Prime256v1
    z2.Secret = new(big.Int).SetBytes(data)
-   
    var signEncryptKey privatekey.PrivateKey
    // they downgrade certs from the cert digest (hash of the signing key)
    Filler('B').Read(data)
    signEncryptKey.Curve = curve.Prime256v1
    signEncryptKey.Secret = new(big.Int).SetBytes(data)
    public := signEncryptKey.PublicKey()
-   err = certificate.Leaf(
-      //&z1,
-      &z2, &public.Point,
-   )
+   err = certificate.Leaf(&z2, &public.Point)
    if err != nil {
       t.Fatal(err)
    }

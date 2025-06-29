@@ -14,6 +14,18 @@ import (
    "slices"
 )
 
+func (c *Chain) verify() bool {
+   modelBase := c.Certificates[c.CertCount-1].Signature.IssuerKey
+   for i := len(c.Certificates) - 1; i >= 0; i-- {
+      valid := c.Certificates[i].verify(modelBase[:])
+      if !valid {
+         return false
+      }
+      modelBase = c.Certificates[i].KeyInfo.Keys[0].PublicKey[:]
+   }
+   return true
+}
+
 func (c *Chain) Leaf(
    modelKey2 *privatekey.PrivateKey,
    signEncryptKey *point.Point,
@@ -72,18 +84,6 @@ func (c *Chain) Leaf(
    c.Certificates = slices.Insert(c.Certificates, 0, cert)
    c.Length += cert.Length
    return nil
-}
-
-func (c *Chain) verify() bool {
-   //modelBase := c.Certificates[c.CertCount-1].Signature.IssuerKey
-   for i := len(c.Certificates) - 1; i >= 0; i-- {
-      //valid := c.Certificates[i].verify(modelBase[:])
-      //if !valid {
-      //   return false
-      //}
-      //modelBase = c.Certificates[i].KeyInfo.Keys[0].PublicKey[:]
-   }
-   return true
 }
 
 func (c *Chain) cipherData(key *xmlKey) ([]byte, error) {
