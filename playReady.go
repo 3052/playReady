@@ -30,7 +30,7 @@ func (l *License) Decrypt(signEncrypt *EcKey, data []byte) error {
    if !bytes.Equal(l.EccKey.Value, signEncrypt.public()) {
       return errors.New("license response is not for this device")
    }
-   err = l.ContentKey.decrypt(&signEncrypt[0], l.AuxKeys)
+   err = l.ContentKey.decrypt(signEncrypt[0].D, l.AuxKeys)
    if err != nil {
       return err
    }

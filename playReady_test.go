@@ -9,6 +9,9 @@ import (
    "net/http"
    "os"
    "testing"
+   "github.com/starkbank/ecdsa-go/v2/ellipticcurve/privatekey"
+   "github.com/starkbank/ecdsa-go/v2/ellipticcurve/curve"
+   "math/big"
 )
 
 func TestLeaf(t *testing.T) {
@@ -27,9 +30,12 @@ func TestLeaf(t *testing.T) {
    }
    var z1 EcKey
    z1.Decode(data)
-   var signEncryptKey EcKey
-   signEncryptKey.Fill('B')
-   err = certificate.Leaf(&z1, &signEncryptKey)
+   var signEncryptKey privatekey.PrivateKey
+   Filler('B').Read(data)
+   signEncryptKey.Curve = curve.Prime256v1
+   signEncryptKey.Secret = new(big.Int).SetBytes(data)
+   public := signEncryptKey.PublicKey()
+   err = certificate.Leaf(&z1, &public.Point)
    if err != nil {
       t.Fatal(err)
    }
@@ -37,7 +43,7 @@ func TestLeaf(t *testing.T) {
    if err != nil {
       t.Fatal(err)
    }
-   err = write_file(SL2000.dir+"signEncryptKey", signEncryptKey.Private())
+   err = write_file(SL2000.dir+"signEncryptKey", signEncryptKey.Secret.Bytes())
    if err != nil {
       t.Fatal(err)
    }
@@ -90,6 +96,7 @@ var key_tests = []struct {
       },
    },
 }
+
 func TestKey(t *testing.T) {
    log.SetFlags(log.Ltime)
    data, err := os.ReadFile(SL2000.dir + "certificate")

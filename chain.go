@@ -9,8 +9,79 @@ import (
    "encoding/binary"
    "errors"
    "github.com/emmansun/gmsm/padding"
+   "github.com/starkbank/ecdsa-go/v2/ellipticcurve/point"
    "slices"
 )
+
+func (c *Chain) Leaf(modelKey *EcKey, signEncryptKey *point.Point) error {
+   if !bytes.Equal(
+      c.Certificates[0].KeyInfo.Keys[0].PublicKey[:], modelKey.public(),
+   ) {
+      return errors.New("zgpriv not for cert")
+   }
+   if !c.verify() {
+      return errors.New("cert is not valid")
+   }
+   var cert Certificate
+   copy(cert.Magic[:], "CERT")
+   cert.Version = 1 // required
+   {
+      // SCALABLE with SL2000, SUPPORTS_PR3_FEATURES
+      var features CertFeatures
+      features.New(0xD)
+      cert.Features = features.ftlv(0, 5)
+   }
+   {
+      sum := sha256.Sum256(
+         append(signEncryptKey.X.Bytes(), signEncryptKey.Y.Bytes()...),
+      )
+      cert.Info = &CertificateInfo{}
+      cert.Info.New(c.Certificates[0].Info.SecurityLevel, sum[:])
+   }
+   cert.KeyInfo = &KeyInfo{}
+   cert.KeyInfo.New(
+      append(signEncryptKey.X.Bytes(), signEncryptKey.Y.Bytes()...),
+   )
+   {
+      cert.LengthToSignature, cert.Length = cert.size()
+      sum := sha256.Sum256(cert.Append(nil))
+      signature, err := sign(&modelKey[0], sum[:])
+      if err != nil {
+         return err
+      }
+      cert.Signature = &CertSignature{}
+      err = cert.Signature.New(signature, modelKey.public())
+      if err != nil {
+         return err
+      }
+   }
+   c.CertCount += 1
+   c.Certificates = slices.Insert(c.Certificates, 0, cert)
+   c.Length += cert.Length
+   return nil
+}
+
+func (c *Chain) cipherData(key *xmlKey) ([]byte, error) {
+   xmlData := xml.Data{
+      CertificateChains: xml.CertificateChains{
+         CertificateChain: c.Encode(),
+      },
+      Features: xml.Features{
+         Feature: xml.Feature{"AESCBC"}, // SCALABLE
+      },
+   }
+   data, err := xmlData.Marshal()
+   if err != nil {
+      return nil, err
+   }
+   data = padding.NewPKCS7Padding(aes.BlockSize).Pad(data)
+   block, err := aes.NewCipher(key.aesKey())
+   if err != nil {
+      return nil, err
+   }
+   cipher.NewCBCEncrypter(block, key.aesIv()).CryptBlocks(data, data)
+   return append(key.aesIv(), data...), nil
+}
 
 func (c *Chain) RequestBody(signEncrypt *EcKey, kid []byte) ([]byte, error) {
    var key xmlKey
@@ -289,71 +360,5 @@ func (c *Chain) Encode() []byte {
       data = cert.Append(data)
    }
    return data
-}
-
-func (c *Chain) Leaf(modelKey, signEncryptKey *EcKey) error {
-   if !bytes.Equal(
-      c.Certificates[0].KeyInfo.Keys[0].PublicKey[:], modelKey.public(),
-   ) {
-      return errors.New("zgpriv not for cert")
-   }
-   if !c.verify() {
-      return errors.New("cert is not valid")
-   }
-   var cert Certificate
-   copy(cert.Magic[:], "CERT")
-   cert.Version = 1 // required
-   {
-      // SCALABLE with SL2000, SUPPORTS_PR3_FEATURES
-      var features CertFeatures
-      features.New(0xD)
-      cert.Features = features.ftlv(0, 5)
-   }
-   {
-      sum := sha256.Sum256(signEncryptKey.public())
-      cert.Info = &CertificateInfo{}
-      cert.Info.New(c.Certificates[0].Info.SecurityLevel, sum[:])
-   }
-   cert.KeyInfo = &KeyInfo{}
-   cert.KeyInfo.New(signEncryptKey.public())
-   {
-      cert.LengthToSignature, cert.Length = cert.size()
-      sum := sha256.Sum256(cert.Append(nil))
-      signature, err := sign(&modelKey[0], sum[:])
-      if err != nil {
-         return err
-      }
-      cert.Signature = &CertSignature{}
-      err = cert.Signature.New(signature, modelKey.public())
-      if err != nil {
-         return err
-      }
-   }
-   c.CertCount += 1
-   c.Certificates = slices.Insert(c.Certificates, 0, cert)
-   c.Length += cert.Length
-   return nil
-}
-
-func (c *Chain) cipherData(key *xmlKey) ([]byte, error) {
-   xmlData := xml.Data{
-      CertificateChains: xml.CertificateChains{
-         CertificateChain: c.Encode(),
-      },
-      Features: xml.Features{
-         Feature: xml.Feature{"AESCBC"}, // SCALABLE
-      },
-   }
-   data, err := xmlData.Marshal()
-   if err != nil {
-      return nil, err
-   }
-   data = padding.NewPKCS7Padding(aes.BlockSize).Pad(data)
-   block, err := aes.NewCipher(key.aesKey())
-   if err != nil {
-      return nil, err
-   }
-   cipher.NewCBCEncrypter(block, key.aesIv()).CryptBlocks(data, data)
-   return append(key.aesIv(), data...), nil
 }
 

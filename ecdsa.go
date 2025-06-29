@@ -67,34 +67,6 @@ func elGamalKeyGeneration() *xmlKey {
    return &key
 }
 
-func elGamalEncrypt(data *xmlKey, key *xmlKey) []byte {
-   g := elliptic.P256()
-   y := big.NewInt(1) // In a real scenario, y should be truly random
-   c1x, c1y := g.ScalarBaseMult(y.Bytes())
-   sX, sY := g.ScalarMult(key.X, key.Y, y.Bytes())
-   c2X, c2Y := g.Add(data.X, data.Y, sX, sY)
-   return slices.Concat(
-      c1x.Bytes(), c1y.Bytes(),
-      c2X.Bytes(), c2Y.Bytes(),
-   )
-}
-
-func elGamalDecrypt(data []byte, key *ecdsa.PrivateKey) (*big.Int, *big.Int) {
-   curve := elliptic.P256()
-   // Unmarshal C1 component
-   c1X := new(big.Int).SetBytes(data[:32])
-   c1Y := new(big.Int).SetBytes(data[32:64])
-   // Unmarshal C2 component
-   c2X := new(big.Int).SetBytes(data[64:96])
-   c2Y := new(big.Int).SetBytes(data[96:])
-   // Calculate shared secret s = C1^x
-   sX, sY := curve.ScalarMult(c1X, c1Y, key.D.Bytes())
-   // Invert the point for subtraction
-   sY.Neg(sY)
-   sY.Mod(sY, curve.Params().P)
-   // Recover message point: M = C2 - s
-   return curve.Add(c2X, c2Y, sX, sY)
-}
 type Filler byte
 
 func (f Filler) Read(data []byte) (int, error) {
@@ -127,11 +99,6 @@ type xmlKey struct {
    RawX [32]byte
 }
 
-func (x *xmlKey) New() {
-   x.X, x.Y = elliptic.P256().ScalarBaseMult([]byte{1})
-   x.X.FillBytes(x.RawX[:])
-}
-
 func (x *xmlKey) aesIv() []byte {
    return x.RawX[:16]
 }
@@ -140,43 +107,7 @@ func (x *xmlKey) aesKey() []byte {
    return x.RawX[16:]
 }
 
-func (e *EcKey) Decode(data []byte) {
-   var public ecdsa.PublicKey
-   public.Curve = elliptic.P256()
-   public.X, public.Y = public.Curve.ScalarBaseMult(data)
-   e[0].D = new(big.Int).SetBytes(data)
-   e[0].PublicKey = public
-}
-
-type EcKey [1]ecdsa.PrivateKey
-
-func sign(key *ecdsa.PrivateKey, hash []byte) ([]byte, error) {
-   r, s, err := ecdsa.Sign(Filler('A'), key, hash)
-   if err != nil {
-      return nil, err
-   }
-   return append(r.Bytes(), s.Bytes()...), nil
-}
-
-func (c *Certificate) verify(pubKey []byte) bool {
-   if !bytes.Equal(c.Signature.IssuerKey, pubKey) {
-      return false
-   }
-   publicKey := ecdsa.PublicKey{
-      Curve: elliptic.P256(), // Assuming P256 curve
-      X:     new(big.Int).SetBytes(pubKey[:32]),
-      Y:     new(big.Int).SetBytes(pubKey[32:]),
-   }
-   data := c.Append(nil)
-   data = data[:c.LengthToSignature]
-   signatureDigest := sha256.Sum256(data)
-   signature := c.Signature.Signature
-   r := new(big.Int).SetBytes(signature[:32])
-   s := new(big.Int).SetBytes(signature[32:])
-   return ecdsa.Verify(&publicKey, signatureDigest[:], r, s)
-}
-
-func (c *ContentKey) decrypt(key *ecdsa.PrivateKey, aux *AuxKeys) error {
+func (c *ContentKey) decrypt(key *big.Int, aux *AuxKeys) error {
    switch c.CipherType {
    case 3:
       messageX, _ := elGamalDecrypt(c.Value, key)
@@ -188,7 +119,9 @@ func (c *ContentKey) decrypt(key *ecdsa.PrivateKey, aux *AuxKeys) error {
    return errors.New("cannot decrypt key")
 }
 
-func (c *ContentKey) scalable(key *ecdsa.PrivateKey, aux *AuxKeys) error {
+type EcKey [1]ecdsa.PrivateKey
+
+func (c *ContentKey) scalable(key *big.Int, aux *AuxKeys) error {
    rootKeyInfo, leafKeys := c.Value[:144], c.Value[144:]
    rootKey := rootKeyInfo[128:]
    messageX, _ := elGamalDecrypt(rootKeyInfo[:128], key)
@@ -229,3 +162,68 @@ func (c *ContentKey) scalable(key *ecdsa.PrivateKey, aux *AuxKeys) error {
    return nil
 }
 
+func sign(key *ecdsa.PrivateKey, hash []byte) ([]byte, error) {
+   r, s, err := ecdsa.Sign(Filler('A'), key, hash)
+   if err != nil {
+      return nil, err
+   }
+   return append(r.Bytes(), s.Bytes()...), nil
+}
+
+func (c *Certificate) verify(pubKey []byte) bool {
+   if !bytes.Equal(c.Signature.IssuerKey, pubKey) {
+      return false
+   }
+   publicKey := ecdsa.PublicKey{
+      Curve: elliptic.P256(), // Assuming P256 curve
+      X:     new(big.Int).SetBytes(pubKey[:32]),
+      Y:     new(big.Int).SetBytes(pubKey[32:]),
+   }
+   data := c.Append(nil)
+   data = data[:c.LengthToSignature]
+   signatureDigest := sha256.Sum256(data)
+   signature := c.Signature.Signature
+   r := new(big.Int).SetBytes(signature[:32])
+   s := new(big.Int).SetBytes(signature[32:])
+   return ecdsa.Verify(&publicKey, signatureDigest[:], r, s)
+}
+
+func (x *xmlKey) New() {
+   param := elliptic.P256().Params()
+   x.X, x.Y = param.Gx, param.Gy
+   x.X.FillBytes(x.RawX[:])
+}
+
+func (e *EcKey) Decode(data []byte) {
+   var public ecdsa.PublicKey
+   public.Curve = elliptic.P256()
+   public.X, public.Y = public.Curve.ScalarBaseMult(data)
+   e[0].D = new(big.Int).SetBytes(data)
+   e[0].PublicKey = public
+}
+
+func elGamalDecrypt(data []byte, key *big.Int) (*big.Int, *big.Int) {
+   curve := elliptic.P256()
+   // Unmarshal C1 component
+   c1X := new(big.Int).SetBytes(data[:32])
+   c1Y := new(big.Int).SetBytes(data[32:64])
+   // Unmarshal C2 component
+   c2X := new(big.Int).SetBytes(data[64:96])
+   c2Y := new(big.Int).SetBytes(data[96:])
+   // Calculate shared secret s = C1^x
+   sX, sY := curve.ScalarMult(c1X, c1Y, key.Bytes())
+   // Invert the point for subtraction
+   sY.Neg(sY)
+   sY.Mod(sY, curve.Params().P)
+   // Recover message point: M = C2 - s
+   return curve.Add(c2X, c2Y, sX, sY)
+}
+
+func elGamalEncrypt(data, key *xmlKey) []byte {
+   curve := elliptic.P256()
+   param := curve.Params()
+   c2X, c2Y := curve.Add(data.X, data.Y, key.X, key.Y)
+   return slices.Concat(
+      param.Gx.Bytes(), param.Gy.Bytes(), c2X.Bytes(), c2Y.Bytes(),
+   )
+}
