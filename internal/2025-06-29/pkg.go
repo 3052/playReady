@@ -9,11 +9,39 @@ var Pkg = []struct {
 }{
    {
       go_sum: 10,
+      spec: "github.com/ltcsuite/ltcd/btcec/v2/ecdsa",
+   },
+   {
+      go_sum: 10,
       spec:   "github.com/btcsuite/btcd/btcec/v2/ecdsa",
+   },
+   {
+      go_sum: 12,
+      spec: "github.com/libsv/go-bk/envelope",
+   },
+   {
+      go_sum: 16,
+      spec: "github.com/privacybydesign/gabi/signed",
+   },
+   {
+      go_sum: 18,
+      spec: "github.com/taurusgroup/multi-party-sig/pkg/ecdsa",
    },
    {
       go_sum: 18,
       spec:   "github.com/ldclabs/cose/key/ecdsa",
+   },
+   {
+      go_sum: 23,
+      spec: "github.com/PaddlePaddle/PaddleDTX/crypto/core/ecdsa",
+   },
+   {
+      go_sum: 49,
+      spec: "git.frostfs.info/TrueCloudLab/frostfs-sdk-go/crypto/ecdsa",
+   },
+   {
+      go_sum: 54,
+      spec: "github.com/consensys/gnark/std/signature/ecdsa",
    },
    {
       go_sum: 56,
@@ -24,8 +52,16 @@ var Pkg = []struct {
       spec: "github.com/renproject/id",
    },
    {
+      go_sum: 96,
+      spec: "github.com/kubernetes/dashboard/src/app/backend/cert/ecdsa",
+   },
+   {
       go_sum: 133,
       spec: "github.com/hellobchain/newcryptosm/ecdsa",
+   },
+   {
+      go_sum: 161,
+      spec: "github.com/TrueCloudLab/frostfs-sdk-go/crypto/ecdsa",
    },
    {
       go_sum: 230,
@@ -52,65 +88,21 @@ var Pkg = []struct {
       spec: "github.com/consensys/gnark-crypto/ecc",
    },
    {
-      spec: "github.com/ltcsuite/ltcd/btcec/v2/ecdsa",
+      issue: "go mod tidy fail",
+      spec: "github.com/epicchainlabs/epicchain-sdk-go/crypto/ecdsa",
+   },
+   {
+      issue: "404 github.com/MrLinnea/EEE",
+      spec: "github.com/MrLinnea/EEE/btcec/v2/ecdsa",
+   },
+   {
+      issue: "go mod tidy fail",
+      spec: "github.com/muirglacier/id",
+   },
+   {
+      spec: "github.com/prysmaticlabs/prysm/v5/crypto/ecdsa",
    },
    /*
-   neofsecdsa (github.com/epicchainlabs/epicchain-sdk-go/crypto/ecdsa)
-   Package neofsecdsa collects ECDSA primitives for NeoFS cryptography.
-   Imported by 12
-   | v0.0.0-...-bb55e7d published on Dec 9, 2024 | Apache-2.0
-
-   ecdsa (github.com/consensys/gnark/std/signature/ecdsa)
-   Package ecdsa implements ECDSA signature verification over any elliptic curve.
-   Imported by 9
-   | v0.13.0 published on Jun 12, 2025 | Apache-2.0
-
-   ecdsa (github.com/PaddlePaddle/PaddleDTX/crypto/core/ecdsa)
-   Imported by 25
-   | v0.0.0-...-fd327ab published on Aug 22, 2024 | Apache-2.0
-
-   ecdsa (github.com/taurusgroup/multi-party-sig/pkg/ecdsa)
-   GO-2024-3288
-   Imported by 24
-   | v0.7.0-alpha-2025-01-28 published on Jan 28, 2025 | Apache-2.0
-
-   frostfsecdsa (github.com/TrueCloudLab/frostfs-sdk-go/crypto/ecdsa)
-   Package frostfsecdsa collects ECDSA primitives for FrostFS cryptography.
-   Imported by 11
-   | v0.0.0-...-5e759bf published on Mar 1, 2023 | Apache-2.0
-
-   ecdsa (github.com/kubernetes/dashboard/src/app/backend/cert/ecdsa)
-   Imported by 52
-   | v1.10.1 published on Dec 21, 2018 | Apache-2.0
-
-   ecdsa (github.com/MrLinnea/EEE/btcec/v2/ecdsa)
-   Imported by 20
-   | v2.0.0-...-28fbc43 published on Sep 9, 2023 | ISC
-
-   frostfsecdsa (git.frostfs.info/TrueCloudLab/frostfs-sdk-go/crypto/ecdsa)
-   Package frostfsecdsa collects ECDSA primitives for FrostFS cryptography.
-   Imported by 9
-   | v0.0.0-...-81815db published on Jun 16, 2025 | Apache-2.0
-
-   signed (github.com/privacybydesign/gabi/signed)
-   Package signed contains (1) convenience functions for ECDSA private and public key handling, and for signing and verifying byte slices with ECDSA; (2) functions for marshaling structs to signed bytes, and verifying and unmarshaling signed bytes back to structs.
-   Imported by 9
-   | v0.0.0-...-202feaa published on Feb 22, 2024 | BSD-3-Clause
-
-   envelope (github.com/libsv/go-bk/envelope)
-   Package envelope supports the JSON Envelope Spec It can be found here https://github.com/bitcoin-sv-specs/brfc-misc/tree/master/jsonenvelope Standard for serialising a JSON document in order to have consistency when ECDSA signing the document.
-   Imported by 15
-   | v0.1.6 published on Dec 15, 2021 | ISC
-
-   id (github.com/muirglacier/id)
-   Imported by 14
-   | v0.4.5 published on Dec 11, 2021 | MIT
-
-   ecdsa (github.com/prysmaticlabs/prysm/v5/crypto/ecdsa)
-   Imported by 1
-   | v5.3.3 published on Apr 9, 2025 | GPL-3.0
-   Other major versions: v4, v3
-
    ecdsa (github.com/ProtonMail/go-crypto/openpgp/ecdsa)
    Package ecdsa implements ECDSA signature, suitable for OpenPGP, as specified in RFC 6637, section 5.
    Imported by 5
@@ -532,54 +524,6 @@ var Pkg_old = []struct {
    issue  string
    spec  string
 }{
-   {
-      issue: "github.com/epicchainlabs/epicchain-sdk-go/blob/main/go.sum",
-      spec: "github.com/epicchainlabs/epicchain-sdk-go/crypto/ecdsa",
-   },
-   {
-      issue: "github.com/Consensys/gnark/blob/master/go.sum",
-      spec: "github.com/consensys/gnark/std/signature/ecdsa",
-   },
-   {
-      issue: "github.com/PaddlePaddle/PaddleDTX/blob/master/crypto/go.sum",
-      spec: "github.com/PaddlePaddle/PaddleDTX/crypto/core/ecdsa",
-   },
-   {
-      issue: "github.com/taurushq-io/multi-party-sig/blob/main/go.sum",
-      spec: "github.com/taurusgroup/multi-party-sig/pkg/ecdsa",
-   },
-   {
-      issue: "github.com/TrueCloudLab/frostfs-sdk-go/blob/master/go.sum",
-      spec: "github.com/TrueCloudLab/frostfs-sdk-go/crypto/ecdsa",
-   },
-   {
-      issue: "github.com/kubernetes/dashboard/blob/master/modules/common/certificates/go.sum",
-      spec: "github.com/kubernetes/dashboard/src/app/backend/cert/ecdsa",
-   },
-   {
-      issue: "404 github.com/MrLinnea/EEE",
-      spec: "github.com/MrLinnea/EEE/btcec/v2/ecdsa",
-   },
-   {
-      issue: "github.com/privacybydesign/gabi/blob/master/go.sum",
-      spec: "github.com/privacybydesign/gabi/signed",
-   },
-   {
-      issue: "git.frostfs.info/TrueCloudLab/frostfs-sdk-go/src/branch/master/go.sum",
-      spec: "git.frostfs.info/TrueCloudLab/frostfs-sdk-go/crypto/ecdsa",
-   },
-   {
-      issue: "github.com/libsv/go-bk/blob/master/go.sum",
-      spec: "github.com/libsv/go-bk/envelope",
-   },
-   {
-      issue: "github.com/OffchainLabs/prysm/blob/develop/go.sum",
-      spec: "github.com/prysmaticlabs/prysm/v5/crypto/ecdsa",
-   },
-   {
-      issue: "github.com/muirglacier/id/blob/master/go.sum",
-      spec: "github.com/muirglacier/id",
-   },
    {
       issue: `github.com/ProtonMail/go-crypto/issues/289
       openpgp/internal/ecc: deprecated items`,
