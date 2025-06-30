@@ -254,14 +254,12 @@ var Pkg = []struct {
       note: "publish",
       url: "github.com/shovon/elliptic-curve-pointless/issues/1",
    },
+   {
+      note: "ECDSA import key raw",
+      issue: "github.com/armortal/webcrypto-go/issues/39",
+      url: "pkg.go.dev/github.com/armortal/webcrypto-go/algorithms/ecdsa",
+   },
    /*
-   ecdsa (github.com/armortal/webcrypto-go/algorithms/ecdsa)
-   Package ecdsa implements ECDSA operations as described in the specifications at §23 (https://www.w3.org/TR/WebCryptoAPI/#ecdsa).
-   Imported by 0
-   | v0.1.0 published on Jan 22, 2025 | Apache-2.0
-   Other packages in module github.com/armortal/webcrypto-go:
-   examples/ecdsa
-
    ecdsa (github.com/vocdoni/gnark-crypto-bn254/ecc/bn254/ecdsa)
    Package ecdsa provides ECDSA signature scheme on the bn254 curve.
    Imported by 0
