@@ -12,6 +12,10 @@ var Pkg = []struct {
       spec: "github.com/starkbank/ecdsa-go/v2/ellipticcurve/ecdsa",
    },
    {
+      go_sum: 8,
+      spec: "github.com/common-library/go/security/crypto/ecdsa",
+   },
+   {
       go_sum: 10,
       spec: "github.com/tinyverse-web3/btcd/btcec/v2/ecdsa",
    },
@@ -177,10 +181,6 @@ var Pkg = []struct {
       spec: "github.com/Decred-Next/dcrnd/dcrec",
    },
    {
-      issue: "secp256k1 only",
-      spec: "github.com/multicash/mcxd/mcxec",
-   },
-   {
       go_sum: 78,
       spec: "github.com/OffchainLabs/prysm/v6/crypto/ecdsa",
    },
@@ -240,80 +240,36 @@ var Pkg = []struct {
       issue: "no sign",
       spec: "gitlab.com/alephledger/threshold-ecdsa/pkg",
    },
+   {
+      issue: "old",
+      spec: "github.com/GM-Publicchain/gm/plugin/crypto/ecdsa",
+   },
+   {
+      issue: "archived",
+      spec: "github.com/keep-network/keep-ecdsa/pkg/ecdsa",
+   },
+   {
+      issue: `github.com/PutinCoinPUT/ppcd/issues/1
+      go.mod`,
+      spec:  "github.com/PutinCoinPUT/ppcd/btcec/ecdsa",
+   },
+   {
+      issue: "go mod tidy fail",
+      spec: "github.com/aakash4dev/gnark2/std/signature/ecdsa",
+   },
+   {
+      go_sum: 69,
+      spec: "github.com/pierreleocadie/SecuraChain/pkg/ecdsa",
+   },
+   {
+      issue: "secp256k1 only",
+      spec: "github.com/multicash/mcxd/mcxec",
+   },
+   {
+      issue: "secp256k1 only",
+      spec: "github.com/wertikalk/gnark-crypto/ecc",
+   },
    /*
-   ecdsa (github.com/GM-Publicchain/gm/plugin/crypto/ecdsa)
-   Imported by 4
-   | v0.0.0-...-0abe6a2 published on Sep 19, 2019 | BSD-3-Clause
-
-   keep-ecdsa (github.com/keep-network/keep-ecdsa)
-   command
-   Imported by 0
-   | v1.8.2 published on Sep 14, 2022 | MIT
-   Other packages in module github.com/keep-network/keep-ecdsa:
-   pkg/ecdsa
-   pkg/chain
-   pkg/client
-   pkg/ecdsa/tss
-
-   ecdsa (github.com/PutinCoinPUT/ppcd/btcec/ecdsa)
-   Imported by 3
-   | v0.0.0-...-3ecc070 published on Jan 31, 2024 | MIT
-
-   ecdsa (github.com/aakash4dev/gnark2/std/signature/ecdsa)
-   Package ecdsa implements ECDSA signature verification over any elliptic curve.
-   Imported by 0
-   | v0.0.0-...-70ee9f5 published on Dec 19, 2023 | Apache-2.0
-
-   ecdsa (github.com/pierreleocadie/SecuraChain/pkg/ecdsa)
-   Package ecdsa provides utilities for generating and managing ECDSA key pairs.
-   Imported by 0
-   | v1.0.0-release published on May 19, 2024 | MIT
-
-   jwkgen (github.com/necessaryeros/jwkgen)
-   command
-   Imported by 0
-   | v0.0.0-...-9cb2e34 published on May 6, 2025 | MIT
-
-   ecdsa (github.com/wertikalk/gnark-crypto/ecc/bls12-377/ecdsa)
-   Package ecdsa provides ECDSA signature scheme on the bls12-377 curve.
-   Imported by 0
-   | v0.0.0-...-6c19a75 published on Aug 4, 2024 | Apache-2.0
-   Other packages in module github.com/wertikalk/gnark-crypto:
-   ecc/bls12-378/ecdsa
-   ecc/bls12-381/ecdsa
-   ecc/bls24-315/ecdsa
-   ecc/bls24-317/ecdsa
-   ecc/bn254/ecdsa
-   +5 more
-
-   ecdsa (github.com/danivilardell/gnark/v2/std/signature/ecdsa)
-   Package ecdsa implements ECDSA signature verification over any elliptic curve.
-   Imported by 0
-   | v2.0.0 published on Jul 18, 2024 | Apache-2.0
-   Other major versions: v1
-
-   jwkgen (github.com/frostyrest/jwkgen)
-   command
-   Imported by 0
-   | v0.0.0-...-36f70b0 published on May 18, 2025 | MIT
-
-   ecdsa (github.com/Overclock-Validator/gnark-crypto/ecc/bls12-377/ecdsa)
-   Package ecdsa provides ECDSA signature scheme on the bls12-377 curve.
-   Imported by 0
-   | v0.0.0-...-68aa4a9 published on Mar 9, 2025 | Apache-2.0
-   Other packages in module github.com/Overclock-Validator/gnark-crypto:
-   ecc/bls12-381/ecdsa
-   ecc/bls24-315/ecdsa
-   ecc/bls24-317/ecdsa
-   ecc/bn254/ecdsa
-   ecc/bw6-633/ecdsa
-   +4 more
-
-   ecdsa (github.com/common-library/go/security/crypto/ecdsa)
-   Package ecdsa provides ecdsa crypto related implementations.
-   Imported by 0
-   | v1.2.2 published on May 5, 2025 | Apache-2.0
-
    ecdsa (github.com/RonanThoraval/gnark/std/signature/ecdsa)
    Package ecdsa implements ECDSA signature verification over any elliptic curve.
    Imported by 0
@@ -335,11 +291,6 @@ var Pkg = []struct {
    Package ecdsa provides ECDSA signature scheme on the bn254 curve.
    Imported by 0
    | v0.10.1 published on Apr 2, 2023 | Apache-2.0
-
-   jwkgen (github.com/glamorouscub/jwkgen)
-   command
-   Imported by 0
-   | v0.0.0-...-d06e9d8 published on Feb 27, 2025 | MIT
    */
 }
 
@@ -358,19 +309,6 @@ var Pkg_old = []struct {
    {
       issue: "github.com/opzlabs/cosmos-sdk-terra3/blob/main/go.sum",
       spec: "github.com/opzlabs/cosmos-sdk-v0.46.13-terra.3/crypto/keys/secp256r1",
-   },
-   {
-      issue: "old",
-      spec: "github.com/GM-Publicchain/gm/plugin/crypto/ecdsa",
-   },
-   {
-      issue: "archived",
-      spec: "github.com/keep-network/keep-ecdsa/pkg/ecdsa",
-   },
-   {
-      issue: `github.com/PutinCoinPUT/ppcd/issues/1
-      go.mod`,
-      spec:  "github.com/PutinCoinPUT/ppcd/btcec/ecdsa",
    },
    {
       issue: "EccFrog512CK2 elliptic curve",
