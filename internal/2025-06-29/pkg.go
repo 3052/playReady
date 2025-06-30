@@ -12,12 +12,8 @@ var Pkg = []struct {
       spec: "github.com/starkbank/ecdsa-go/v2/ellipticcurve/ecdsa",
    },
    {
-      go_sum: 8,
-      spec: "github.com/common-library/go/security/crypto/ecdsa",
-   },
-   {
       go_sum: 10,
-      spec: "github.com/tinyverse-web3/btcd/btcec/v2/ecdsa",
+      spec:   "github.com/btcsuite/btcd/btcec/v2/ecdsa",
    },
    {
       go_sum: 10,
@@ -29,7 +25,12 @@ var Pkg = []struct {
    },
    {
       go_sum: 10,
-      spec:   "github.com/btcsuite/btcd/btcec/v2/ecdsa",
+      spec: "github.com/tinyverse-web3/btcd/btcec/v2/ecdsa",
+   },
+   {
+      issue: `github.com/common-library/go/issues/158
+      elliptic curve math`,
+      spec: "github.com/common-library/go/security/crypto/ecdsa",
    },
    {
       go_sum: 12,
@@ -92,7 +93,8 @@ var Pkg = []struct {
       spec:   "github.com/cosmos/cosmos-sdk/crypto/keys/secp256r1",
    },
    {
-      issue: "D deprecated",
+      issue: `pkg.go.dev/crypto/ecdsa@go1.25rc1#PublicKey.X
+      pkg.go.dev/crypto/ecdsa@go1.25rc1#PublicKey.Y`,
       spec:  "crypto/ecdsa",
    },
    {
@@ -136,19 +138,6 @@ var Pkg = []struct {
       spec: "github.com/meshplus/bitxhub-kit/crypto/asym/ecdsa",
    },
    {
-      issue: `github.com/primefactor-io/ecc/issues/1
-      secp256r1`,
-      spec:  "github.com/primefactor-io/ecc/pkg/ecdsa",
-   },
-   {
-      issue: "requires crypto/ecdsa",
-      spec: "github.com/common-fate/httpsig/alg_ecdsa",
-   },
-   {
-      issue: "requires crypto/elliptic.Curve.ScalarBaseMult",
-      spec: "github.com/FISCO-BCOS/crypto/ecdsa",
-   },
-   {
       issue: "secp256k1 only",
       spec: "github.com/EXCCoin/exccd/dcrec",
    },
@@ -181,6 +170,19 @@ var Pkg = []struct {
       spec: "github.com/Decred-Next/dcrnd/dcrec",
    },
    {
+      issue: `github.com/primefactor-io/ecc/issues/1
+      secp256r1`,
+      spec:  "github.com/primefactor-io/ecc/pkg/ecdsa",
+   },
+   {
+      issue: "requires crypto/ecdsa",
+      spec: "github.com/common-fate/httpsig/alg_ecdsa",
+   },
+   {
+      issue: "requires crypto/elliptic.Curve.ScalarBaseMult",
+      spec: "github.com/FISCO-BCOS/crypto/ecdsa",
+   },
+   {
       go_sum: 78,
       spec: "github.com/OffchainLabs/prysm/v6/crypto/ecdsa",
    },
@@ -193,21 +195,17 @@ var Pkg = []struct {
       spec: "github.com/Layr-Labs/eigensdk-go/crypto/ecdsa",
    },
    {
-      issue: "fucking stupid",
-      spec: "github.com/sonr-io/multi-party-sig/pkg/ecdsa",
-   },
-   {
-      issue: "go mod tidy fail",
-      spec: "chainmaker.org/chainmaker/common/v3/crypto/asym/ecdsa",
-   },
-   {
       issue: "cursed",
       spec: "github.com/keep-network/keep-core/pkg/chain/ethereum/ecdsa",
-   }
+   },
    {
       issue: `github.com/cloudflare/pat-go/issues/61
       ScalarBaseMult is deprecated`,
       spec:  "github.com/cloudflare/pat-go/ecdsa",
+   },
+   {
+      issue: "go mod tidy fail",
+      spec: "chainmaker.org/chainmaker/common/v3/crypto/asym/ecdsa",
    },
    {
       issue: `github.com/runZeroInc/excrypto/issues/37
@@ -228,15 +226,6 @@ var Pkg = []struct {
       spec: "github.com/0xPellNetwork/pelldvs-libs/crypto/ecdsa",
    },
    {
-      issue: "weird",
-      spec: "github.com/okx/threshold-lib/tss/ecdsa/sign",
-   },
-   {
-      issue: `github.com/A1andNS/newCrypto/issues/1
-      ecdsa: need way to generate PrivateKey from bytes`,
-      spec:  "https://github.com/A1andNS/newCrypto/ecdsa",
-   },
-   {
       issue: "no sign",
       spec: "gitlab.com/alephledger/threshold-ecdsa/pkg",
    },
@@ -247,15 +236,6 @@ var Pkg = []struct {
    {
       issue: "archived",
       spec: "github.com/keep-network/keep-ecdsa/pkg/ecdsa",
-   },
-   {
-      issue: `github.com/PutinCoinPUT/ppcd/issues/1
-      go.mod`,
-      spec:  "github.com/PutinCoinPUT/ppcd/btcec/ecdsa",
-   },
-   {
-      issue: "go mod tidy fail",
-      spec: "github.com/aakash4dev/gnark2/std/signature/ecdsa",
    },
    {
       go_sum: 69,
@@ -269,46 +249,35 @@ var Pkg = []struct {
       issue: "secp256k1 only",
       spec: "github.com/wertikalk/gnark-crypto/ecc",
    },
-   /*
-   ecdsa (github.com/RonanThoraval/gnark/std/signature/ecdsa)
-   Package ecdsa implements ECDSA signature verification over any elliptic curve.
-   Imported by 0
-   | v0.0.0-...-4c0a751 published on Oct 7, 2024 | Apache-2.0
-
-   ecdsa (github.com/airchains-network/gnark/std/signature/ecdsa)
-   Package ecdsa implements ECDSA signature verification over any elliptic curve.
-   Imported by 0
-   | v1.0.1 published on Dec 19, 2023 | Apache-2.0
-
-   ecdsa (github.com/armortal/webcrypto-go/algorithms/ecdsa)
-   Package ecdsa implements ECDSA operations as described in the specifications at §23 (https://www.w3.org/TR/WebCryptoAPI/#ecdsa).
-   Imported by 0
-   | v0.1.0 published on Jan 22, 2025 | Apache-2.0
-   Other packages in module github.com/armortal/webcrypto-go:
-   examples/ecdsa
-
-   ecdsa (github.com/vocdoni/gnark-crypto-bn254/ecc/bn254/ecdsa)
-   Package ecdsa provides ECDSA signature scheme on the bn254 curve.
-   Imported by 0
-   | v0.10.1 published on Apr 2, 2023 | Apache-2.0
-   */
-}
-
-var Pkg_old = []struct {
-   issue  string
-   spec  string
-}{
    {
-      issue: "fucking stupid",
-      spec: "github.com/tink-crypto/tink-go/v2/signature/ecdsa",
+      issue: "go mod tidy fail",
+      spec: "github.com/RonanThoraval/gnark/std/signature/ecdsa",
    },
    {
-      issue: "github.com/libp2p/go-libp2p/blob/master/go.sum",
+      issue: "go mod tidy fail",
+      spec: "github.com/airchains-network/gnark/std/signature/ecdsa",
+   },
+   {
+      issue: `github.com/A1andNS/newCrypto/issues/1
+      ecdsa: need way to generate PrivateKey from bytes`,
+      spec:  "https://github.com/A1andNS/newCrypto/ecdsa",
+   },
+   {
+      issue: `github.com/PutinCoinPUT/ppcd/issues/1
+      go.mod`,
+      spec:  "github.com/PutinCoinPUT/ppcd/btcec/ecdsa",
+   },
+   {
+      issue: "go mod tidy fail",
+      spec: "github.com/aakash4dev/gnark2/std/signature/ecdsa",
+   },
+   {
+      issue: "secp256r1 missing",
+      spec: "github.com/vocdoni/gnark-crypto-bn254/ecc",
+   },
+   {
+      go_sum: 54,
       spec: "github.com/libp2p/go-libp2p/core/crypto",
-   },
-   {
-      issue: "github.com/opzlabs/cosmos-sdk-terra3/blob/main/go.sum",
-      spec: "github.com/opzlabs/cosmos-sdk-v0.46.13-terra.3/crypto/keys/secp256r1",
    },
    {
       issue: "EccFrog512CK2 elliptic curve",
@@ -319,20 +288,16 @@ var Pkg_old = []struct {
       spec: "github.com/shovon/elliptic-curve-pointless/issues/1",
    },
    {
-      issue: `github.com/armortal/webcrypto-go/issues/39
-      ECDSA import key raw`,
-      spec:  "github.com/armortal/webcrypto-go/algorithms/ecdsa",
-   },
-   {
-      issue: "github.com/BeratOz01/gnark/blob/master/go.sum",
+      issue: "go mod tidy fail",
       spec: "github.com/BeratOz01/gnark/std/signature/ecdsa",
-   },
-   {
-      issue: "fork",
-      spec: "github.com/Overclock-Validator/gnark-crypto/ecc",
    },
    {
       issue: "uses crypto/ecdsa",
       spec: "github.com/denpeshkov/httpsign/ecdsa",
+   },
+   {
+      issue: `github.com/armortal/webcrypto-go/issues/39
+      ECDSA import key raw`,
+      spec:  "github.com/armortal/webcrypto-go/algorithms/ecdsa",
    },
 }

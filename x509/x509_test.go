@@ -5,15 +5,15 @@ import (
    "testing"
 )
 
-func TestPkcs8(t *testing.T) {
+func TestPem(t *testing.T) {
    data := bytes.Repeat([]byte{1}, 32)
    var key ecPrivateKey
    key.New(data)
-   pkcs8, err := key.pkcs8()
+   data1, err := key.pem()
    if err != nil {
       t.Fatal(err)
    }
-   ecdsa, err := pkcs8.ecdsa()
+   ecdsa, err := pemDecode(data1)
    if err != nil {
       t.Fatal(err)
    }
@@ -22,7 +22,7 @@ func TestPkcs8(t *testing.T) {
    }
 }
 
-func TestEc(t *testing.T) {
+func TestEcdsa(t *testing.T) {
    data := bytes.Repeat([]byte{1}, 32)
    var key ecPrivateKey
    key.New(data)
