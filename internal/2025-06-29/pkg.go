@@ -4,9 +4,33 @@ package ecdsa
 
 var Pkg = []struct {
    go_sum int
-   issue string
+   issue  string
    spec   string
 }{
+   {
+      go_sum: 10,
+      spec:   "github.com/btcsuite/btcd/btcec/v2/ecdsa",
+   },
+   {
+      go_sum: 18,
+      spec:   "github.com/ldclabs/cose/key/ecdsa",
+   },
+   {
+      go_sum: 56,
+      spec:   "github.com/nspcc-dev/neofs-sdk-go/crypto/ecdsa",
+   },
+   {
+      go_sum: 85,
+      spec: "github.com/renproject/id",
+   },
+   {
+      go_sum: 133,
+      spec: "github.com/hellobchain/newcryptosm/ecdsa",
+   },
+   {
+      go_sum: 230,
+      spec:   "github.com/cosmos/cosmos-sdk/crypto/keys/secp256r1",
+   },
    {
       issue: "D deprecated",
       spec:  "crypto/ecdsa",
@@ -16,60 +40,21 @@ var Pkg = []struct {
       spec:  "github.com/decred/dcrd/dcrec",
    },
    {
-      go_sum: 10,
-      spec:  "github.com/btcsuite/btcd/btcec/v2/ecdsa",
+      issue: "secp256k1 is not compatible with secp256r1",
+      spec: "github.com/dustinxie/ecc",
    },
    {
-      go_sum: 230,
-      spec:  "github.com/cosmos/cosmos-sdk/crypto/keys/secp256r1",
+      issue: "go mod tidy fail",
+      spec: "github.com/bnb-chain/tss-lib/v2/ecdsa/signing",
    },
    {
-      spec:  "github.com/nspcc-dev/neofs-sdk-go/crypto/ecdsa",
+      issue: "secp256k1 only",
+      spec: "github.com/consensys/gnark-crypto/ecc",
+   },
+   {
+      spec: "github.com/ltcsuite/ltcd/btcec/v2/ecdsa",
    },
    /*
-   ecdsa (github.com/ldclabs/cose/key/ecdsa)
-   Package ecdsa implements signature algorithm ECDSA for COSE as defined in RFC9053.
-   Imported by 0
-   | v1.3.2 published on Sep 29, 2024 | MIT
-
-   id (github.com/renproject/id)
-   Imported by 42
-   | v0.4.2 published on Jun 19, 2020 | MIT
-
-   ecdsa (github.com/hellobchain/newcryptosm/ecdsa)
-   Package ecdsa implements the Elliptic Curve Digital Signature Algorithm, as defined in FIPS 186-3.
-   Imported by 17
-   | v0.0.0-...-edb949a published on Oct 19, 2022 | Apache-2.0
-
-   ecc (github.com/dustinxie/ecc)
-   Package ecdsa implements the Elliptic Curve Digital Signature Algorithm, as defined in FIPS 186-3.
-   Imported by 36
-   | v0.0.0-...-9595441 published on May 11, 2021 | MIT
-
-   keygen (github.com/bnb-chain/tss-lib/v2/ecdsa/keygen)
-   Imported by 18
-   | v2.0.2 published on Jan 16, 2024 | MIT
-   Other major versions: v1
-   Other packages in module github.com/bnb-chain/tss-lib/v2:
-   ecdsa/signing
-   ecdsa/resharing
-
-   ecdsa (github.com/consensys/gnark-crypto/ecc/secp256k1/ecdsa)
-   Package ecdsa provides ECDSA signature scheme on the secp256k1 curve.
-   Imported by 10
-   | v0.18.0 published on Jun 9, 2025 | Apache-2.0
-   Other packages in module github.com/consensys/gnark-crypto:
-   ecc/stark-curve/ecdsa
-   ecc/bls12-377/ecdsa
-   ecc/bls12-381/ecdsa
-   ecc/bls24-315/ecdsa
-   ecc/bls24-317/ecdsa
-   +5 more
-
-   ecdsa (github.com/ltcsuite/ltcd/btcec/v2/ecdsa)
-   Imported by 28
-   | v2.3.2 published on Jan 31, 2024 | ISC
-
    neofsecdsa (github.com/epicchainlabs/epicchain-sdk-go/crypto/ecdsa)
    Package neofsecdsa collects ECDSA primitives for NeoFS cryptography.
    Imported by 12
@@ -544,252 +529,227 @@ var Pkg = []struct {
 }
 
 var Pkg_old = []struct {
-   issue string
-   note  string
-   spec   string
+   issue  string
+   spec  string
 }{
    {
-      note: "github.com/renproject/id/blob/master/go.sum",
-      spec:  "github.com/renproject/id",
+      issue: "github.com/epicchainlabs/epicchain-sdk-go/blob/main/go.sum",
+      spec: "github.com/epicchainlabs/epicchain-sdk-go/crypto/ecdsa",
    },
    {
-      note: "github.com/hellobchain/newcryptosm/blob/main/go.sum",
-      spec:  "github.com/hellobchain/newcryptosm/ecdsa",
+      issue: "github.com/Consensys/gnark/blob/master/go.sum",
+      spec: "github.com/consensys/gnark/std/signature/ecdsa",
    },
    {
-      note: "secp256k1 is not compatible with secp256r1",
-      spec:  "github.com/dustinxie/ecc",
+      issue: "github.com/PaddlePaddle/PaddleDTX/blob/master/crypto/go.sum",
+      spec: "github.com/PaddlePaddle/PaddleDTX/crypto/core/ecdsa",
    },
    {
-      note: "github.com/bnb-chain/tss-lib/blob/master/go.sum",
-      spec:  "github.com/bnb-chain/tss-lib/v2/ecdsa/keygen",
+      issue: "github.com/taurushq-io/multi-party-sig/blob/main/go.sum",
+      spec: "github.com/taurusgroup/multi-party-sig/pkg/ecdsa",
    },
    {
-      note: "github.com/Consensys/gnark-crypto/blob/master/go.sum",
-      spec:  "github.com/consensys/gnark-crypto/ecc",
+      issue: "github.com/TrueCloudLab/frostfs-sdk-go/blob/master/go.sum",
+      spec: "github.com/TrueCloudLab/frostfs-sdk-go/crypto/ecdsa",
    },
    {
-      note: "github.com/ltcsuite/ltcd/blob/master/btcec/go.sum",
-      spec:  "github.com/ltcsuite/ltcd/btcec/v2/ecdsa",
+      issue: "github.com/kubernetes/dashboard/blob/master/modules/common/certificates/go.sum",
+      spec: "github.com/kubernetes/dashboard/src/app/backend/cert/ecdsa",
    },
    {
-      note: "github.com/epicchainlabs/epicchain-sdk-go/blob/main/go.sum",
-      spec:  "github.com/epicchainlabs/epicchain-sdk-go/crypto/ecdsa",
+      issue: "404 github.com/MrLinnea/EEE",
+      spec: "github.com/MrLinnea/EEE/btcec/v2/ecdsa",
    },
    {
-      note: "github.com/Consensys/gnark/blob/master/go.sum",
-      spec:  "github.com/consensys/gnark/std/signature/ecdsa",
+      issue: "github.com/privacybydesign/gabi/blob/master/go.sum",
+      spec: "github.com/privacybydesign/gabi/signed",
    },
    {
-      note: "github.com/PaddlePaddle/PaddleDTX/blob/master/crypto/go.sum",
-      spec:  "github.com/PaddlePaddle/PaddleDTX/crypto/core/ecdsa",
+      issue: "git.frostfs.info/TrueCloudLab/frostfs-sdk-go/src/branch/master/go.sum",
+      spec: "git.frostfs.info/TrueCloudLab/frostfs-sdk-go/crypto/ecdsa",
    },
    {
-      note: "github.com/taurushq-io/multi-party-sig/blob/main/go.sum",
-      spec:  "github.com/taurusgroup/multi-party-sig/pkg/ecdsa",
+      issue: "github.com/libsv/go-bk/blob/master/go.sum",
+      spec: "github.com/libsv/go-bk/envelope",
    },
    {
-      note: "github.com/TrueCloudLab/frostfs-sdk-go/blob/master/go.sum",
-      spec:  "github.com/TrueCloudLab/frostfs-sdk-go/crypto/ecdsa",
+      issue: "github.com/OffchainLabs/prysm/blob/develop/go.sum",
+      spec: "github.com/prysmaticlabs/prysm/v5/crypto/ecdsa",
    },
    {
-      note: "github.com/kubernetes/dashboard/blob/master/modules/common/certificates/go.sum",
-      spec:  "github.com/kubernetes/dashboard/src/app/backend/cert/ecdsa",
+      issue: "github.com/muirglacier/id/blob/master/go.sum",
+      spec: "github.com/muirglacier/id",
    },
    {
-      note: "404 github.com/MrLinnea/EEE",
-      spec:  "github.com/MrLinnea/EEE/btcec/v2/ecdsa",
-   },
-   {
-      note: "github.com/privacybydesign/gabi/blob/master/go.sum",
-      spec:  "github.com/privacybydesign/gabi/signed",
-   },
-   {
-      note: "git.frostfs.info/TrueCloudLab/frostfs-sdk-go/src/branch/master/go.sum",
-      spec:  "git.frostfs.info/TrueCloudLab/frostfs-sdk-go/crypto/ecdsa",
-   },
-   {
-      note: "github.com/libsv/go-bk/blob/master/go.sum",
-      spec:  "github.com/libsv/go-bk/envelope",
-   },
-   {
-      note: "github.com/OffchainLabs/prysm/blob/develop/go.sum",
-      spec:  "github.com/prysmaticlabs/prysm/v5/crypto/ecdsa",
-   },
-   {
-      note: "github.com/muirglacier/id/blob/master/go.sum",
-      spec:  "github.com/muirglacier/id",
-   },
-   {
-      issue: "github.com/ProtonMail/go-crypto/issues/289",
-      note: "openpgp/internal/ecc: deprecated items",
+      issue: `github.com/ProtonMail/go-crypto/issues/289
+      openpgp/internal/ecc: deprecated items`,
       spec:  "github.com/ProtonMail/go-crypto/openpgp/ecdsa",
    },
    {
-      note: "github.com/meshplus/bitxhub-kit/blob/master/go.sum",
+      issue: "github.com/meshplus/bitxhub-kit/blob/master/go.sum",
       spec: "github.com/meshplus/bitxhub-kit/crypto/asym/ecdsa",
    },
    {
-      note: "requires crypto/ecdsa",
+      issue: "requires crypto/ecdsa",
       spec: "github.com/common-fate/httpsig/alg_ecdsa",
    },
    {
-      note: "secp256r1",
-      issue: "github.com/primefactor-io/ecc/issues/1",
-      spec: "github.com/primefactor-io/ecc/pkg/ecdsa",
+      issue: `github.com/primefactor-io/ecc/issues/1
+      secp256r1`,
+      spec:  "github.com/primefactor-io/ecc/pkg/ecdsa",
    },
    {
-      note: "requires crypto/elliptic.Curve.ScalarBaseMult",
+      issue: "requires crypto/elliptic.Curve.ScalarBaseMult",
       spec: "github.com/FISCO-BCOS/crypto/ecdsa",
    },
    {
-      note: "secp256k1 only",
+      issue: "secp256k1 only",
       spec: "github.com/EXCCoin/exccd/dcrec",
    },
    {
-      note: "secp256k1 only",
+      issue: "secp256k1 only",
       spec: "github.com/Decred-Next/dcrnd/dcrec",
    },
    {
-      note: "secp256k1 only",
+      issue: "secp256k1 only",
       spec: "github.com/sebitt27/dcrd/dcrec",
    },
    {
-      note: "PASS github.com/starkbank/ecdsa-go/blob/master/go.mod",
+      issue: "PASS github.com/starkbank/ecdsa-go/blob/master/go.mod",
       spec: "github.com/starkbank/ecdsa-go/v2/ellipticcurve/ecdsa",
    },
    {
-      note: "404 github.com/sodiumlabs/tss-lib",
+      issue: "404 github.com/sodiumlabs/tss-lib",
       spec: "github.com/sodiumlabs/tss-lib",
    },
    {
-      note: "weird",
+      issue: "weird",
       spec: "github.com/zeta-chain/tss-lib/ecdsa/signing",
    },
    {
-      note: "weird",
+      issue: "weird",
       spec: "github.com/ordinox/thorchain-tss-lib/ecdsa/signing",
    },
    {
-      note: "github.com/xuperchain/crypto/blob/master/go.sum",
+      issue: "github.com/xuperchain/crypto/blob/master/go.sum",
       spec: "github.com/xuperchain/crypto",
    },
    {
-      note: "gitlab.com/thorchain/tss/tss-lib/-/blob/master/go.sum",
+      issue: "gitlab.com/thorchain/tss/tss-lib/-/blob/master/go.sum",
       spec: "gitlab.com/thorchain/tss/tss-lib/ecdsa/signing",
    },
    {
-      note: "fucking stupid",
+      issue: "fucking stupid",
       spec: "github.com/tink-crypto/tink-go/v2/signature/ecdsa",
    },
    {
-      note: "secp256k1 only",
+      issue: "secp256k1 only",
       spec: "github.com/multicash/mcxd/mcxec",
    },
    {
-      note: "secp256k1 only",
+      issue: "secp256k1 only",
       spec: "github.com/Decred-Next/dcrnd/dcrec",
    },
    {
-      note: "github.com/AVecsi/pq-gabi/blob/master/go.sum",
+      issue: "github.com/AVecsi/pq-gabi/blob/master/go.sum",
       spec: "github.com/AVecsi/pq-gabi/signed",
    },
    {
-      note: "github.com/libp2p/go-libp2p/blob/master/go.sum",
+      issue: "github.com/libp2p/go-libp2p/blob/master/go.sum",
       spec: "github.com/libp2p/go-libp2p/core/crypto",
    },
    {
-      note: "uses crypto/ecdsa",
+      issue: "uses crypto/ecdsa",
       spec: "github.com/libs4go/crypto/ecdsa",
    },
    {
-      note: "github.com/Layr-Labs/eigensdk-go/blob/dev/go.sum",
+      issue: "github.com/Layr-Labs/eigensdk-go/blob/dev/go.sum",
       spec: "github.com/Layr-Labs/eigensdk-go/crypto/ecdsa",
    },
    {
-      note: "fucking stupid",
+      issue: "fucking stupid",
       spec: "github.com/sonr-io/multi-party-sig/pkg/ecdsa",
    },
    {
-      note: "git.chainmaker.org.cn/chainmaker/common/-/blob/master/go.sum",
+      issue: "git.chainmaker.org.cn/chainmaker/common/-/blob/master/go.sum",
       spec: "chainmaker.org/chainmaker/common/v3/crypto/asym/ecdsa",
    },
    {
-      note: "ScalarBaseMult is deprecated",
-      issue: "github.com/cloudflare/pat-go/issues/61",
-      spec: "github.com/cloudflare/pat-go/ecdsa",
+      issue: `github.com/cloudflare/pat-go/issues/61
+      ScalarBaseMult is deprecated`,
+      spec:  "github.com/cloudflare/pat-go/ecdsa",
    },
    {
-      note: "crypto/ecdsa need way to generate PrivateKey from bytes",
-      issue: "github.com/runZeroInc/excrypto/issues/37",
-      spec: "github.com/runZeroInc/excrypto/crypto/ecdsa",
+      issue: `github.com/runZeroInc/excrypto/issues/37
+      crypto/ecdsa need way to generate PrivateKey from bytes`,
+      spec:  "github.com/runZeroInc/excrypto/crypto/ecdsa",
    },
    {
-      note: "ECDSA key from bytes",
-      issue: "github.com/svicknesh/key/issues/1",
-      spec: "github.com/svicknesh/key/v2",
+      issue: `github.com/svicknesh/key/issues/1
+      ECDSA key from bytes`,
+      spec:  "github.com/svicknesh/key/v2",
    },
    {
-      note: "ecdsa: need way to generate PrivateKey from bytes",
-      issue: "github.com/A1andNS/newCrypto/issues/1",
-      spec: "https://github.com/A1andNS/newCrypto/ecdsa",
+      issue: `github.com/A1andNS/newCrypto/issues/1
+      ecdsa: need way to generate PrivateKey from bytes`,
+      spec:  "https://github.com/A1andNS/newCrypto/ecdsa",
    },
    {
-      note: "weird",
+      issue: "weird",
       spec: "github.com/okx/threshold-lib/tss/ecdsa/sign",
    },
    {
-      note: "github.com/flokiorg/go-flokicoin/blob/main/go.sum",
+      issue: "github.com/flokiorg/go-flokicoin/blob/main/go.sum",
       spec: "github.com/flokiorg/go-flokicoin/crypto/ecdsa",
    },
    {
-      note: "no sign",
+      issue: "no sign",
       spec: "github.com/0xPellNetwork/pelldvs-libs/crypto/ecdsa",
    },
    {
-      note: "github.com/opzlabs/cosmos-sdk-terra3/blob/main/go.sum",
+      issue: "github.com/opzlabs/cosmos-sdk-terra3/blob/main/go.sum",
       spec: "github.com/opzlabs/cosmos-sdk-v0.46.13-terra.3/crypto/keys/secp256r1",
    },
    {
-      note: "no sign",
+      issue: "no sign",
       spec: "gitlab.com/alephledger/threshold-ecdsa/pkg",
    },
    {
-      note: "old",
+      issue: "old",
       spec: "github.com/GM-Publicchain/gm/plugin/crypto/ecdsa",
    },
    {
-      note: "archived",
+      issue: "archived",
       spec: "github.com/keep-network/keep-ecdsa/pkg/ecdsa",
    },
    {
-      note: "go.mod",
-      issue: "github.com/PutinCoinPUT/ppcd/issues/1",
-      spec: "github.com/PutinCoinPUT/ppcd/btcec/ecdsa",
+      issue: `github.com/PutinCoinPUT/ppcd/issues/1
+      go.mod`,
+      spec:  "github.com/PutinCoinPUT/ppcd/btcec/ecdsa",
    },
    {
-      note: "EccFrog512CK2 elliptic curve",
+      issue: "EccFrog512CK2 elliptic curve",
       spec: "github.com/shovon/go-eccfrog512ck2/ecc/ecdsa",
    },
    {
-      note: "publish",
+      issue: "publish",
       spec: "github.com/shovon/elliptic-curve-pointless/issues/1",
    },
    {
-      note: "ECDSA import key raw",
-      issue: "github.com/armortal/webcrypto-go/issues/39",
-      spec: "github.com/armortal/webcrypto-go/algorithms/ecdsa",
+      issue: `github.com/armortal/webcrypto-go/issues/39
+      ECDSA import key raw`,
+      spec:  "github.com/armortal/webcrypto-go/algorithms/ecdsa",
    },
    {
-      note: "github.com/BeratOz01/gnark/blob/master/go.sum",
+      issue: "github.com/BeratOz01/gnark/blob/master/go.sum",
       spec: "github.com/BeratOz01/gnark/std/signature/ecdsa",
    },
    {
-      note: "fork",
+      issue: "fork",
       spec: "github.com/Overclock-Validator/gnark-crypto/ecc",
    },
    {
-      note: "uses crypto/ecdsa",
+      issue: "uses crypto/ecdsa",
       spec: "github.com/denpeshkov/httpsign/ecdsa",
    },
 }
