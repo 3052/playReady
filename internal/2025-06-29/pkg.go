@@ -13,6 +13,14 @@ var Pkg = []struct {
    },
    {
       go_sum: 10,
+      spec: "github.com/tinyverse-web3/btcd/btcec/v2/ecdsa",
+   },
+   {
+      go_sum: 10,
+      spec: "github.com/flokiorg/go-flokicoin/crypto/ecdsa",
+   },
+   {
+      go_sum: 10,
       spec: "github.com/ltcsuite/ltcd/btcec/v2/ecdsa",
    },
    {
@@ -184,88 +192,55 @@ var Pkg = []struct {
       go_sum: 87,
       spec: "github.com/Layr-Labs/eigensdk-go/crypto/ecdsa",
    },
+   {
+      issue: "fucking stupid",
+      spec: "github.com/sonr-io/multi-party-sig/pkg/ecdsa",
+   },
+   {
+      issue: "go mod tidy fail",
+      spec: "chainmaker.org/chainmaker/common/v3/crypto/asym/ecdsa",
+   },
+   {
+      issue: "cursed",
+      spec: "github.com/keep-network/keep-core/pkg/chain/ethereum/ecdsa",
+   }
+   {
+      issue: `github.com/cloudflare/pat-go/issues/61
+      ScalarBaseMult is deprecated`,
+      spec:  "github.com/cloudflare/pat-go/ecdsa",
+   },
+   {
+      issue: `github.com/runZeroInc/excrypto/issues/37
+      crypto/ecdsa need way to generate PrivateKey from bytes`,
+      spec:  "github.com/runZeroInc/excrypto/crypto/ecdsa",
+   },
+   {
+      issue: `github.com/svicknesh/key/issues/1
+      ECDSA key from bytes`,
+      spec:  "github.com/svicknesh/key/v2",
+   },
+   {
+      issue: "go mod tidy fail",
+      spec: "github.com/sonrhq/sonr/crypto/signatures/ecdsa",
+   },
+   {
+      issue: "no sign",
+      spec: "github.com/0xPellNetwork/pelldvs-libs/crypto/ecdsa",
+   },
+   {
+      issue: "weird",
+      spec: "github.com/okx/threshold-lib/tss/ecdsa/sign",
+   },
+   {
+      issue: `github.com/A1andNS/newCrypto/issues/1
+      ecdsa: need way to generate PrivateKey from bytes`,
+      spec:  "https://github.com/A1andNS/newCrypto/ecdsa",
+   },
+   {
+      issue: "no sign",
+      spec: "gitlab.com/alephledger/threshold-ecdsa/pkg",
+   },
    /*
-   sign (github.com/ORBAT/Peerdoc/pkg/crypto/sign)
-   package sign provides a standardized interface for cryptographic signatures
-   and a default implementation with ECDSA with the secp256k1 curve.
-   Imported by 4
-   | v0.0.0-...-2f646e5 published on Mar 11, 2019 | MIT
-   
-   ecdsa (github.com/sonr-io/multi-party-sig/pkg/ecdsa)
-   Imported by 3
-   | v0.7.0 published on Jun 13, 2022 | Apache-2.0
-
-   ecdsa (chainmaker.org/chainmaker/common/v2/crypto/asym/ecdsa)
-   nolint
-   Imported by 3
-   | v2.4.0 published on May 28, 2025 | Apache-2.0
-
-   abi (github.com/keep-network/keep-core/pkg/chain/ethereum/ecdsa/gen/abi)
-   Imported by 3
-   | v1.21.0 published on Feb 1, 2024 | MIT
-   Other packages in module github.com/keep-network/keep-core:
-   pkg/chain/ethereum/ecdsa/gen/contract
-   pkg/chain/ethereum/ecdsa/gen
-   pkg/chain/ethereum/ecdsa/gen/cmd
-
-   ecdsa (github.com/tinyverse-web3/btcd/btcec/v2/ecdsa)
-   Imported by 3
-   | v2.3.4 published on Aug 21, 2024 | ISC
-
-   ecdsa (github.com/cloudflare/pat-go/ecdsa)
-   Package ecdsa implements the Elliptic Curve Digital Signature Algorithm, as defined in FIPS 186-3.
-   Imported by 1
-   | v0.0.0-...-555c9a4 published on Jun 11, 2025 | BSD-3-Clause
-
-   ecdsa (github.com/runZeroInc/excrypto/crypto/ecdsa)
-   Package ecdsa implements the Elliptic Curve Digital Signature Algorithm, as defined in FIPS 186-4 and SEC 1, Version 2.0.
-   Imported by 1
-   | v0.0.0-...-7e62a70 published on 5 hours ago | Apache-2.0, BSD-3-Clause, GooglePatentsFile, MIT
-
-   ecdsa (github.com/relab/hotstuff/crypto/ecdsa)
-   Package ecdsa provides a crypto implementation for HotStuff using Go's 'crypto/ecdsa' package.
-   Imported by 1
-   | v0.4.0 published on Dec 6, 2021 | MIT
-
-   key (github.com/svicknesh/key/v2)
-   Imported by 2
-   | v2.1.3 published on 5 days ago | MIT
-   Other major versions: v1
-
-   ecdsa (github.com/flokiorg/go-flokicoin/crypto/ecdsa)
-   Imported by 2
-   | v0.25.6-dev published on May 2, 2025 | ISC
-
-   ecdsa (github.com/sonrhq/sonr/crypto/signatures/ecdsa)
-   Imported by 2
-   | v0.16.1 published on Mar 10, 2024 | GPL-3.0
-
-   ecdsa (github.com/0xPellNetwork/pelldvs-libs/crypto/ecdsa)
-   Imported by 2
-   | v0.2.2 published on Jun 13, 2025 | Apache-2.0
-
-   keygen (github.com/okx/threshold-lib/tss/ecdsa/keygen)
-   Imported by 2
-   | v1.0.1 published on Aug 28, 2023 | Apache-2.0
-   Other packages in module github.com/okx/threshold-lib:
-   tss/ecdsa/sign
-
-   ecdsa (github.com/A1andNS/newCrypto/ecdsa)
-   Package ecdsa implements the Elliptic Curve Digital Signature Algorithm, as defined in FIPS 186-3.
-   Imported by 2
-   | v0.0.0-...-3d4b386 published on Jan 10, 2025 | BSD-3-Clause
-
-   curve (gitlab.com/alephledger/threshold-ecdsa/pkg/curve)
-   Imported by 4
-   | v0.0.0-...-abd57cf published on Mar 5, 2021 | Apache-2.0
-   Other packages in module gitlab.com/alephledger/threshold-ecdsa:
-   pkg/crypto/commitment
-   pkg/sync
-   pkg/crypto
-   pkg/arith
-   pkg/crypto/zkpok
-   +1 more
-
    ecdsa (github.com/GM-Publicchain/gm/plugin/crypto/ecdsa)
    Imported by 4
    | v0.0.0-...-0abe6a2 published on Sep 19, 2019 | BSD-3-Clause
@@ -381,52 +356,8 @@ var Pkg_old = []struct {
       spec: "github.com/libp2p/go-libp2p/core/crypto",
    },
    {
-      issue: "fucking stupid",
-      spec: "github.com/sonr-io/multi-party-sig/pkg/ecdsa",
-   },
-   {
-      issue: "git.chainmaker.org.cn/chainmaker/common/-/blob/master/go.sum",
-      spec: "chainmaker.org/chainmaker/common/v3/crypto/asym/ecdsa",
-   },
-   {
-      issue: `github.com/cloudflare/pat-go/issues/61
-      ScalarBaseMult is deprecated`,
-      spec:  "github.com/cloudflare/pat-go/ecdsa",
-   },
-   {
-      issue: `github.com/runZeroInc/excrypto/issues/37
-      crypto/ecdsa need way to generate PrivateKey from bytes`,
-      spec:  "github.com/runZeroInc/excrypto/crypto/ecdsa",
-   },
-   {
-      issue: `github.com/svicknesh/key/issues/1
-      ECDSA key from bytes`,
-      spec:  "github.com/svicknesh/key/v2",
-   },
-   {
-      issue: `github.com/A1andNS/newCrypto/issues/1
-      ecdsa: need way to generate PrivateKey from bytes`,
-      spec:  "https://github.com/A1andNS/newCrypto/ecdsa",
-   },
-   {
-      issue: "weird",
-      spec: "github.com/okx/threshold-lib/tss/ecdsa/sign",
-   },
-   {
-      issue: "github.com/flokiorg/go-flokicoin/blob/main/go.sum",
-      spec: "github.com/flokiorg/go-flokicoin/crypto/ecdsa",
-   },
-   {
-      issue: "no sign",
-      spec: "github.com/0xPellNetwork/pelldvs-libs/crypto/ecdsa",
-   },
-   {
       issue: "github.com/opzlabs/cosmos-sdk-terra3/blob/main/go.sum",
       spec: "github.com/opzlabs/cosmos-sdk-v0.46.13-terra.3/crypto/keys/secp256r1",
-   },
-   {
-      issue: "no sign",
-      spec: "gitlab.com/alephledger/threshold-ecdsa/pkg",
    },
    {
       issue: "old",
