@@ -9,8 +9,6 @@ import (
    "net/http"
    "os"
    "testing"
-   "github.com/starkbank/ecdsa-go/v2/ellipticcurve/privatekey"
-   "github.com/starkbank/ecdsa-go/v2/ellipticcurve/curve"
    "math/big"
 )
 
@@ -76,16 +74,11 @@ func TestLeaf(t *testing.T) {
    if err != nil {
       t.Fatal(err)
    }
-   var z2 privatekey.PrivateKey
-   z2.Curve = curve.Prime256v1
-   z2.Secret = new(big.Int).SetBytes(data)
-   var signEncryptKey privatekey.PrivateKey
+   z1 := new(big.Int).SetBytes(data)
    // they downgrade certs from the cert digest (hash of the signing key)
    Filler('B').Read(data)
-   signEncryptKey.Curve = curve.Prime256v1
-   signEncryptKey.Secret = new(big.Int).SetBytes(data)
-   public := signEncryptKey.PublicKey()
-   err = certificate.Leaf(&z2, &public.Point)
+   signEncryptKey := new(big.Int).SetBytes(data)
+   err = certificate.Leaf(z1, signEncryptKey)
    if err != nil {
       t.Fatal(err)
    }
@@ -93,7 +86,7 @@ func TestLeaf(t *testing.T) {
    if err != nil {
       t.Fatal(err)
    }
-   err = write_file(SL2000.dir+"signEncryptKey", signEncryptKey.Secret.Bytes())
+   err = write_file(SL2000.dir+"signEncryptKey", signEncryptKey.Bytes())
    if err != nil {
       t.Fatal(err)
    }
@@ -118,9 +111,7 @@ func TestKey(t *testing.T) {
    if err != nil {
       t.Fatal(err)
    }
-   var signEncryptKey2 privatekey.PrivateKey
-   signEncryptKey2.Curve = curve.Prime256v1
-   signEncryptKey2.Secret = new(big.Int).SetBytes(data)
+   signEncryptKey := new(big.Int).SetBytes(data)
    for _, test := range key_tests {
       url, err := test.url(home)
       if err != nil {
@@ -132,10 +123,7 @@ func TestKey(t *testing.T) {
          t.Fatal(err)
       }
       UuidOrGuid(kid)
-      data, err = certificate.RequestBody(
-         &signEncryptKey2,
-         kid,
-      )
+      data, err = certificate.RequestBody(signEncryptKey, kid)
       if err != nil {
          t.Fatal(err)
       }
@@ -144,7 +132,7 @@ func TestKey(t *testing.T) {
          t.Fatal(err)
       }
       var license1 License
-      err = license1.Decrypt(&signEncryptKey2, data)
+      err = license1.Decrypt(signEncryptKey, data)
       if err != nil {
          t.Fatal(err)
       }

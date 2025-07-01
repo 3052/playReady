@@ -9,19 +9,10 @@ import (
    "github.com/emmansun/gmsm/cbcmac"
    "github.com/emmansun/gmsm/padding"
    ecb "github.com/emmansun/gmsm/cipher"
+   "math/big"
 )
 
-func aesEcbEncrypt(data, key []byte) ([]byte, error) {
-   block, err := aes.NewCipher(key)
-   if err != nil {
-      return nil, err
-   }
-   data1 := make([]byte, len(data))
-   ecb.NewECBEncrypter(block).CryptBlocks(data1, data)
-   return data1, nil
-}
-
-func (c *Chain) cipherData(key *xmlKey) ([]byte, error) {
+func (c *Chain) cipherData(x *big.Int) ([]byte, error) {
    xmlData := xml.Data{
       CertificateChains: xml.CertificateChains{
          CertificateChain: c.Encode(),
@@ -35,12 +26,24 @@ func (c *Chain) cipherData(key *xmlKey) ([]byte, error) {
       return nil, err
    }
    data = padding.NewPKCS7Padding(aes.BlockSize).Pad(data)
-   block, err := aes.NewCipher(key.aesKey())
+   xBytes := x.Bytes()
+   iv, key := xBytes[:16], xBytes[16:]
+   block, err := aes.NewCipher(key)
    if err != nil {
       return nil, err
    }
-   cipher.NewCBCEncrypter(block, key.aesIv()).CryptBlocks(data, data)
-   return append(key.aesIv(), data...), nil
+   cipher.NewCBCEncrypter(block, iv).CryptBlocks(data, data)
+   return append(iv, data...), nil
+}
+
+func aesEcbEncrypt(data, key []byte) ([]byte, error) {
+   block, err := aes.NewCipher(key)
+   if err != nil {
+      return nil, err
+   }
+   data1 := make([]byte, len(data))
+   ecb.NewECBEncrypter(block).CryptBlocks(data1, data)
+   return data1, nil
 }
 
 func (l *License) verify(data []byte) error {

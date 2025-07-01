@@ -6,9 +6,37 @@ import (
    "encoding/hex"
    "errors"
    "math/big"
+   "github.com/arnaucube/cryptofun/ecc"
 )
 
-func newLa(m *xmlKey, cipherData, kid []byte) *xml.La {
+func (c *Chain) verify() (bool, error) {
+   modelBase := c.Certificates[c.CertCount-1].Signature.IssuerKey
+   for i := len(c.Certificates) - 1; i >= 0; i-- {
+      ok, err := c.Certificates[i].verify(modelBase[:])
+      if err != nil {
+         return false, err
+      }
+      if !ok {
+         return false, nil
+      }
+      modelBase = c.Certificates[i].KeyInfo.Keys[0].PublicKey[:]
+   }
+   return true, nil
+}
+
+func elGamalKeyGeneration() *ecc.Point {
+   data, _ := hex.DecodeString(wmrmPublicKey)
+   return &ecc.Point{
+      X: new(big.Int).SetBytes(data[:32]),
+      Y: new(big.Int).SetBytes(data[32:]),
+   }
+}
+
+func newLa(m *ecc.Point, cipherData, kid []byte) (*xml.La, error) {
+   data, err := elGamalEncrypt(m, elGamalKeyGeneration())
+   if err != nil {
+      return nil, err
+   }
    return &xml.La{
       XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/protocols",
       Id:      "SignedData",
@@ -44,7 +72,7 @@ func newLa(m *xmlKey, cipherData, kid []byte) *xml.La {
                   KeyName: "WMRMServer",
                },
                CipherData: xml.CipherData{
-                  CipherValue: elGamalEncrypt(m, elGamalKeyGeneration()),
+                  CipherValue: data,
                },
             },
          },
@@ -52,7 +80,7 @@ func newLa(m *xmlKey, cipherData, kid []byte) *xml.La {
             CipherValue: cipherData,
          },
       },
-   }
+   }, nil
 }
 
 func (a *AuxKey) decode(data []byte) int {
@@ -151,35 +179,14 @@ type LicenseSignature struct {
    Data   []byte
 }
 
-type xmlKey struct {
-   X *big.Int
-   Y *big.Int
-   RawX [32]byte
-}
-
-func elGamalKeyGeneration() *xmlKey {
-   data, _ := hex.DecodeString(wmrmPublicKey)
-   var key xmlKey
-   key.X = new(big.Int).SetBytes(data[:32])
-   key.Y = new(big.Int).SetBytes(data[32:])
-   return &key
-}
-
-///
-
-func (x *xmlKey) aesIv() []byte {
-   return x.RawX[:16]
-}
-
-func (x *xmlKey) aesKey() []byte {
-   return x.RawX[16:]
-}
-
 func (c *ContentKey) decrypt(key *big.Int, aux *AuxKeys) error {
    switch c.CipherType {
    case 3:
-      messageX, _ := elGamalDecrypt(c.Value, key)
-      c.Value = messageX.Bytes()
+      point, err := elGamalDecrypt(c.Value, key)
+      if err != nil {
+         return err
+      }
+      c.Value = point.X.Bytes()
       return nil
    case 6:
       return c.scalable(key, aux)
@@ -190,8 +197,11 @@ func (c *ContentKey) decrypt(key *big.Int, aux *AuxKeys) error {
 func (c *ContentKey) scalable(key *big.Int, aux *AuxKeys) error {
    rootKeyInfo, leafKeys := c.Value[:144], c.Value[144:]
    rootKey := rootKeyInfo[128:]
-   messageX, _ := elGamalDecrypt(rootKeyInfo[:128], key)
-   decrypted := messageX.Bytes()
+   point, err := elGamalDecrypt(rootKeyInfo[:128], key)
+   if err != nil {
+      return err
+   }
+   decrypted := point.X.Bytes()
    var (
       ci [16]byte
       ck [16]byte
@@ -424,17 +434,6 @@ func (c *ContentKey) decode(data []byte) {
 
 func (c *ContentKey) integrity() []byte {
    return c.Value[:16]
-}
-func (c *Chain) verify() bool {
-   modelBase := c.Certificates[c.CertCount-1].Signature.IssuerKey
-   for i := len(c.Certificates) - 1; i >= 0; i-- {
-      valid := c.Certificates[i].verify(modelBase[:])
-      if !valid {
-         return false
-      }
-      modelBase = c.Certificates[i].KeyInfo.Keys[0].PublicKey[:]
-   }
-   return true
 }
 
 // Decode decodes a byte slice into the Chain structure.

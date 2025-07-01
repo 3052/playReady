@@ -3,96 +3,230 @@ package playReady
 import (
    "41.neocities.org/playReady/xml"
    "bytes"
+   "crypto/elliptic"
    "crypto/sha256"
    "errors"
-   "github.com/starkbank/ecdsa-go/v2/ellipticcurve/curve"
-   "github.com/starkbank/ecdsa-go/v2/ellipticcurve/ecdsa"
-   "github.com/starkbank/ecdsa-go/v2/ellipticcurve/math"
-   "github.com/starkbank/ecdsa-go/v2/ellipticcurve/point"
-   "github.com/starkbank/ecdsa-go/v2/ellipticcurve/privatekey"
-   "github.com/starkbank/ecdsa-go/v2/ellipticcurve/publickey"
-   "github.com/starkbank/ecdsa-go/v2/ellipticcurve/signature"
+   "github.com/arnaucube/cryptofun/ecc"
+   "github.com/arnaucube/cryptofun/ecdsa"
+   "github.com/arnaucube/cryptofun/elgamal"
    "math/big"
    "slices"
 )
 
-func elGamalEncrypt(msg, pub *xmlKey) []byte {
-   g := curve.Prime256v1
-   m := point.Point{X: msg.X, Y: msg.Y}
-   s := point.Point{X: pub.X, Y: pub.Y}
-   C2 := math.Add(m, s, g.A, g.P)
-   return slices.Concat(
-      g.G.X.Bytes(), g.G.Y.Bytes(), C2.X.Bytes(), C2.Y.Bytes(),
-   )
+// nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-4.pdf
+func p256() (ec ecc.EC, g ecc.Point) {
+   params := elliptic.P256().Params()
+   ec.A = big.NewInt(-3) // pkg.go.dev/crypto/elliptic#Curve
+   ec.B = params.B
+   ec.Q = params.P
+   g.X = params.Gx
+   g.Y = params.Gy
+   return
 }
 
-func elGamalDecrypt(data []byte, key *big.Int) (*big.Int, *big.Int) {
-   // Unmarshal C1 component
-   c1X := new(big.Int).SetBytes(data[:32])
-   c1Y := new(big.Int).SetBytes(data[32:64])
-   C1 := point.Point{X: c1X, Y: c1Y}
-   // Unmarshal C2 component
-   c2X := new(big.Int).SetBytes(data[64:96])
-   c2Y := new(big.Int).SetBytes(data[96:])
-   C2 := point.Point{X: c2X, Y: c2Y}
-   g1 := curve.Prime256v1
-   // Calculate shared secret s = C1^x
-   S := math.Multiply(C1, key, g1.N, g1.A, g1.P)
-   // Invert the point for subtraction
-   S.Y.Neg(S.Y)
-   S.Y.Mod(S.Y, g1.P)
-   // Recover message point: M = C2 - s
-   M := math.Add(C2, S, g1.A, g1.P)
-   return M.X, M.Y
+func p256n() *big.Int {
+   return elliptic.P256().Params().N
 }
 
-func (c *Certificate) verify(pubKey []byte) bool {
-   if !bytes.Equal(c.Signature.IssuerKey, pubKey) {
-      return false
+func (c *Certificate) verify(pubK []byte) (bool, error) {
+   if !bytes.Equal(c.Signature.IssuerKey, pubK) {
+      return false, nil
    }
-   publicKey := publickey.PublicKey{
-      Point: point.Point{
-         X:     new(big.Int).SetBytes(pubKey[:32]),
-         Y:     new(big.Int).SetBytes(pubKey[32:]),
-      },
-      Curve: curve.Prime256v1,
-   }
+   var dsa ecdsa.DSA
+   dsa.EC, dsa.G = p256()
+   dsa.N = p256n()
    message := c.Append(nil)
    message = message[:c.LengthToSignature]
    sign := c.Signature.Signature
-   r := new(big.Int).SetBytes(sign[:32])
-   s := new(big.Int).SetBytes(sign[32:])
-   // VERIFY DOES SHA-256 ITSELF
-   return ecdsa.Verify(
-      string(message),
-      signature.Signature{R: *r, S: *s},
-      &publicKey,
+   hashVal := func() *big.Int {
+      sum := sha256.Sum256(message)
+      return new(big.Int).SetBytes(sum[:])
+   }()
+   sig := [2]*big.Int{
+      new(big.Int).SetBytes(sign[:32]),
+      new(big.Int).SetBytes(sign[32:]),
+   }
+   return dsa.Verify(
+      hashVal,
+      sig,
+      ecc.Point{
+         X: new(big.Int).SetBytes(pubK[:32]),
+         Y: new(big.Int).SetBytes(pubK[32:]),
+      },
    )
 }
 
-func Sign2(key *privatekey.PrivateKey, hash []byte) ([]byte, error) {
-   // SIGN DOES SHA-256 ITSELF
-   data := ecdsa.Sign(string(hash), key)
-   return append(data.R.Bytes(), data.S.Bytes()...), nil
+func (c *Chain) Leaf(
+   modelKey *big.Int,
+   signEncryptKey *big.Int,
+) error {
+   var dsa ecdsa.DSA
+   dsa.EC, dsa.G = p256()
+   dsa.N = p256n()
+   modelPub, err := dsa.PubK(modelKey)
+   if err != nil {
+      return err
+   }
+   if !bytes.Equal(
+      c.Certificates[0].KeyInfo.Keys[0].PublicKey[:],
+      append(modelPub.X.Bytes(), modelPub.Y.Bytes()...),
+   ) {
+      return errors.New("zgpriv not for cert")
+   }
+   ok, err := c.verify()
+   if err != nil {
+      return err
+   }
+   if !ok {
+      return errors.New("cert is not valid")
+   }
+   var cert Certificate
+   copy(cert.Magic[:], "CERT")
+   cert.Version = 1 // required
+   {
+      // SCALABLE with SL2000, SUPPORTS_PR3_FEATURES
+      var features CertFeatures
+      features.New(0xD)
+      cert.Features = features.ftlv(0, 5)
+   }
+   signEncryptPub, err := dsa.PubK(signEncryptKey)
+   if err != nil {
+      return err
+   }
+   {
+      sum := sha256.Sum256(
+         append(signEncryptPub.X.Bytes(), signEncryptPub.Y.Bytes()...),
+      )
+      cert.Info = &CertificateInfo{}
+      cert.Info.New(c.Certificates[0].Info.SecurityLevel, sum[:])
+   }
+   cert.KeyInfo = &KeyInfo{}
+   cert.KeyInfo.New(
+      append(signEncryptPub.X.Bytes(), signEncryptPub.Y.Bytes()...),
+   )
+   {
+      cert.LengthToSignature, cert.Length = cert.size()
+      hashVal := sha256.Sum256(cert.Append(nil))
+      signature, err := sign(modelKey, hashVal[:])
+      if err != nil {
+         return err
+      }
+      cert.Signature = &CertSignature{}
+      err = cert.Signature.New(
+         signature,
+         append(modelPub.X.Bytes(), modelPub.Y.Bytes()...),
+      )
+      if err != nil {
+         return err
+      }
+   }
+   c.CertCount += 1
+   c.Certificates = slices.Insert(c.Certificates, 0, cert)
+   c.Length += cert.Length
+   return nil
 }
 
-func (x *xmlKey) New() {
-   point := curve.Prime256v1.G
-   x.X, x.Y = point.X, point.Y
-   x.X.FillBytes(x.RawX[:])
-}
-
-func (c *Chain) RequestBody(
-   signEncrypt2 *privatekey.PrivateKey,
-   kid []byte,
-) ([]byte, error) {
-   var key xmlKey
-   key.New()
-   cipherData, err := c.cipherData(&key)
+// 5
+func sign(privK *big.Int, hashVal []byte) ([]byte, error) {
+   var dsa ecdsa.DSA
+   dsa.EC, dsa.G = p256()
+   dsa.N = p256n()
+   rs, err := dsa.Sign(
+      new(big.Int).SetBytes(hashVal), privK, big.NewInt(1),
+   )
    if err != nil {
       return nil, err
    }
-   la := newLa(&key, cipherData, kid)
+   return append(rs[0].Bytes(), rs[1].Bytes()...), nil
+}
+
+// 9
+func elGamalEncrypt(m, pubK *ecc.Point) ([]byte, error) {
+   var eg elgamal.EG
+   eg.EC, eg.G = p256()
+   eg.N = p256n()
+   c, err := eg.Encrypt(*m, *pubK, big.NewInt(1))
+   if err != nil {
+      return nil, err
+   }
+   return slices.Concat(
+      c[0].X.Bytes(), c[0].Y.Bytes(), c[1].X.Bytes(), c[1].Y.Bytes(),
+   ), nil
+}
+
+// 19
+func elGamalDecrypt(data []byte, privK *big.Int) (ecc.Point, error) {
+   var eg elgamal.EG
+   eg.EC, eg.G = p256()
+   eg.N = p256n()
+   // Unmarshal C1 component
+   c1 := ecc.Point{
+      X: new(big.Int).SetBytes(data[:32]),
+      Y: new(big.Int).SetBytes(data[32:64]),
+   }
+   // Unmarshal C2 component
+   c2 := ecc.Point{
+      X: new(big.Int).SetBytes(data[64:96]),
+      Y: new(big.Int).SetBytes(data[96:]),
+   }
+   return eg.Decrypt([2]ecc.Point{c1, c2}, privK)
+}
+
+// 35
+func (l *License) Decrypt(
+   signEncrypt *big.Int,
+   data []byte,
+) error {
+   var envelope xml.EnvelopeResponse
+   err := envelope.Unmarshal(data)
+   if err != nil {
+      return err
+   }
+   data = envelope.
+      Body.
+      AcquireLicenseResponse.
+      AcquireLicenseResult.
+      Response.
+      LicenseResponse.
+      Licenses.
+      License
+   err = l.decode(data)
+   if err != nil {
+      return err
+   }
+   var dsa ecdsa.DSA
+   dsa.EC, dsa.G = p256()
+   dsa.N = p256n()
+   pubK, err := dsa.PubK(signEncrypt)
+   if err != nil {
+      return err
+   }
+   if !bytes.Equal(
+      l.EccKey.Value,
+      append(pubK.X.Bytes(), pubK.Y.Bytes()...),
+   ) {
+      return errors.New("license response is not for this device")
+   }
+   err = l.ContentKey.decrypt(signEncrypt, l.AuxKeys)
+   if err != nil {
+      return err
+   }
+   return l.verify(data)
+}
+
+func (c *Chain) RequestBody(
+   signEncrypt *big.Int,
+   kid []byte,
+) ([]byte, error) {
+   _, g := p256()
+   cipherData, err := c.cipherData(g.X)
+   if err != nil {
+      return nil, err
+   }
+   la, err := newLa(&g, cipherData, kid)
+   if err != nil {
+      return nil, err
+   }
    laData, err := la.Marshal()
    if err != nil {
       return nil, err
@@ -109,7 +243,8 @@ func (c *Chain) RequestBody(
    if err != nil {
       return nil, err
    }
-   signature, err := Sign2(signEncrypt2, signedData)
+   hashVal := sha256.Sum256(signedData)
+   signature, err := sign(signEncrypt, hashVal[:])
    if err != nil {
       return nil, err
    }
@@ -132,100 +267,4 @@ func (c *Chain) RequestBody(
       },
    }
    return envelope.Marshal()
-}
-
-func (c *Chain) Leaf(
-   modelKey2 *privatekey.PrivateKey,
-   signEncryptKey *point.Point,
-) error {
-   if !bytes.Equal(
-      c.Certificates[0].KeyInfo.Keys[0].PublicKey[:],
-      func() []byte {
-         p := modelKey2.PublicKey().Point
-         return append(p.X.Bytes(), p.Y.Bytes()...)
-      }(),
-   ) {
-      return errors.New("zgpriv not for cert")
-   }
-   if !c.verify() {
-      return errors.New("cert is not valid")
-   }
-   var cert Certificate
-   copy(cert.Magic[:], "CERT")
-   cert.Version = 1 // required
-   {
-      // SCALABLE with SL2000, SUPPORTS_PR3_FEATURES
-      var features CertFeatures
-      features.New(0xD)
-      cert.Features = features.ftlv(0, 5)
-   }
-   {
-      sum := sha256.Sum256(
-         append(signEncryptKey.X.Bytes(), signEncryptKey.Y.Bytes()...),
-      )
-      cert.Info = &CertificateInfo{}
-      cert.Info.New(c.Certificates[0].Info.SecurityLevel, sum[:])
-   }
-   cert.KeyInfo = &KeyInfo{}
-   cert.KeyInfo.New(
-      append(signEncryptKey.X.Bytes(), signEncryptKey.Y.Bytes()...),
-   )
-   {
-      cert.LengthToSignature, cert.Length = cert.size()
-      signature, err := Sign2(modelKey2, cert.Append(nil))
-      if err != nil {
-         return err
-      }
-      cert.Signature = &CertSignature{}
-      err = cert.Signature.New(
-         signature,
-         func() []byte {
-            p := modelKey2.PublicKey().Point
-            return append(p.X.Bytes(), p.Y.Bytes()...)
-         }(),
-      )
-      if err != nil {
-         return err
-      }
-   }
-   c.CertCount += 1
-   c.Certificates = slices.Insert(c.Certificates, 0, cert)
-   c.Length += cert.Length
-   return nil
-}
-
-func (l *License) Decrypt(
-   signEncrypt *privatekey.PrivateKey, data []byte,
-) error {
-   var envelope xml.EnvelopeResponse
-   err := envelope.Unmarshal(data)
-   if err != nil {
-      return err
-   }
-   data = envelope.
-      Body.
-      AcquireLicenseResponse.
-      AcquireLicenseResult.
-      Response.
-      LicenseResponse.
-      Licenses.
-      License
-   err = l.decode(data)
-   if err != nil {
-      return err
-   }
-   if !bytes.Equal(
-      l.EccKey.Value,
-      func() []byte {
-         p := signEncrypt.PublicKey().Point
-         return append(p.X.Bytes(), p.Y.Bytes()...)
-      }(),
-   ) {
-      return errors.New("license response is not for this device")
-   }
-   err = l.ContentKey.decrypt(signEncrypt.Secret, l.AuxKeys)
-   if err != nil {
-      return err
-   }
-   return l.verify(data)
 }

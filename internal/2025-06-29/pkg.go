@@ -2,7 +2,7 @@ package ecdsa
 
 // https://pkg.go.dev/search?limit=100&q=ecdsa
 
-var Pkg = []struct {
+var pkg = []struct {
    go_sum int
    issue  string
    spec   string
@@ -13,19 +13,21 @@ var Pkg = []struct {
    },
    {
       go_sum: 10,
+      spec: "github.com/arnaucube/cryptofun/ecdsa",
+   },
+/////////////////////////////////////////////////////////////////////////////////
+   {
+      issue: `github.com/deatil/go-cryptobin/issues/38
+      deprecated methods`,
+      spec: "github.com/deatil/go-cryptobin/cryptobin/ecdsa",
+   },
+   {
+      issue: "go mod tidy fail",
+      spec: "github.com/bnb-chain/tss-lib/v2/ecdsa/signing",
+   },
+   {
+      issue: "secp256k1 only",
       spec:   "github.com/btcsuite/btcd/btcec/v2/ecdsa",
-   },
-   {
-      go_sum: 10,
-      spec: "github.com/flokiorg/go-flokicoin/crypto/ecdsa",
-   },
-   {
-      go_sum: 10,
-      spec: "github.com/ltcsuite/ltcd/btcec/v2/ecdsa",
-   },
-   {
-      go_sum: 10,
-      spec: "github.com/tinyverse-web3/btcd/btcec/v2/ecdsa",
    },
    {
       issue: `github.com/common-library/go/issues/158
@@ -112,10 +114,6 @@ var Pkg = []struct {
    {
       issue: "secp256k1 is not compatible with secp256r1",
       spec: "github.com/dustinxie/ecc",
-   },
-   {
-      issue: "go mod tidy fail",
-      spec: "github.com/bnb-chain/tss-lib/v2/ecdsa/signing",
    },
    {
       issue: "secp256k1 only",
@@ -299,5 +297,17 @@ var Pkg = []struct {
       issue: `github.com/armortal/webcrypto-go/issues/39
       ECDSA import key raw`,
       spec:  "github.com/armortal/webcrypto-go/algorithms/ecdsa",
+   },
+   {
+      issue: "secp256k1 only",
+      spec: "github.com/flokiorg/go-flokicoin/crypto/ecdsa",
+   },
+   {
+      issue: "secp256k1 only",
+      spec: "github.com/ltcsuite/ltcd/btcec/v2/ecdsa",
+   },
+   {
+      issue: "secp256k1 only",
+      spec: "github.com/tinyverse-web3/btcd/btcec/v2/ecdsa",
    },
 }
