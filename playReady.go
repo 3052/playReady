@@ -7,6 +7,52 @@ import (
    "github.com/emmansun/gmsm/cipher"
 )
 
+// Constants for object types within the certificate structure.
+const (
+   objTypeBasic            = 0x0001
+   objTypeDomain           = 0x0002
+   objTypePc               = 0x0003
+   objTypeDevice           = 0x0004
+   objTypeFeature          = 0x0005
+   objTypeKey              = 0x0006
+   objTypeManufacturer     = 0x0007
+   objTypeSignature        = 0x0008
+   objTypeSilverlight      = 0x0009
+   objTypeMetering         = 0x000A
+   objTypeExtDataSignKey   = 0x000B
+   objTypeExtDataContainer = 0x000C
+   objTypeExtDataSignature = 0x000D
+   objTypeExtDataHwid      = 0x000E
+   objTypeServer           = 0x000F
+   objTypeSecurityVersion  = 0x0010
+   objTypeSecurityVersion2 = 0x0011
+)
+
+const magicConstantZero = "7ee9ed4af773224f00b8ea7efb027cbb"
+
+// xorKey performs XOR operation on two byte slices.
+func xorKey(a, b []byte) []byte {
+   if len(a) != len(b) {
+      panic("slices have different lengths")
+   }
+   c := make([]byte, len(a))
+   for i := 0; i < len(a); i++ {
+      c[i] = a[i] ^ b[i]
+   }
+   return c
+}
+
+func UuidOrGuid(data []byte) {
+   // Data1 (first 4 bytes) - swap endianness in place
+   data[0], data[3] = data[3], data[0]
+   data[1], data[2] = data[2], data[1]
+   // Data2 (next 2 bytes) - swap endianness in place
+   data[4], data[5] = data[5], data[4]
+   // Data3 (next 2 bytes) - swap endianness in place
+   data[6], data[7] = data[7], data[6]
+   // Data4 (last 8 bytes) - no change needed, so no operation here
+}
+
 func aesEcbEncrypt(data, key []byte) ([]byte, error) {
    block, err := aes.NewCipher(key)
    if err != nil {
@@ -44,202 +90,6 @@ func (a *AuxKeys) decode(data []byte) {
 type AuxKeys struct {
    Count uint16
    Keys  []AuxKey
-}
-
-func (c *CertificateInfo) decode(data []byte) {
-   n := copy(c.CertificateId[:], data)
-   data = data[n:]
-   c.SecurityLevel = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   c.Flags = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   c.InfoType = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   n = copy(c.Digest[:], data)
-   data = data[n:]
-   c.Expiry = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   copy(c.ClientId[:], data)
-}
-
-func (c *CertificateInfo) New(securityLevel uint32, digest []byte) {
-   copy(c.Digest[:], digest)
-   // required, Max uint32, effectively never expires
-   c.Expiry = 4294967295
-   // required
-   c.InfoType = 2
-   c.SecurityLevel = securityLevel
-}
-
-func (e *EccKey) decode(data []byte) {
-   e.Curve = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   e.Length = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   e.Value = data
-}
-
-type EccKey struct {
-   Curve  uint16
-   Length uint16
-   Value  []byte
-}
-
-type Filler byte
-
-func (f Filler) Read(data []byte) (int, error) {
-   for index := range data {
-      data[index] = byte(f)
-   }
-   return len(data), nil
-}
-
-func (f *Ftlv) decode(data []byte) (int, error) {
-   f.Flag = binary.BigEndian.Uint16(data)
-   n := 2
-   f.Type = binary.BigEndian.Uint16(data[n:])
-   n += 2
-   f.Length = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   f.Value = data[n:f.Length]
-   n += len(f.Value)
-   return n, nil
-}
-
-type Ftlv struct {
-   Flag   uint16 // this can be 0 or 1
-   Type   uint16
-   Length uint32
-   Value  []byte
-}
-
-func (l *LicenseSignature) decode(data []byte) {
-   l.Type = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   l.Length = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   l.Data = data
-}
-
-type LicenseSignature struct {
-   Type   uint16
-   Length uint16
-   Data   []byte
-}
-
-///
-
-func (k *KeyData) decode(data []byte) int {
-   k.KeyType = binary.BigEndian.Uint16(data)
-   n := 2
-   k.Length = binary.BigEndian.Uint16(data[n:])
-   n += 2
-   k.Flags = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   n += copy(k.PublicKey[:], data[n:])
-   n += k.Usage.decode(data[n:])
-   return n
-}
-
-func (k *KeyData) Append(data []byte) []byte {
-   data = binary.BigEndian.AppendUint16(data, k.KeyType)
-   data = binary.BigEndian.AppendUint16(data, k.Length)
-   data = binary.BigEndian.AppendUint32(data, k.Flags)
-   data = append(data, k.PublicKey[:]...)
-   return k.Usage.Append(data)
-}
-
-func (k *KeyData) New(PublicKey []byte, Type uint32) {
-   k.Length = 512 // required
-   copy(k.PublicKey[:], PublicKey)
-   k.Usage.New(Type)
-}
-
-type KeyData struct {
-   KeyType   uint16
-   Length    uint16
-   Flags     uint32
-   PublicKey [64]byte // ECDSA P256 public key (X and Y coordinates)
-   Usage     CertFeatures
-}
-
-func (k *KeyInfo) decode(data []byte) {
-   k.Entries = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   k.Keys = make([]KeyData, k.Entries)
-   for i := range k.Entries {
-      var key KeyData
-      n := key.decode(data)
-      k.Keys[i] = key
-      data = data[n:] // Advance data slice for the next key
-   }
-}
-
-type KeyInfo struct {
-   Entries uint32 // can be 1 or 2
-   Keys    []KeyData
-}
-
-func (k *KeyInfo) New(signEncryptKey []byte) {
-   k.Entries = 2 // required
-   k.Keys = make([]KeyData, 2)
-   k.Keys[0].New(signEncryptKey, 1)
-   k.Keys[1].New(signEncryptKey, 2)
-}
-
-func (k *KeyInfo) encode() []byte {
-   data := binary.BigEndian.AppendUint32(nil, k.Entries)
-   for _, key := range k.Keys {
-      data = key.Append(data)
-   }
-   return data
-}
-
-func (k *KeyInfo) ftlv(Flag, Type uint16) *Ftlv {
-   return newFtlv(Flag, Type, k.encode())
-}
-
-func (k *KeyInfo) size() int {
-   n := 4 // entries
-   for _, key := range k.Keys {
-      n += key.size()
-   }
-   return n
-}
-
-// Constants for object types within the certificate structure.
-const (
-   objTypeBasic            = 0x0001
-   objTypeDomain           = 0x0002
-   objTypePc               = 0x0003
-   objTypeDevice           = 0x0004
-   objTypeFeature          = 0x0005
-   objTypeKey              = 0x0006
-   objTypeManufacturer     = 0x0007
-   objTypeSignature        = 0x0008
-   objTypeSilverlight      = 0x0009
-   objTypeMetering         = 0x000A
-   objTypeExtDataSignKey   = 0x000B
-   objTypeExtDataContainer = 0x000C
-   objTypeExtDataSignature = 0x000D
-   objTypeExtDataHwid      = 0x000E
-   objTypeServer           = 0x000F
-   objTypeSecurityVersion  = 0x0010
-   objTypeSecurityVersion2 = 0x0011
-)
-
-const magicConstantZero = "7ee9ed4af773224f00b8ea7efb027cbb"
-
-// xorKey performs XOR operation on two byte slices.
-func xorKey(a, b []byte) []byte {
-   if len(a) != len(b) {
-      panic("slices have different lengths")
-   }
-   c := make([]byte, len(a))
-   for i := 0; i < len(a); i++ {
-      c[i] = a[i] ^ b[i]
-   }
-   return c
 }
 
 func (c *CertFeatures) Append(data []byte) []byte {
@@ -347,6 +197,22 @@ func (c *CertSignature) size() int {
    return n
 }
 
+func (c *CertificateInfo) decode(data []byte) {
+   n := copy(c.CertificateId[:], data)
+   data = data[n:]
+   c.SecurityLevel = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   c.Flags = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   c.InfoType = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   n = copy(c.Digest[:], data)
+   data = data[n:]
+   c.Expiry = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   copy(c.ClientId[:], data)
+}
+
 type CertificateInfo struct {
    CertificateId [16]byte
    SecurityLevel uint32
@@ -369,6 +235,38 @@ func (c *CertificateInfo) encode() []byte {
 
 func (c *CertificateInfo) ftlv(Flag, Type uint16) *Ftlv {
    return newFtlv(Flag, Type, c.encode())
+}
+
+func (c *CertificateInfo) New(securityLevel uint32, digest []byte) {
+   copy(c.Digest[:], digest)
+   // required, Max uint32, effectively never expires
+   c.Expiry = 4294967295
+   // required
+   c.InfoType = 2
+   c.SecurityLevel = securityLevel
+}
+
+func (e *EccKey) decode(data []byte) {
+   e.Curve = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   e.Length = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   e.Value = data
+}
+
+type EccKey struct {
+   Curve  uint16
+   Length uint16
+   Value  []byte
+}
+
+type Filler byte
+
+func (f Filler) Read(data []byte) (int, error) {
+   for index := range data {
+      data[index] = byte(f)
+   }
+   return len(data), nil
 }
 
 func newFtlv(Flag, Type uint16, Value []byte) *Ftlv {
@@ -395,6 +293,51 @@ func (f *Ftlv) Append(data []byte) []byte {
    return append(data, f.Value...)
 }
 
+func (f *Ftlv) decode(data []byte) (int, error) {
+   f.Flag = binary.BigEndian.Uint16(data)
+   n := 2
+   f.Type = binary.BigEndian.Uint16(data[n:])
+   n += 2
+   f.Length = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   f.Value = data[n:f.Length]
+   n += len(f.Value)
+   return n, nil
+}
+
+type Ftlv struct {
+   Flag   uint16 // this can be 0 or 1
+   Type   uint16
+   Length uint32
+   Value  []byte
+}
+
+func (k *KeyData) decode(data []byte) int {
+   k.KeyType = binary.BigEndian.Uint16(data)
+   n := 2
+   k.Length = binary.BigEndian.Uint16(data[n:])
+   n += 2
+   k.Flags = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   n += copy(k.PublicKey[:], data[n:])
+   n += k.Usage.decode(data[n:])
+   return n
+}
+
+func (k *KeyData) Append(data []byte) []byte {
+   data = binary.BigEndian.AppendUint16(data, k.KeyType)
+   data = binary.BigEndian.AppendUint16(data, k.Length)
+   data = binary.BigEndian.AppendUint32(data, k.Flags)
+   data = append(data, k.PublicKey[:]...)
+   return k.Usage.Append(data)
+}
+
+func (k *KeyData) New(PublicKey []byte, Type uint32) {
+   k.Length = 512 // required
+   copy(k.PublicKey[:], PublicKey)
+   k.Usage.New(Type)
+}
+
 func (k *KeyData) size() int {
    n := 2 // keyType
    n += 2 // length
@@ -404,11 +347,77 @@ func (k *KeyData) size() int {
    return n
 }
 
+type KeyData struct {
+   KeyType   uint16
+   Length    uint16
+   Flags     uint32
+   PublicKey [64]byte // ECDSA P256 public key (X and Y coordinates)
+   Usage     CertFeatures
+}
+
+func (k *KeyInfo) decode(data []byte) {
+   k.Entries = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   k.Keys = make([]KeyData, k.Entries)
+   for i := range k.Entries {
+      var key KeyData
+      n := key.decode(data)
+      k.Keys[i] = key
+      data = data[n:] // Advance data slice for the next key
+   }
+}
+
+type KeyInfo struct {
+   Entries uint32 // can be 1 or 2
+   Keys    []KeyData
+}
+
+func (k *KeyInfo) New(signEncryptKey []byte) {
+   k.Entries = 2 // required
+   k.Keys = make([]KeyData, 2)
+   k.Keys[0].New(signEncryptKey, 1)
+   k.Keys[1].New(signEncryptKey, 2)
+}
+
+func (k *KeyInfo) encode() []byte {
+   data := binary.BigEndian.AppendUint32(nil, k.Entries)
+   for _, key := range k.Keys {
+      data = key.Append(data)
+   }
+   return data
+}
+
+func (k *KeyInfo) ftlv(Flag, Type uint16) *Ftlv {
+   return newFtlv(Flag, Type, k.encode())
+}
+
+func (k *KeyInfo) size() int {
+   n := 4 // entries
+   for _, key := range k.Keys {
+      n += key.size()
+   }
+   return n
+}
+
 func (l *LicenseSignature) size() int {
    n := 2 // type
    n += 2 // length
    n += len(l.Data)
    return n
+}
+
+func (l *LicenseSignature) decode(data []byte) {
+   l.Type = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   l.Length = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   l.Data = data
+}
+
+type LicenseSignature struct {
+   Type   uint16
+   Length uint16
+   Data   []byte
 }
 
 type xmrType uint16
@@ -459,14 +468,3 @@ const (
    unknownContainersEntryType              xmrType = 65534
    playbackUnknownContainerEntryType       xmrType = 65534
 )
-
-func UuidOrGuid(data []byte) {
-   // Data1 (first 4 bytes) - swap endianness in place
-   data[0], data[3] = data[3], data[0]
-   data[1], data[2] = data[2], data[1]
-   // Data2 (next 2 bytes) - swap endianness in place
-   data[4], data[5] = data[5], data[4]
-   // Data3 (next 2 bytes) - swap endianness in place
-   data[6], data[7] = data[7], data[6]
-   // Data4 (last 8 bytes) - no change needed, so no operation here
-}
