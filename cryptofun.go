@@ -3,7 +3,7 @@ package playReady
 import (
    "41.neocities.org/playReady/xml"
    "bytes"
-   "crypto/elliptic"
+   //"crypto/elliptic"
    "crypto/sha256"
    "errors"
    "github.com/arnaucube/cryptofun/ecc"
@@ -14,18 +14,14 @@ import (
 )
 
 // nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-4.pdf
-func p256() (ec ecc.EC, g ecc.Point) {
-   params := elliptic.P256().Params()
-   ec.A = big.NewInt(-3) // pkg.go.dev/crypto/elliptic#Curve
-   ec.B = params.B
-   ec.Q = params.P
-   g.X = params.Gx
-   g.Y = params.Gy
+func p256() (ec ecc.EC, g ecc.Point, n *big.Int) {
+   ec.A = big.NewInt(-3)
+   ec.B, _ = new(big.Int).SetString("5ac635d8aa3a93e7b3ebbd55769886bc651d06b0cc53b0f63bce3c3e27d2604b", 16)
+   ec.Q, _ = new(big.Int).SetString("115792089210356248762697446949407573530086143415290314195533631308867097853951", 10)
+   g.X, _ = new(big.Int).SetString("6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296", 16)
+   g.Y, _ = new(big.Int).SetString("4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5", 16)
+   n, _ = new(big.Int).SetString("115792089210356248762697446949407573529996955224135760342422259061068512044369", 10)
    return
-}
-
-func p256n() *big.Int {
-   return elliptic.P256().Params().N
 }
 
 func (c *Certificate) verify(pubK []byte) (bool, error) {
@@ -33,8 +29,7 @@ func (c *Certificate) verify(pubK []byte) (bool, error) {
       return false, nil
    }
    var dsa ecdsa.DSA
-   dsa.EC, dsa.G = p256()
-   dsa.N = p256n()
+   dsa.EC, dsa.G, dsa.N = p256()
    message := c.Append(nil)
    message = message[:c.LengthToSignature]
    sign := c.Signature.Signature
@@ -61,8 +56,7 @@ func (c *Chain) Leaf(
    signEncryptKey *big.Int,
 ) error {
    var dsa ecdsa.DSA
-   dsa.EC, dsa.G = p256()
-   dsa.N = p256n()
+   dsa.EC, dsa.G, dsa.N = p256()
    modelPub, err := dsa.PubK(modelKey)
    if err != nil {
       return err
@@ -126,11 +120,9 @@ func (c *Chain) Leaf(
    return nil
 }
 
-// 5
 func sign(privK *big.Int, hashVal []byte) ([]byte, error) {
    var dsa ecdsa.DSA
-   dsa.EC, dsa.G = p256()
-   dsa.N = p256n()
+   dsa.EC, dsa.G, dsa.N = p256()
    rs, err := dsa.Sign(
       new(big.Int).SetBytes(hashVal), privK, big.NewInt(1),
    )
@@ -140,11 +132,9 @@ func sign(privK *big.Int, hashVal []byte) ([]byte, error) {
    return append(rs[0].Bytes(), rs[1].Bytes()...), nil
 }
 
-// 9
 func elGamalEncrypt(m, pubK *ecc.Point) ([]byte, error) {
    var eg elgamal.EG
-   eg.EC, eg.G = p256()
-   eg.N = p256n()
+   eg.EC, eg.G, eg.N = p256()
    c, err := eg.Encrypt(*m, *pubK, big.NewInt(1))
    if err != nil {
       return nil, err
@@ -154,11 +144,9 @@ func elGamalEncrypt(m, pubK *ecc.Point) ([]byte, error) {
    ), nil
 }
 
-// 19
 func elGamalDecrypt(data []byte, privK *big.Int) (ecc.Point, error) {
    var eg elgamal.EG
-   eg.EC, eg.G = p256()
-   eg.N = p256n()
+   eg.EC, eg.G, eg.N = p256()
    // Unmarshal C1 component
    c1 := ecc.Point{
       X: new(big.Int).SetBytes(data[:32]),
@@ -195,8 +183,7 @@ func (l *License) Decrypt(
       return err
    }
    var dsa ecdsa.DSA
-   dsa.EC, dsa.G = p256()
-   dsa.N = p256n()
+   dsa.EC, dsa.G, dsa.N = p256()
    pubK, err := dsa.PubK(signEncrypt)
    if err != nil {
       return err
@@ -214,11 +201,8 @@ func (l *License) Decrypt(
    return l.verify(data)
 }
 
-func (c *Chain) RequestBody(
-   signEncrypt *big.Int,
-   kid []byte,
-) ([]byte, error) {
-   _, g := p256()
+func (c *Chain) RequestBody(signEncrypt *big.Int, kid []byte) ([]byte, error) {
+   _, g, _ := p256()
    cipherData, err := c.cipherData(g.X)
    if err != nil {
       return nil, err

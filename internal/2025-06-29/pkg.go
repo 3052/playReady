@@ -17,6 +17,18 @@ var pkg = []struct {
    },
 /////////////////////////////////////////////////////////////////////////////////
    {
+      go_sum: 18,
+      spec: "github.com/go-compile/rome",
+   },
+   {
+      go_sum: 14,
+      spec: "github.com/bsv-blockchain/go-sdk/primitives/ecdsa",
+   },
+   {
+      issue: "go mod tidy fail",
+      spec: "github.com/DE-labtory/heimdall/hecdsa",
+   },
+   {
       issue: "no sign",
       spec: "github.com/aureleoules/ecdsa",
    },
