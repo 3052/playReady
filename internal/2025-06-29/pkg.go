@@ -17,6 +17,10 @@ var pkg = []struct {
    },
 /////////////////////////////////////////////////////////////////////////////////
    {
+      issue: "no sign",
+      spec: "github.com/aureleoules/ecdsa",
+   },
+   {
       issue: `github.com/deatil/go-cryptobin/issues/38
       deprecated methods`,
       spec: "github.com/deatil/go-cryptobin/cryptobin/ecdsa",
