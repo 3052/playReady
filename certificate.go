@@ -7,162 +7,6 @@ import (
    "math/big"
 )
 
-func (l *License) decode(data []byte) error {
-   n := copy(l.Magic[:], data)
-   data = data[n:]
-   l.Offset = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   l.Version = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   n = copy(l.RightsId[:], data)
-   data = data[n:]
-   var value1 Ftlv
-   _, err := value1.decode(data) // Type 1
-   if err != nil {
-      return err
-   }
-   for len(value1.Value) >= 1 {
-      var value2 Ftlv
-      n, err = value2.decode(value1.Value)
-      if err != nil {
-         return err
-      }
-      value1.Value = value1.Value[n:]
-      switch xmrType(value2.Type) {
-      case globalPolicyContainerEntryType: // 2
-         // Rakuten
-      case playbackPolicyContainerEntryType: // 4
-         // Rakuten
-      case keyMaterialContainerEntryType: // 9
-         for len(value2.Value) >= 1 {
-            var value3 Ftlv
-            n, err = value3.decode(value2.Value)
-            if err != nil {
-               return err
-            }
-            value2.Value = value2.Value[n:]
-            switch xmrType(value3.Type) {
-            case contentKeyEntryType: // 10
-               l.ContentKey = &ContentKey{}
-               l.ContentKey.decode(value3.Value)
-            case deviceKeyEntryType: // 42
-               l.EccKey = &EccKey{}
-               l.EccKey.decode(value3.Value)
-            case auxKeyEntryType: // 81
-               l.AuxKeys = &AuxKeys{}
-               l.AuxKeys.decode(value3.Value)
-            default:
-               return errors.New("Ftlv.type")
-            }
-         }
-      case signatureEntryType: // 11
-         l.Signature = &LicenseSignature{}
-         l.Signature.decode(value2.Value)
-      default:
-         return errors.New("Ftlv.type")
-      }
-   }
-   return nil
-}
-
-type License struct {
-   Magic      [4]byte           // 0
-   Offset     uint16            // 1
-   Version    uint16            // 2
-   RightsId   [16]byte          // 3
-   ContentKey *ContentKey       // 4.9.10
-   EccKey     *EccKey           // 4.9.42
-   AuxKeys    *AuxKeys          // 4.9.81
-   Signature  *LicenseSignature // 4.11
-}
-type ContentKey struct {
-   KeyId      [16]byte
-   KeyType    uint16
-   CipherType uint16
-   Length     uint16
-   Value      []byte
-}
-
-func (c *ContentKey) Key() []byte {
-   return c.Value[16:]
-}
-
-// decode decodes a byte slice into a ContentKey structure.
-func (c *ContentKey) decode(data []byte) {
-   n := copy(c.KeyId[:], data)
-   data = data[n:]
-   c.KeyType = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   c.CipherType = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   c.Length = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   c.Value = data
-}
-
-func (c *ContentKey) integrity() []byte {
-   return c.Value[:16]
-}
-
-func (c *ContentKey) decrypt(key *big.Int, aux *AuxKeys) error {
-   switch c.CipherType {
-   case 3:
-      point, err := elGamalDecrypt(c.Value, key)
-      if err != nil {
-         return err
-      }
-      c.Value = point.X.Bytes()
-      return nil
-   case 6:
-      return c.scalable(key, aux)
-   }
-   return errors.New("cannot decrypt key")
-}
-
-func (c *ContentKey) scalable(key *big.Int, aux *AuxKeys) error {
-   rootKeyInfo, leafKeys := c.Value[:144], c.Value[144:]
-   rootKey := rootKeyInfo[128:]
-   point, err := elGamalDecrypt(rootKeyInfo[:128], key)
-   if err != nil {
-      return err
-   }
-   decrypted := point.X.Bytes()
-   var (
-      ci [16]byte
-      ck [16]byte
-   )
-   for i := range 16 {
-      ci[i] = decrypted[i*2]
-      ck[i] = decrypted[i*2+1]
-   }
-   constantZero, err := hex.DecodeString(magicConstantZero)
-   if err != nil {
-      return err
-   }
-   rgbUplinkXkey := xorKey(ck[:], constantZero)
-   contentKeyPrime, err := aesEcbEncrypt(rgbUplinkXkey, ck[:])
-   if err != nil {
-      return err
-   }
-   auxKeyCalc, err := aesEcbEncrypt(aux.Keys[0].Key[:], contentKeyPrime)
-   if err != nil {
-      return err
-   }
-   oSecondaryKey, err := aesEcbEncrypt(rootKey, ck[:])
-   if err != nil {
-      return err
-   }
-   c.Value, err = aesEcbEncrypt(leafKeys, auxKeyCalc)
-   if err != nil {
-      return err
-   }
-   c.Value, err = aesEcbEncrypt(c.Value, oSecondaryKey)
-   if err != nil {
-      return err
-   }
-   return nil
-}
-
 func (c *Certificate) decode(data []byte) (int, error) {
    // Copy the magic bytes and check for "CERT" signature.
    n := copy(c.Magic[:], data)
@@ -265,4 +109,161 @@ func (c *Certificate) size() (uint32, uint32) {
    n1 += new(Ftlv).size()
    n1 += c.Signature.size()
    return uint32(n), uint32(n1)
+}
+
+type ContentKey struct {
+   KeyId      [16]byte
+   KeyType    uint16
+   CipherType uint16
+   Length     uint16
+   Value      []byte
+}
+
+func (c *ContentKey) Key() []byte {
+   return c.Value[16:]
+}
+
+// decode decodes a byte slice into a ContentKey structure.
+func (c *ContentKey) decode(data []byte) {
+   n := copy(c.KeyId[:], data)
+   data = data[n:]
+   c.KeyType = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   c.CipherType = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   c.Length = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   c.Value = data
+}
+
+func (c *ContentKey) integrity() []byte {
+   return c.Value[:16]
+}
+
+func (c *ContentKey) decrypt(key *big.Int, aux *AuxKeys) error {
+   switch c.CipherType {
+   case 3:
+      point, err := elGamalDecrypt(c.Value, key)
+      if err != nil {
+         return err
+      }
+      c.Value = point.X.Bytes()
+      return nil
+   case 6:
+      return c.scalable(key, aux)
+   }
+   return errors.New("cannot decrypt key")
+}
+
+func (c *ContentKey) scalable(key *big.Int, aux *AuxKeys) error {
+   rootKeyInfo, leafKeys := c.Value[:144], c.Value[144:]
+   rootKey := rootKeyInfo[128:]
+   point, err := elGamalDecrypt(rootKeyInfo[:128], key)
+   if err != nil {
+      return err
+   }
+   decrypted := point.X.Bytes()
+   var (
+      ci [16]byte
+      ck [16]byte
+   )
+   for i := range 16 {
+      ci[i] = decrypted[i*2]
+      ck[i] = decrypted[i*2+1]
+   }
+   constantZero, err := hex.DecodeString(magicConstantZero)
+   if err != nil {
+      return err
+   }
+   rgbUplinkXkey := xorKey(ck[:], constantZero)
+   contentKeyPrime, err := aesEcbEncrypt(rgbUplinkXkey, ck[:])
+   if err != nil {
+      return err
+   }
+   auxKeyCalc, err := aesEcbEncrypt(aux.Keys[0].Key[:], contentKeyPrime)
+   if err != nil {
+      return err
+   }
+   oSecondaryKey, err := aesEcbEncrypt(rootKey, ck[:])
+   if err != nil {
+      return err
+   }
+   c.Value, err = aesEcbEncrypt(leafKeys, auxKeyCalc)
+   if err != nil {
+      return err
+   }
+   c.Value, err = aesEcbEncrypt(c.Value, oSecondaryKey)
+   if err != nil {
+      return err
+   }
+   return nil
+}
+
+func (l *License) decode(data []byte) error {
+   n := copy(l.Magic[:], data)
+   data = data[n:]
+   l.Offset = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   l.Version = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   n = copy(l.RightsId[:], data)
+   data = data[n:]
+   var value1 Ftlv
+   _, err := value1.decode(data) // Type 1
+   if err != nil {
+      return err
+   }
+   for len(value1.Value) >= 1 {
+      var value2 Ftlv
+      n, err = value2.decode(value1.Value)
+      if err != nil {
+         return err
+      }
+      value1.Value = value1.Value[n:]
+      switch xmrType(value2.Type) {
+      case globalPolicyContainerEntryType: // 2
+         // Rakuten
+      case playbackPolicyContainerEntryType: // 4
+         // Rakuten
+      case keyMaterialContainerEntryType: // 9
+         for len(value2.Value) >= 1 {
+            var value3 Ftlv
+            n, err = value3.decode(value2.Value)
+            if err != nil {
+               return err
+            }
+            value2.Value = value2.Value[n:]
+            switch xmrType(value3.Type) {
+            case contentKeyEntryType: // 10
+               l.ContentKey = &ContentKey{}
+               l.ContentKey.decode(value3.Value)
+            case deviceKeyEntryType: // 42
+               l.EccKey = &EccKey{}
+               l.EccKey.decode(value3.Value)
+            case auxKeyEntryType: // 81
+               l.AuxKeys = &AuxKeys{}
+               l.AuxKeys.decode(value3.Value)
+            default:
+               return errors.New("Ftlv.type")
+            }
+         }
+      case signatureEntryType: // 11
+         l.Signature = &LicenseSignature{}
+         l.Signature.decode(value2.Value)
+      default:
+         return errors.New("Ftlv.type")
+      }
+   }
+   return nil
+}
+
+type License struct {
+   Magic      [4]byte           // 0
+   Offset     uint16            // 1
+   Version    uint16            // 2
+   RightsId   [16]byte          // 3
+   ContentKey *ContentKey       // 4.9.10
+   EccKey     *EccKey           // 4.9.42
+   AuxKeys    *AuxKeys          // 4.9.81
+   Signature  *LicenseSignature // 4.11
 }
