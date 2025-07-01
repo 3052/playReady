@@ -1,86 +1,20 @@
 package playReady
 
 import (
-   "41.neocities.org/playReady/xml"
+   "crypto/aes"
    "encoding/binary"
-   "encoding/hex"
    "errors"
-   "math/big"
-   "github.com/arnaucube/cryptofun/ecc"
+   "github.com/emmansun/gmsm/cipher"
 )
 
-func (c *Chain) verify() (bool, error) {
-   modelBase := c.Certificates[c.CertCount-1].Signature.IssuerKey
-   for i := len(c.Certificates) - 1; i >= 0; i-- {
-      ok, err := c.Certificates[i].verify(modelBase[:])
-      if err != nil {
-         return false, err
-      }
-      if !ok {
-         return false, nil
-      }
-      modelBase = c.Certificates[i].KeyInfo.Keys[0].PublicKey[:]
-   }
-   return true, nil
-}
-
-func elGamalKeyGeneration() *ecc.Point {
-   data, _ := hex.DecodeString(wmrmPublicKey)
-   return &ecc.Point{
-      X: new(big.Int).SetBytes(data[:32]),
-      Y: new(big.Int).SetBytes(data[32:]),
-   }
-}
-
-func newLa(m *ecc.Point, cipherData, kid []byte) (*xml.La, error) {
-   data, err := elGamalEncrypt(m, elGamalKeyGeneration())
+func aesEcbEncrypt(data, key []byte) ([]byte, error) {
+   block, err := aes.NewCipher(key)
    if err != nil {
       return nil, err
    }
-   return &xml.La{
-      XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/protocols",
-      Id:      "SignedData",
-      Version: "1",
-      ContentHeader: xml.ContentHeader{
-         WrmHeader: xml.WrmHeader{
-            XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/PlayReadyHeader",
-            Version: "4.0.0.0",
-            Data: xml.WrmHeaderData{
-               ProtectInfo: xml.ProtectInfo{
-                  KeyLen: "16",
-                  AlgId:  "AESCTR",
-               },
-               Kid: kid,
-            },
-         },
-      },
-      EncryptedData: xml.EncryptedData{
-         XmlNs: "http://www.w3.org/2001/04/xmlenc#",
-         Type:  "http://www.w3.org/2001/04/xmlenc#Element",
-         EncryptionMethod: xml.Algorithm{
-            Algorithm: "http://www.w3.org/2001/04/xmlenc#aes128-cbc",
-         },
-         KeyInfo: xml.KeyInfo{
-            XmlNs: "http://www.w3.org/2000/09/xmldsig#",
-            EncryptedKey: xml.EncryptedKey{
-               XmlNs: "http://www.w3.org/2001/04/xmlenc#",
-               EncryptionMethod: xml.Algorithm{
-                  Algorithm: "http://schemas.microsoft.com/DRM/2007/03/protocols#ecc256",
-               },
-               KeyInfo: xml.EncryptedKeyInfo{
-                  XmlNs:   "http://www.w3.org/2000/09/xmldsig#",
-                  KeyName: "WMRMServer",
-               },
-               CipherData: xml.CipherData{
-                  CipherValue: data,
-               },
-            },
-         },
-         CipherData: xml.CipherData{
-            CipherValue: cipherData,
-         },
-      },
-   }, nil
+   data1 := make([]byte, len(data))
+   cipher.NewECBEncrypter(block).CryptBlocks(data1, data)
+   return data1, nil
 }
 
 func (a *AuxKey) decode(data []byte) int {
@@ -179,74 +113,7 @@ type LicenseSignature struct {
    Data   []byte
 }
 
-func (c *ContentKey) decrypt(key *big.Int, aux *AuxKeys) error {
-   switch c.CipherType {
-   case 3:
-      point, err := elGamalDecrypt(c.Value, key)
-      if err != nil {
-         return err
-      }
-      c.Value = point.X.Bytes()
-      return nil
-   case 6:
-      return c.scalable(key, aux)
-   }
-   return errors.New("cannot decrypt key")
-}
-
-func (c *ContentKey) scalable(key *big.Int, aux *AuxKeys) error {
-   rootKeyInfo, leafKeys := c.Value[:144], c.Value[144:]
-   rootKey := rootKeyInfo[128:]
-   point, err := elGamalDecrypt(rootKeyInfo[:128], key)
-   if err != nil {
-      return err
-   }
-   decrypted := point.X.Bytes()
-   var (
-      ci [16]byte
-      ck [16]byte
-   )
-   for i := range 16 {
-      ci[i] = decrypted[i*2]
-      ck[i] = decrypted[i*2+1]
-   }
-   constantZero, err := hex.DecodeString(magicConstantZero)
-   if err != nil {
-      return err
-   }
-   rgbUplinkXkey := xorKey(ck[:], constantZero)
-   contentKeyPrime, err := aesEcbEncrypt(rgbUplinkXkey, ck[:])
-   if err != nil {
-      return err
-   }
-   auxKeyCalc, err := aesEcbEncrypt(aux.Keys[0].Key[:], contentKeyPrime)
-   if err != nil {
-      return err
-   }
-   oSecondaryKey, err := aesEcbEncrypt(rootKey, ck[:])
-   if err != nil {
-      return err
-   }
-   c.Value, err = aesEcbEncrypt(leafKeys, auxKeyCalc)
-   if err != nil {
-      return err
-   }
-   c.Value, err = aesEcbEncrypt(c.Value, oSecondaryKey)
-   if err != nil {
-      return err
-   }
-   return nil
-}
-
 const wmrmPublicKey = "C8B6AF16EE941AADAA5389B4AF2C10E356BE42AF175EF3FACE93254E7B0B3D9B982B27B5CB2341326E56AA857DBFD5C634CE2CF9EA74FCA8F2AF5957EFEEA562"
-
-type ContentKey struct {
-   KeyId      [16]byte
-   KeyType    uint16
-   CipherType uint16
-   Length     uint16
-   Value      []byte
-}
 
 func (e *EccKey) decode(data []byte) {
    e.Curve = binary.BigEndian.Uint16(data)
@@ -415,64 +282,6 @@ type CertFeatures struct {
    Features []uint32
 }
 
-func (c *ContentKey) Key() []byte {
-   return c.Value[16:]
-}
-
-// decode decodes a byte slice into a ContentKey structure.
-func (c *ContentKey) decode(data []byte) {
-   n := copy(c.KeyId[:], data)
-   data = data[n:]
-   c.KeyType = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   c.CipherType = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   c.Length = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   c.Value = data
-}
-
-func (c *ContentKey) integrity() []byte {
-   return c.Value[:16]
-}
-
-// Decode decodes a byte slice into the Chain structure.
-func (c *Chain) Decode(data []byte) error {
-   n := copy(c.Magic[:], data)
-   if string(c.Magic[:]) != "CHAI" {
-      return errors.New("failed to find chain magic")
-   }
-   data = data[n:]
-   c.Version = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   c.Length = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   c.Flags = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   c.CertCount = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   c.Certificates = make([]Certificate, c.CertCount)
-   for i := range c.CertCount {
-      var cert Certificate
-      n, err := cert.decode(data)
-      if err != nil {
-         return err
-      }
-      c.Certificates[i] = cert
-      data = data[n:]
-   }
-   return nil
-}
-
-type Chain struct {
-   Magic        [4]byte
-   Version      uint32
-   Length       uint32
-   Flags        uint32
-   CertCount    uint32
-   Certificates []Certificate
-}
-
 func (c *CertSignature) decode(data []byte) error {
    c.SignatureType = binary.BigEndian.Uint16(data)
    data = data[2:]
@@ -536,122 +345,6 @@ func (c *CertSignature) size() int {
    n += 4  // issuerLength
    n += 64 // issuerKey
    return n
-}
-
-func (c *Certificate) decode(data []byte) (int, error) {
-   // Copy the magic bytes and check for "CERT" signature.
-   n := copy(c.Magic[:], data)
-   if string(c.Magic[:]) != "CERT" {
-      return 0, errors.New("failed to find cert magic")
-   }
-   // Decode Version, Length, and LengthToSignature fields.
-   c.Version = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   c.Length = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   c.LengthToSignature = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   for n < int(c.Length) {
-      var value Ftlv
-      bytesReadFromFtlv, err := value.decode(data[n:])
-      if err != nil {
-         return 0, err
-      }
-      switch value.Type {
-      case objTypeBasic: // 0x0001
-         c.Info = &CertificateInfo{}
-         c.Info.decode(value.Value)
-      case objTypeFeature: // 0x0005
-         c.Features = &value
-      case objTypeKey: // 0x0006
-         c.KeyInfo = &KeyInfo{}
-         c.KeyInfo.decode(value.Value)
-      case objTypeManufacturer: // 0x0007
-         c.Manufacturer = &value
-      case objTypeSignature: // 0x0008
-         c.Signature = &CertSignature{}
-         err := c.Signature.decode(value.Value)
-         if err != nil {
-            return 0, err
-         }
-      default:
-         return 0, errors.New("Ftlv.Type")
-      }
-      n += bytesReadFromFtlv
-   }
-   return n, nil // Return total bytes consumed and nil for no error
-}
-
-type Certificate struct {
-   Magic             [4]byte          // bytes 0 - 3
-   Version           uint32           // bytes 4 - 7
-   Length            uint32           // bytes 8 - 11
-   LengthToSignature uint32           // bytes 12 - 15
-   Info              *CertificateInfo // type 1
-   Features          *Ftlv            // type 5
-   KeyInfo           *KeyInfo         // type 6
-   Manufacturer      *Ftlv            // type 7
-   Signature         *CertSignature   // type 8
-}
-
-func (c *Certificate) Append(data []byte) []byte {
-   data = append(data, c.Magic[:]...)
-   data = binary.BigEndian.AppendUint32(data, c.Version)
-   data = binary.BigEndian.AppendUint32(data, c.Length)
-   data = binary.BigEndian.AppendUint32(data, c.LengthToSignature)
-   if c.Info != nil {
-      data = c.Info.ftlv(1, 1).Append(data)
-   }
-   if c.Features != nil {
-      data = c.Features.Append(data)
-   }
-   if c.KeyInfo != nil {
-      data = c.KeyInfo.ftlv(1, 6).Append(data)
-   }
-   if c.Manufacturer != nil {
-      data = c.Manufacturer.Append(data)
-   }
-   if c.Signature != nil {
-      data = c.Signature.ftlv(0, 8).Append(data)
-   }
-   return data
-}
-
-func (c *Certificate) size() (uint32, uint32) {
-   n := len(c.Magic)
-   n += 4 // Version
-   n += 4 // Length
-   n += 4 // LengthToSignature
-   if c.Info != nil {
-      n += new(Ftlv).size()
-      n += binary.Size(c.Info)
-   }
-   if c.Features != nil {
-      n += c.Features.size()
-   }
-   if c.KeyInfo != nil {
-      n += new(Ftlv).size()
-      n += c.KeyInfo.size()
-   }
-   if c.Manufacturer != nil {
-      n += c.Manufacturer.size()
-   }
-   n1 := n
-   n1 += new(Ftlv).size()
-   n1 += c.Signature.size()
-   return uint32(n), uint32(n1)
-}
-
-func (c *Chain) Encode() []byte {
-   data := c.Magic[:]
-   data = binary.BigEndian.AppendUint32(data, c.Version)
-   data = binary.BigEndian.AppendUint32(data, c.Length)
-   data = binary.BigEndian.AppendUint32(data, c.Flags)
-   data = binary.BigEndian.AppendUint32(data, c.CertCount)
-   for _, cert := range c.Certificates {
-      data = cert.Append(data)
-   }
-   return data
 }
 
 type CertificateInfo struct {
@@ -776,73 +469,4 @@ func UuidOrGuid(data []byte) {
    // Data3 (next 2 bytes) - swap endianness in place
    data[6], data[7] = data[7], data[6]
    // Data4 (last 8 bytes) - no change needed, so no operation here
-}
-
-func (l *License) decode(data []byte) error {
-   n := copy(l.Magic[:], data)
-   data = data[n:]
-   l.Offset = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   l.Version = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   n = copy(l.RightsId[:], data)
-   data = data[n:]
-   var value1 Ftlv
-   _, err := value1.decode(data) // Type 1
-   if err != nil {
-      return err
-   }
-   for len(value1.Value) >= 1 {
-      var value2 Ftlv
-      n, err = value2.decode(value1.Value)
-      if err != nil {
-         return err
-      }
-      value1.Value = value1.Value[n:]
-      switch xmrType(value2.Type) {
-      case globalPolicyContainerEntryType: // 2
-         // Rakuten
-      case playbackPolicyContainerEntryType: // 4
-         // Rakuten
-      case keyMaterialContainerEntryType: // 9
-         for len(value2.Value) >= 1 {
-            var value3 Ftlv
-            n, err = value3.decode(value2.Value)
-            if err != nil {
-               return err
-            }
-            value2.Value = value2.Value[n:]
-            switch xmrType(value3.Type) {
-            case contentKeyEntryType: // 10
-               l.ContentKey = &ContentKey{}
-               l.ContentKey.decode(value3.Value)
-            case deviceKeyEntryType: // 42
-               l.EccKey = &EccKey{}
-               l.EccKey.decode(value3.Value)
-            case auxKeyEntryType: // 81
-               l.AuxKeys = &AuxKeys{}
-               l.AuxKeys.decode(value3.Value)
-            default:
-               return errors.New("Ftlv.type")
-            }
-         }
-      case signatureEntryType: // 11
-         l.Signature = &LicenseSignature{}
-         l.Signature.decode(value2.Value)
-      default:
-         return errors.New("Ftlv.type")
-      }
-   }
-   return nil
-}
-
-type License struct {
-   Magic      [4]byte           // 0
-   Offset     uint16            // 1
-   Version    uint16            // 2
-   RightsId   [16]byte          // 3
-   ContentKey *ContentKey       // 4.9.10
-   EccKey     *EccKey           // 4.9.42
-   AuxKeys    *AuxKeys          // 4.9.81
-   Signature  *LicenseSignature // 4.11
 }
