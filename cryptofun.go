@@ -3,7 +3,6 @@ package playReady
 import (
    "41.neocities.org/playReady/xml"
    "bytes"
-   //"crypto/elliptic"
    "crypto/sha256"
    "errors"
    "github.com/arnaucube/cryptofun/ecc"
@@ -12,6 +11,46 @@ import (
    "math/big"
    "slices"
 )
+
+func sign(privK *big.Int, hashVal []byte) ([]byte, error) {
+   var dsa ecdsa.DSA
+   dsa.EC, dsa.G, dsa.N = p256()
+   rs, err := dsa.Sign(
+      new(big.Int).SetBytes(hashVal), privK, big.NewInt(1),
+   )
+   if err != nil {
+      return nil, err
+   }
+   return append(rs[0].Bytes(), rs[1].Bytes()...), nil
+}
+
+func elGamalEncrypt(m, pubK *ecc.Point) ([]byte, error) {
+   var eg elgamal.EG
+   eg.EC, eg.G, eg.N = p256()
+   c, err := eg.Encrypt(*m, *pubK, big.NewInt(1))
+   if err != nil {
+      return nil, err
+   }
+   return slices.Concat(
+      c[0].X.Bytes(), c[0].Y.Bytes(), c[1].X.Bytes(), c[1].Y.Bytes(),
+   ), nil
+}
+
+func elGamalDecrypt(data []byte, privK *big.Int) (ecc.Point, error) {
+   var eg elgamal.EG
+   eg.EC, eg.G, eg.N = p256()
+   // Unmarshal C1 component
+   c1 := ecc.Point{
+      X: new(big.Int).SetBytes(data[:32]),
+      Y: new(big.Int).SetBytes(data[32:64]),
+   }
+   // Unmarshal C2 component
+   c2 := ecc.Point{
+      X: new(big.Int).SetBytes(data[64:96]),
+      Y: new(big.Int).SetBytes(data[96:]),
+   }
+   return eg.Decrypt([2]ecc.Point{c1, c2}, privK)
+}
 
 // nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-4.pdf
 func p256() (ec ecc.EC, g ecc.Point, n *big.Int) {
@@ -51,10 +90,59 @@ func (c *Certificate) verify(pubK []byte) (bool, error) {
    )
 }
 
-func (c *Chain) Leaf(
-   modelKey *big.Int,
-   signEncryptKey *big.Int,
-) error {
+func (c *Chain) RequestBody(signEncrypt *big.Int, kid []byte) ([]byte, error) {
+   _, g, _ := p256()
+   cipherData, err := c.cipherData(g.X)
+   if err != nil {
+      return nil, err
+   }
+   la, err := newLa(&g, cipherData, kid)
+   if err != nil {
+      return nil, err
+   }
+   laData, err := la.Marshal()
+   if err != nil {
+      return nil, err
+   }
+   laDigest := sha256.Sum256(laData)
+   signedInfo := xml.SignedInfo{
+      XmlNs: "http://www.w3.org/2000/09/xmldsig#",
+      Reference: xml.Reference{
+         Uri:         "#SignedData",
+         DigestValue: laDigest[:],
+      },
+   }
+   signedData, err := signedInfo.Marshal()
+   if err != nil {
+      return nil, err
+   }
+   hashVal := sha256.Sum256(signedData)
+   signature, err := sign(signEncrypt, hashVal[:])
+   if err != nil {
+      return nil, err
+   }
+   envelope := xml.Envelope{
+      Soap: "http://schemas.xmlsoap.org/soap/envelope/",
+      Body: xml.Body{
+         AcquireLicense: &xml.AcquireLicense{
+            XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols",
+            Challenge: xml.Challenge{
+               Challenge: xml.InnerChallenge{
+                  XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols/messages",
+                  La:    la,
+                  Signature: xml.Signature{
+                     SignedInfo:     signedInfo,
+                     SignatureValue: signature,
+                  },
+               },
+            },
+         },
+      },
+   }
+   return envelope.Marshal()
+}
+
+func (c *Chain) Leaf(modelKey, signEncryptKey *big.Int) error {
    var dsa ecdsa.DSA
    dsa.EC, dsa.G, dsa.N = p256()
    modelPub, err := dsa.PubK(modelKey)
@@ -120,51 +208,7 @@ func (c *Chain) Leaf(
    return nil
 }
 
-func sign(privK *big.Int, hashVal []byte) ([]byte, error) {
-   var dsa ecdsa.DSA
-   dsa.EC, dsa.G, dsa.N = p256()
-   rs, err := dsa.Sign(
-      new(big.Int).SetBytes(hashVal), privK, big.NewInt(1),
-   )
-   if err != nil {
-      return nil, err
-   }
-   return append(rs[0].Bytes(), rs[1].Bytes()...), nil
-}
-
-func elGamalEncrypt(m, pubK *ecc.Point) ([]byte, error) {
-   var eg elgamal.EG
-   eg.EC, eg.G, eg.N = p256()
-   c, err := eg.Encrypt(*m, *pubK, big.NewInt(1))
-   if err != nil {
-      return nil, err
-   }
-   return slices.Concat(
-      c[0].X.Bytes(), c[0].Y.Bytes(), c[1].X.Bytes(), c[1].Y.Bytes(),
-   ), nil
-}
-
-func elGamalDecrypt(data []byte, privK *big.Int) (ecc.Point, error) {
-   var eg elgamal.EG
-   eg.EC, eg.G, eg.N = p256()
-   // Unmarshal C1 component
-   c1 := ecc.Point{
-      X: new(big.Int).SetBytes(data[:32]),
-      Y: new(big.Int).SetBytes(data[32:64]),
-   }
-   // Unmarshal C2 component
-   c2 := ecc.Point{
-      X: new(big.Int).SetBytes(data[64:96]),
-      Y: new(big.Int).SetBytes(data[96:]),
-   }
-   return eg.Decrypt([2]ecc.Point{c1, c2}, privK)
-}
-
-// 35
-func (l *License) Decrypt(
-   signEncrypt *big.Int,
-   data []byte,
-) error {
+func (l *License) Decrypt(signEncrypt *big.Int, data []byte) error {
    var envelope xml.EnvelopeResponse
    err := envelope.Unmarshal(data)
    if err != nil {
@@ -199,56 +243,4 @@ func (l *License) Decrypt(
       return err
    }
    return l.verify(data)
-}
-
-func (c *Chain) RequestBody(signEncrypt *big.Int, kid []byte) ([]byte, error) {
-   _, g, _ := p256()
-   cipherData, err := c.cipherData(g.X)
-   if err != nil {
-      return nil, err
-   }
-   la, err := newLa(&g, cipherData, kid)
-   if err != nil {
-      return nil, err
-   }
-   laData, err := la.Marshal()
-   if err != nil {
-      return nil, err
-   }
-   laDigest := sha256.Sum256(laData)
-   signedInfo := xml.SignedInfo{
-      XmlNs: "http://www.w3.org/2000/09/xmldsig#",
-      Reference: xml.Reference{
-         Uri:         "#SignedData",
-         DigestValue: laDigest[:],
-      },
-   }
-   signedData, err := signedInfo.Marshal()
-   if err != nil {
-      return nil, err
-   }
-   hashVal := sha256.Sum256(signedData)
-   signature, err := sign(signEncrypt, hashVal[:])
-   if err != nil {
-      return nil, err
-   }
-   envelope := xml.Envelope{
-      Soap: "http://schemas.xmlsoap.org/soap/envelope/",
-      Body: xml.Body{
-         AcquireLicense: &xml.AcquireLicense{
-            XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols",
-            Challenge: xml.Challenge{
-               Challenge: xml.InnerChallenge{
-                  XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols/messages",
-                  La:    la,
-                  Signature: xml.Signature{
-                     SignedInfo:     signedInfo,
-                     SignatureValue: signature,
-                  },
-               },
-            },
-         },
-      },
-   }
-   return envelope.Marshal()
 }
