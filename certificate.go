@@ -1,11 +1,42 @@
 package playReady
 
 import (
+   "bytes"
+   "crypto/sha256"
    "encoding/binary"
    "encoding/hex"
    "errors"
+   "github.com/arnaucube/cryptofun/ecc"
+   "github.com/arnaucube/cryptofun/ecdsa"
    "math/big"
 )
+
+func (c *Certificate) verify(pubK []byte) (bool, error) {
+   if !bytes.Equal(c.Signature.IssuerKey, pubK) {
+      return false, nil
+   }
+   var dsa ecdsa.DSA
+   dsa.EC, dsa.G, dsa.N = p256()
+   message := c.Append(nil)
+   message = message[:c.LengthToSignature]
+   sign := c.Signature.Signature
+   hashVal := func() *big.Int {
+      sum := sha256.Sum256(message)
+      return new(big.Int).SetBytes(sum[:])
+   }()
+   sig := [2]*big.Int{
+      new(big.Int).SetBytes(sign[:32]),
+      new(big.Int).SetBytes(sign[32:]),
+   }
+   return dsa.Verify(
+      hashVal,
+      sig,
+      ecc.Point{
+         X: new(big.Int).SetBytes(pubK[:32]),
+         Y: new(big.Int).SetBytes(pubK[32:]),
+      },
+   )
+}
 
 func (c *Certificate) decode(data []byte) (int, error) {
    // Copy the magic bytes and check for "CERT" signature.

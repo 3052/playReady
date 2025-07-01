@@ -71,6 +71,20 @@ func (c *CertificateInfo) New(securityLevel uint32, digest []byte) {
    c.SecurityLevel = securityLevel
 }
 
+func (e *EccKey) decode(data []byte) {
+   e.Curve = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   e.Length = binary.BigEndian.Uint16(data)
+   data = data[2:]
+   e.Value = data
+}
+
+type EccKey struct {
+   Curve  uint16
+   Length uint16
+   Value  []byte
+}
+
 type Filler byte
 
 func (f Filler) Read(data []byte) (int, error) {
@@ -113,21 +127,7 @@ type LicenseSignature struct {
    Data   []byte
 }
 
-const wmrmPublicKey = "C8B6AF16EE941AADAA5389B4AF2C10E356BE42AF175EF3FACE93254E7B0B3D9B982B27B5CB2341326E56AA857DBFD5C634CE2CF9EA74FCA8F2AF5957EFEEA562"
-
-func (e *EccKey) decode(data []byte) {
-   e.Curve = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   e.Length = binary.BigEndian.Uint16(data)
-   data = data[2:]
-   e.Value = data
-}
-
-type EccKey struct {
-   Curve  uint16
-   Length uint16
-   Value  []byte
-}
+///
 
 func (k *KeyData) decode(data []byte) int {
    k.KeyType = binary.BigEndian.Uint16(data)

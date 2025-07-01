@@ -18,81 +18,7 @@ import (
    "slices"
 )
 
-func (l *License) Decrypt(signEncrypt *big.Int, data []byte) error {
-   var envelope xml.EnvelopeResponse
-   err := envelope.Unmarshal(data)
-   if err != nil {
-      return err
-   }
-   data = envelope.
-      Body.
-      AcquireLicenseResponse.
-      AcquireLicenseResult.
-      Response.
-      LicenseResponse.
-      Licenses.
-      License
-   err = l.decode(data)
-   if err != nil {
-      return err
-   }
-   var dsa ecdsa.DSA
-   dsa.EC, dsa.G, dsa.N = p256()
-   pubK, err := dsa.PubK(signEncrypt)
-   if err != nil {
-      return err
-   }
-   if !bytes.Equal(
-      l.EccKey.Value,
-      append(pubK.X.Bytes(), pubK.Y.Bytes()...),
-   ) {
-      return errors.New("license response is not for this device")
-   }
-   err = l.ContentKey.decrypt(signEncrypt, l.AuxKeys)
-   if err != nil {
-      return err
-   }
-   return l.verify(data)
-}
-
-func sign(privK *big.Int, hashVal []byte) ([]byte, error) {
-   var dsa ecdsa.DSA
-   dsa.EC, dsa.G, dsa.N = p256()
-   rs, err := dsa.Sign(
-      new(big.Int).SetBytes(hashVal), privK, big.NewInt(1),
-   )
-   if err != nil {
-      return nil, err
-   }
-   return append(rs[0].Bytes(), rs[1].Bytes()...), nil
-}
-
-func (c *Certificate) verify(pubK []byte) (bool, error) {
-   if !bytes.Equal(c.Signature.IssuerKey, pubK) {
-      return false, nil
-   }
-   var dsa ecdsa.DSA
-   dsa.EC, dsa.G, dsa.N = p256()
-   message := c.Append(nil)
-   message = message[:c.LengthToSignature]
-   sign := c.Signature.Signature
-   hashVal := func() *big.Int {
-      sum := sha256.Sum256(message)
-      return new(big.Int).SetBytes(sum[:])
-   }()
-   sig := [2]*big.Int{
-      new(big.Int).SetBytes(sign[:32]),
-      new(big.Int).SetBytes(sign[32:]),
-   }
-   return dsa.Verify(
-      hashVal,
-      sig,
-      ecc.Point{
-         X: new(big.Int).SetBytes(pubK[:32]),
-         Y: new(big.Int).SetBytes(pubK[32:]),
-      },
-   )
-}
+const wmrmPublicKey = "C8B6AF16EE941AADAA5389B4AF2C10E356BE42AF175EF3FACE93254E7B0B3D9B982B27B5CB2341326E56AA857DBFD5C634CE2CF9EA74FCA8F2AF5957EFEEA562"
 
 func elGamalKeyGeneration() *ecc.Point {
    data, _ := hex.DecodeString(wmrmPublicKey)
@@ -192,18 +118,16 @@ func p256() (ec ecc.EC, g ecc.Point, n *big.Int) {
    return
 }
 
-func (l *License) verify(data []byte) error {
-   signature := new(Ftlv).size() + l.Signature.size()
-   data = data[:len(data)-signature]
-   block, err := aes.NewCipher(l.ContentKey.integrity())
+func sign(privK *big.Int, hashVal []byte) ([]byte, error) {
+   var dsa ecdsa.DSA
+   dsa.EC, dsa.G, dsa.N = p256()
+   rs, err := dsa.Sign(
+      new(big.Int).SetBytes(hashVal), privK, big.NewInt(1),
+   )
    if err != nil {
-      return err
+      return nil, err
    }
-   data = cbcmac.NewCMAC(block, aes.BlockSize).MAC(data)
-   if !bytes.Equal(data, l.Signature.Data) {
-      return errors.New("failed to decrypt the keys")
-   }
-   return nil
+   return append(rs[0].Bytes(), rs[1].Bytes()...), nil
 }
 
 func (c *Chain) cipherData(x *big.Int) ([]byte, error) {
@@ -410,4 +334,55 @@ func (c *Chain) Encode() []byte {
       data = cert.Append(data)
    }
    return data
+}
+
+func (l *License) verify(data []byte) error {
+   signature := new(Ftlv).size() + l.Signature.size()
+   data = data[:len(data)-signature]
+   block, err := aes.NewCipher(l.ContentKey.integrity())
+   if err != nil {
+      return err
+   }
+   data = cbcmac.NewCMAC(block, aes.BlockSize).MAC(data)
+   if !bytes.Equal(data, l.Signature.Data) {
+      return errors.New("failed to decrypt the keys")
+   }
+   return nil
+}
+
+func (l *License) Decrypt(signEncrypt *big.Int, data []byte) error {
+   var envelope xml.EnvelopeResponse
+   err := envelope.Unmarshal(data)
+   if err != nil {
+      return err
+   }
+   data = envelope.
+      Body.
+      AcquireLicenseResponse.
+      AcquireLicenseResult.
+      Response.
+      LicenseResponse.
+      Licenses.
+      License
+   err = l.decode(data)
+   if err != nil {
+      return err
+   }
+   var dsa ecdsa.DSA
+   dsa.EC, dsa.G, dsa.N = p256()
+   pubK, err := dsa.PubK(signEncrypt)
+   if err != nil {
+      return err
+   }
+   if !bytes.Equal(
+      l.EccKey.Value,
+      append(pubK.X.Bytes(), pubK.Y.Bytes()...),
+   ) {
+      return errors.New("license response is not for this device")
+   }
+   err = l.ContentKey.decrypt(signEncrypt, l.AuxKeys)
+   if err != nil {
+      return err
+   }
+   return l.verify(data)
 }
