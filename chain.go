@@ -18,6 +18,8 @@ import (
    "slices"
 )
 
+const wmrmPublicKey = "C8B6AF16EE941AADAA5389B4AF2C10E356BE42AF175EF3FACE93254E7B0B3D9B982B27B5CB2341326E56AA857DBFD5C634CE2CF9EA74FCA8F2AF5957EFEEA562"
+
 // nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-4.pdf
 func p256() (ec ecc.EC, g ecc.Point, n *big.Int) {
    ec.A = big.NewInt(-3)
@@ -28,18 +30,48 @@ func p256() (ec ecc.EC, g ecc.Point, n *big.Int) {
    return
 }
 
-const wmrmPublicKey = "C8B6AF16EE941AADAA5389B4AF2C10E356BE42AF175EF3FACE93254E7B0B3D9B982B27B5CB2341326E56AA857DBFD5C634CE2CF9EA74FCA8F2AF5957EFEEA562"
-
-func elGamalKeyGeneration() *ecc.Point {
-   data, _ := hex.DecodeString(wmrmPublicKey)
-   return &ecc.Point{
-      X: new(big.Int).SetBytes(data[:32]),
-      Y: new(big.Int).SetBytes(data[32:]),
+func sign(privK *big.Int, hashVal []byte) ([]byte, error) {
+   var dsa ecdsa.DSA
+   dsa.EC, dsa.G, dsa.N = p256()
+   rs, err := dsa.Sign(
+      new(big.Int).SetBytes(hashVal), privK, big.NewInt(1),
+   )
+   if err != nil {
+      return nil, err
    }
+   return append(rs[0].Bytes(), rs[1].Bytes()...), nil
 }
 
-func newLa(m *ecc.Point, cipherData, kid []byte) (*xml.La, error) {
-   data, err := elGamalEncrypt(m, elGamalKeyGeneration())
+///
+
+func (c *Chain) cipherData() ([]byte, error) {
+   xmlData := xml.Data{
+      CertificateChains: xml.CertificateChains{
+         CertificateChain: c.Encode(),
+      },
+      Features: xml.Features{
+         Feature: xml.Feature{"AESCBC"}, // SCALABLE
+      },
+   }
+   data, err := xmlData.Marshal()
+   if err != nil {
+      return nil, err
+   }
+   data = padding.NewPKCS7Padding(aes.BlockSize).Pad(data)
+   _, g, _ := p256()
+   xBytes := g.X.Bytes()
+   iv, key := xBytes[:16], xBytes[16:]
+   block, err := aes.NewCipher(key)
+   if err != nil {
+      return nil, err
+   }
+   cipher.NewCBCEncrypter(block, iv).CryptBlocks(data, data)
+   return append(iv, data...), nil
+}
+
+func newLa(cipherData, kid []byte) (*xml.La, error) {
+   _, g, _ := p256()
+   data, err := elGamalEncrypt(&g, elGamalKeyGeneration())
    if err != nil {
       return nil, err
    }
@@ -89,77 +121,12 @@ func newLa(m *ecc.Point, cipherData, kid []byte) (*xml.La, error) {
    }, nil
 }
 
-func elGamalEncrypt(m, pubK *ecc.Point) ([]byte, error) {
-   var eg elgamal.EG
-   eg.EC, eg.G, eg.N = p256()
-   c, err := eg.Encrypt(*m, *pubK, big.NewInt(1))
-   if err != nil {
-      return nil, err
-   }
-   return slices.Concat(
-      c[0].X.Bytes(), c[0].Y.Bytes(), c[1].X.Bytes(), c[1].Y.Bytes(),
-   ), nil
-}
-
-func elGamalDecrypt(data []byte, privK *big.Int) (ecc.Point, error) {
-   var eg elgamal.EG
-   eg.EC, eg.G, eg.N = p256()
-   // Unmarshal C1 component
-   c1 := ecc.Point{
-      X: new(big.Int).SetBytes(data[:32]),
-      Y: new(big.Int).SetBytes(data[32:64]),
-   }
-   // Unmarshal C2 component
-   c2 := ecc.Point{
-      X: new(big.Int).SetBytes(data[64:96]),
-      Y: new(big.Int).SetBytes(data[96:]),
-   }
-   return eg.Decrypt([2]ecc.Point{c1, c2}, privK)
-}
-
-func sign(privK *big.Int, hashVal []byte) ([]byte, error) {
-   var dsa ecdsa.DSA
-   dsa.EC, dsa.G, dsa.N = p256()
-   rs, err := dsa.Sign(
-      new(big.Int).SetBytes(hashVal), privK, big.NewInt(1),
-   )
-   if err != nil {
-      return nil, err
-   }
-   return append(rs[0].Bytes(), rs[1].Bytes()...), nil
-}
-
-func (c *Chain) cipherData(x *big.Int) ([]byte, error) {
-   xmlData := xml.Data{
-      CertificateChains: xml.CertificateChains{
-         CertificateChain: c.Encode(),
-      },
-      Features: xml.Features{
-         Feature: xml.Feature{"AESCBC"}, // SCALABLE
-      },
-   }
-   data, err := xmlData.Marshal()
-   if err != nil {
-      return nil, err
-   }
-   data = padding.NewPKCS7Padding(aes.BlockSize).Pad(data)
-   xBytes := x.Bytes()
-   iv, key := xBytes[:16], xBytes[16:]
-   block, err := aes.NewCipher(key)
-   if err != nil {
-      return nil, err
-   }
-   cipher.NewCBCEncrypter(block, iv).CryptBlocks(data, data)
-   return append(iv, data...), nil
-}
-
 func (c *Chain) RequestBody(signEncrypt *big.Int, kid []byte) ([]byte, error) {
-   _, g, _ := p256()
-   cipherData, err := c.cipherData(g.X)
+   cipherData, err := c.cipherData()
    if err != nil {
       return nil, err
    }
-   la, err := newLa(&g, cipherData, kid)
+   la, err := newLa(cipherData, kid)
    if err != nil {
       return nil, err
    }
@@ -203,6 +170,42 @@ func (c *Chain) RequestBody(signEncrypt *big.Int, kid []byte) ([]byte, error) {
       },
    }
    return envelope.Marshal()
+}
+
+func elGamalKeyGeneration() *ecc.Point {
+   data, _ := hex.DecodeString(wmrmPublicKey)
+   return &ecc.Point{
+      X: new(big.Int).SetBytes(data[:32]),
+      Y: new(big.Int).SetBytes(data[32:]),
+   }
+}
+
+func elGamalEncrypt(m, pubK *ecc.Point) ([]byte, error) {
+   var eg elgamal.EG
+   eg.EC, eg.G, eg.N = p256()
+   c, err := eg.Encrypt(*m, *pubK, big.NewInt(1))
+   if err != nil {
+      return nil, err
+   }
+   return slices.Concat(
+      c[0].X.Bytes(), c[0].Y.Bytes(), c[1].X.Bytes(), c[1].Y.Bytes(),
+   ), nil
+}
+
+func elGamalDecrypt(data []byte, privK *big.Int) (ecc.Point, error) {
+   var eg elgamal.EG
+   eg.EC, eg.G, eg.N = p256()
+   // Unmarshal C1 component
+   c1 := ecc.Point{
+      X: new(big.Int).SetBytes(data[:32]),
+      Y: new(big.Int).SetBytes(data[32:64]),
+   }
+   // Unmarshal C2 component
+   c2 := ecc.Point{
+      X: new(big.Int).SetBytes(data[64:96]),
+      Y: new(big.Int).SetBytes(data[96:]),
+   }
+   return eg.Decrypt([2]ecc.Point{c1, c2}, privK)
 }
 
 func (c *Chain) Leaf(modelKey, signEncryptKey *big.Int) error {

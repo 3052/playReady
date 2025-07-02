@@ -17,20 +17,18 @@ func (c *Certificate) verify(pubK []byte) (bool, error) {
    }
    var dsa ecdsa.DSA
    dsa.EC, dsa.G, dsa.N = p256()
-   message := c.Append(nil)
-   message = message[:c.LengthToSignature]
-   sign := c.Signature.Signature
-   hashVal := func() *big.Int {
-      sum := sha256.Sum256(message)
-      return new(big.Int).SetBytes(sum[:])
+   hashVal := func() [32]byte {
+      data := c.Append(nil)
+      data = data[:c.LengthToSignature]
+      return sha256.Sum256(data)
    }()
-   sig := [2]*big.Int{
-      new(big.Int).SetBytes(sign[:32]),
-      new(big.Int).SetBytes(sign[32:]),
-   }
+   sign := c.Signature.Signature
    return dsa.Verify(
-      hashVal,
-      sig,
+      new(big.Int).SetBytes(hashVal[:]),
+      [2]*big.Int{
+         new(big.Int).SetBytes(sign[:32]),
+         new(big.Int).SetBytes(sign[32:]),
+      },
       ecc.Point{
          X: new(big.Int).SetBytes(pubK[:32]),
          Y: new(big.Int).SetBytes(pubK[32:]),
@@ -150,10 +148,6 @@ type ContentKey struct {
    Value      []byte
 }
 
-func (c *ContentKey) Key() []byte {
-   return c.Value[16:]
-}
-
 // decode decodes a byte slice into a ContentKey structure.
 func (c *ContentKey) decode(data []byte) {
    n := copy(c.KeyId[:], data)
@@ -165,69 +159,6 @@ func (c *ContentKey) decode(data []byte) {
    c.Length = binary.BigEndian.Uint16(data)
    data = data[2:]
    c.Value = data
-}
-
-func (c *ContentKey) integrity() []byte {
-   return c.Value[:16]
-}
-
-func (c *ContentKey) decrypt(key *big.Int, aux *AuxKeys) error {
-   switch c.CipherType {
-   case 3:
-      point, err := elGamalDecrypt(c.Value, key)
-      if err != nil {
-         return err
-      }
-      c.Value = point.X.Bytes()
-      return nil
-   case 6:
-      return c.scalable(key, aux)
-   }
-   return errors.New("cannot decrypt key")
-}
-
-func (c *ContentKey) scalable(key *big.Int, aux *AuxKeys) error {
-   rootKeyInfo, leafKeys := c.Value[:144], c.Value[144:]
-   rootKey := rootKeyInfo[128:]
-   point, err := elGamalDecrypt(rootKeyInfo[:128], key)
-   if err != nil {
-      return err
-   }
-   decrypted := point.X.Bytes()
-   var (
-      ci [16]byte
-      ck [16]byte
-   )
-   for i := range 16 {
-      ci[i] = decrypted[i*2]
-      ck[i] = decrypted[i*2+1]
-   }
-   constantZero, err := hex.DecodeString(magicConstantZero)
-   if err != nil {
-      return err
-   }
-   rgbUplinkXkey := xorKey(ck[:], constantZero)
-   contentKeyPrime, err := aesEcbEncrypt(rgbUplinkXkey, ck[:])
-   if err != nil {
-      return err
-   }
-   auxKeyCalc, err := aesEcbEncrypt(aux.Keys[0].Key[:], contentKeyPrime)
-   if err != nil {
-      return err
-   }
-   oSecondaryKey, err := aesEcbEncrypt(rootKey, ck[:])
-   if err != nil {
-      return err
-   }
-   c.Value, err = aesEcbEncrypt(leafKeys, auxKeyCalc)
-   if err != nil {
-      return err
-   }
-   c.Value, err = aesEcbEncrypt(c.Value, oSecondaryKey)
-   if err != nil {
-      return err
-   }
-   return nil
 }
 
 func (l *License) decode(data []byte) error {
@@ -297,4 +228,73 @@ type License struct {
    EccKey     *EccKey           // 4.9.42
    AuxKeys    *AuxKeys          // 4.9.81
    Signature  *LicenseSignature // 4.11
+}
+
+///
+
+func (c *ContentKey) Key() []byte {
+   return c.Value[16:]
+}
+
+func (c *ContentKey) integrity() []byte {
+   return c.Value[:16]
+}
+
+func (c *ContentKey) decrypt(key *big.Int, aux *AuxKeys) error {
+   switch c.CipherType {
+   case 3:
+      point, err := elGamalDecrypt(c.Value, key)
+      if err != nil {
+         return err
+      }
+      c.Value = point.X.Bytes()
+      return nil
+   case 6:
+      return c.scalable(key, aux)
+   }
+   return errors.New("cannot decrypt key")
+}
+
+func (c *ContentKey) scalable(key *big.Int, aux *AuxKeys) error {
+   rootKeyInfo, leafKeys := c.Value[:144], c.Value[144:]
+   rootKey := rootKeyInfo[128:]
+   point, err := elGamalDecrypt(rootKeyInfo[:128], key)
+   if err != nil {
+      return err
+   }
+   decrypted := point.X.Bytes()
+   var (
+      ci [16]byte
+      ck [16]byte
+   )
+   for i := range 16 {
+      ci[i] = decrypted[i*2]
+      ck[i] = decrypted[i*2+1]
+   }
+   constantZero, err := hex.DecodeString(magicConstantZero)
+   if err != nil {
+      return err
+   }
+   rgbUplinkXkey := xorKey(ck[:], constantZero)
+   contentKeyPrime, err := aesEcbEncrypt(rgbUplinkXkey, ck[:])
+   if err != nil {
+      return err
+   }
+   auxKeyCalc, err := aesEcbEncrypt(aux.Keys[0].Key[:], contentKeyPrime)
+   if err != nil {
+      return err
+   }
+   oSecondaryKey, err := aesEcbEncrypt(rootKey, ck[:])
+   if err != nil {
+      return err
+   }
+   c.Value, err = aesEcbEncrypt(leafKeys, auxKeyCalc)
+   if err != nil {
+      return err
+   }
+   c.Value, err = aesEcbEncrypt(c.Value, oSecondaryKey)
+   if err != nil {
+      return err
+   }
+   return nil
 }
