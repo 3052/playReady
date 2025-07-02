@@ -51,17 +51,16 @@ func TestKey(t *testing.T) {
       if err != nil {
          t.Fatal(err)
       }
-      var license1 License
-      err = license1.Decrypt(data, signEncryptKey)
+      var lic License
+      coord, err := lic.Decrypt(data, signEncryptKey)
       if err != nil {
          t.Fatal(err)
       }
-      content := license1.ContentKey
-      UuidOrGuid(content.KeyId[:])
-      if hex.EncodeToString(content.KeyId[:]) != test.kid_wv {
+      UuidOrGuid(lic.ContentKey.KeyId[:])
+      if hex.EncodeToString(lic.ContentKey.KeyId[:]) != test.kid_wv {
          t.Fatal(".KeyId")
       }
-      if hex.EncodeToString(content.Key()) != test.key {
+      if hex.EncodeToString(coord.key()) != test.key {
          t.Fatal(".Key")
       }
    }
