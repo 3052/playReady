@@ -18,6 +18,24 @@ import (
    "slices"
 )
 
+func wmrmPublicKey() *ecc.Point {
+   data, _ := hex.DecodeString("C8B6AF16EE941AADAA5389B4AF2C10E356BE42AF175EF3FACE93254E7B0B3D9B982B27B5CB2341326E56AA857DBFD5C634CE2CF9EA74FCA8F2AF5957EFEEA562")
+   return &ecc.Point{
+      X: new(big.Int).SetBytes(data[:32]),
+      Y: new(big.Int).SetBytes(data[32:]),
+   }
+}
+
+func sign(hashVal []byte, privK *big.Int) ([]byte, error) {
+   rs, err := p256().dsa().Sign(
+      new(big.Int).SetBytes(hashVal), privK, big.NewInt(1),
+   )
+   if err != nil {
+      return nil, err
+   }
+   return append(rs[0].Bytes(), rs[1].Bytes()...), nil
+}
+
 func elGamalDecrypt(data []byte, privK *big.Int) ([]byte, error) {
    // Unmarshal C1 component
    c1 := ecc.Point{
@@ -97,6 +115,145 @@ func newLa(cipherData, kid []byte) (*xml.La, error) {
       },
    }
    return &la, nil
+}
+
+func (c *Chain) cipherData() ([]byte, error) {
+   xmlData := xml.Data{
+      CertificateChains: xml.CertificateChains{
+         CertificateChain: c.Encode(),
+      },
+      Features: xml.Features{
+         Feature: xml.Feature{"AESCBC"}, // SCALABLE
+      },
+   }
+   data, err := xmlData.Marshal()
+   if err != nil {
+      return nil, err
+   }
+   data = padding.NewPKCS7Padding(aes.BlockSize).Pad(data)
+   var coord xCoord
+   coord.New(p256().G.X)
+   block, err := aes.NewCipher(coord.key())
+   if err != nil {
+      return nil, err
+   }
+   cipher.NewCBCEncrypter(block, coord.iv()).CryptBlocks(data, data)
+   return append(coord.iv(), data...), nil
+}
+
+// Decode decodes a byte slice into the Chain structure.
+func (c *Chain) Decode(data []byte) error {
+   n := copy(c.Magic[:], data)
+   if string(c.Magic[:]) != "CHAI" {
+      return errors.New("failed to find chain magic")
+   }
+   data = data[n:]
+   c.Version = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   c.Length = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   c.Flags = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   c.CertCount = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   c.Certificates = make([]Certificate, c.CertCount)
+   for i := range c.CertCount {
+      var cert Certificate
+      n, err := cert.decode(data)
+      if err != nil {
+         return err
+      }
+      c.Certificates[i] = cert
+      data = data[n:]
+   }
+   return nil
+}
+
+type Chain struct {
+   Magic        [4]byte
+   Version      uint32
+   Length       uint32
+   Flags        uint32
+   CertCount    uint32
+   Certificates []Certificate
+}
+
+func (c *Chain) Encode() []byte {
+   data := c.Magic[:]
+   data = binary.BigEndian.AppendUint32(data, c.Version)
+   data = binary.BigEndian.AppendUint32(data, c.Length)
+   data = binary.BigEndian.AppendUint32(data, c.Flags)
+   data = binary.BigEndian.AppendUint32(data, c.CertCount)
+   for _, cert := range c.Certificates {
+      data = cert.Append(data)
+   }
+   return data
+}
+
+func (c *Chain) verify() (bool, error) {
+   modelBase := c.Certificates[c.CertCount-1].Signature.IssuerKey
+   for i := len(c.Certificates) - 1; i >= 0; i-- {
+      ok, err := c.Certificates[i].verify(modelBase[:])
+      if err != nil {
+         return false, err
+      }
+      if !ok {
+         return false, nil
+      }
+      modelBase = c.Certificates[i].KeyInfo.Keys[0].PublicKey[:]
+   }
+   return true, nil
+}
+
+func (c *Chain) RequestBody(privK *big.Int, kid []byte) ([]byte, error) {
+   cipherData, err := c.cipherData()
+   if err != nil {
+      return nil, err
+   }
+   la, err := newLa(cipherData, kid)
+   if err != nil {
+      return nil, err
+   }
+   laData, err := la.Marshal()
+   if err != nil {
+      return nil, err
+   }
+   laDigest := sha256.Sum256(laData)
+   signedInfo := xml.SignedInfo{
+      XmlNs: "http://www.w3.org/2000/09/xmldsig#",
+      Reference: xml.Reference{
+         Uri:         "#SignedData",
+         DigestValue: laDigest[:],
+      },
+   }
+   signedData, err := signedInfo.Marshal()
+   if err != nil {
+      return nil, err
+   }
+   hashVal := sha256.Sum256(signedData)
+   signature, err := sign(hashVal[:], privK)
+   if err != nil {
+      return nil, err
+   }
+   envelope := xml.Envelope{
+      Soap: "http://schemas.xmlsoap.org/soap/envelope/",
+      Body: xml.Body{
+         AcquireLicense: &xml.AcquireLicense{
+            XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols",
+            Challenge: xml.Challenge{
+               Challenge: xml.InnerChallenge{
+                  XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols/messages",
+                  La:    la,
+                  Signature: xml.Signature{
+                     SignedInfo:     signedInfo,
+                     SignatureValue: signature,
+                  },
+               },
+            },
+         },
+      },
+   }
+   return envelope.Marshal()
 }
 
 func (c *Chain) Leaf(modelPriv, signEncryptPriv *big.Int) error {
@@ -215,8 +372,6 @@ func (l *License) verify(coord *xCoord, data []byte) error {
    return nil
 }
 
-///
-
 func (c *curve) dsa() *ecdsa.DSA {
    return (*ecdsa.DSA)(c)
 }
@@ -242,36 +397,6 @@ type curve struct {
    N  *big.Int
 }
 
-func (xc *xCoord) New(x *big.Int) {
-   x.FillBytes(xc[:])
-}
-
-type xCoord [32]byte
-
-func (c *Chain) cipherData() ([]byte, error) {
-   xmlData := xml.Data{
-      CertificateChains: xml.CertificateChains{
-         CertificateChain: c.Encode(),
-      },
-      Features: xml.Features{
-         Feature: xml.Feature{"AESCBC"}, // SCALABLE
-      },
-   }
-   data, err := xmlData.Marshal()
-   if err != nil {
-      return nil, err
-   }
-   data = padding.NewPKCS7Padding(aes.BlockSize).Pad(data)
-   var coord xCoord
-   coord.New(p256().G.X)
-   block, err := aes.NewCipher(coord.key())
-   if err != nil {
-      return nil, err
-   }
-   cipher.NewCBCEncrypter(block, coord.iv()).CryptBlocks(data, data)
-   return append(coord.iv(), data...), nil
-}
-
 func (x *xCoord) iv() []byte {
    return x[:16]
 }
@@ -284,135 +409,8 @@ func (x *xCoord) key() []byte {
    return x[16:]
 }
 
-// Decode decodes a byte slice into the Chain structure.
-func (c *Chain) Decode(data []byte) error {
-   n := copy(c.Magic[:], data)
-   if string(c.Magic[:]) != "CHAI" {
-      return errors.New("failed to find chain magic")
-   }
-   data = data[n:]
-   c.Version = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   c.Length = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   c.Flags = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   c.CertCount = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   c.Certificates = make([]Certificate, c.CertCount)
-   for i := range c.CertCount {
-      var cert Certificate
-      n, err := cert.decode(data)
-      if err != nil {
-         return err
-      }
-      c.Certificates[i] = cert
-      data = data[n:]
-   }
-   return nil
+func (xc *xCoord) New(x *big.Int) {
+   x.FillBytes(xc[:])
 }
 
-type Chain struct {
-   Magic        [4]byte
-   Version      uint32
-   Length       uint32
-   Flags        uint32
-   CertCount    uint32
-   Certificates []Certificate
-}
-
-func (c *Chain) Encode() []byte {
-   data := c.Magic[:]
-   data = binary.BigEndian.AppendUint32(data, c.Version)
-   data = binary.BigEndian.AppendUint32(data, c.Length)
-   data = binary.BigEndian.AppendUint32(data, c.Flags)
-   data = binary.BigEndian.AppendUint32(data, c.CertCount)
-   for _, cert := range c.Certificates {
-      data = cert.Append(data)
-   }
-   return data
-}
-
-func (c *Chain) verify() (bool, error) {
-   modelBase := c.Certificates[c.CertCount-1].Signature.IssuerKey
-   for i := len(c.Certificates) - 1; i >= 0; i-- {
-      ok, err := c.Certificates[i].verify(modelBase[:])
-      if err != nil {
-         return false, err
-      }
-      if !ok {
-         return false, nil
-      }
-      modelBase = c.Certificates[i].KeyInfo.Keys[0].PublicKey[:]
-   }
-   return true, nil
-}
-
-func (c *Chain) RequestBody(privK *big.Int, kid []byte) ([]byte, error) {
-   cipherData, err := c.cipherData()
-   if err != nil {
-      return nil, err
-   }
-   la, err := newLa(cipherData, kid)
-   if err != nil {
-      return nil, err
-   }
-   laData, err := la.Marshal()
-   if err != nil {
-      return nil, err
-   }
-   laDigest := sha256.Sum256(laData)
-   signedInfo := xml.SignedInfo{
-      XmlNs: "http://www.w3.org/2000/09/xmldsig#",
-      Reference: xml.Reference{
-         Uri:         "#SignedData",
-         DigestValue: laDigest[:],
-      },
-   }
-   signedData, err := signedInfo.Marshal()
-   if err != nil {
-      return nil, err
-   }
-   hashVal := sha256.Sum256(signedData)
-   signature, err := sign(hashVal[:], privK)
-   if err != nil {
-      return nil, err
-   }
-   envelope := xml.Envelope{
-      Soap: "http://schemas.xmlsoap.org/soap/envelope/",
-      Body: xml.Body{
-         AcquireLicense: &xml.AcquireLicense{
-            XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols",
-            Challenge: xml.Challenge{
-               Challenge: xml.InnerChallenge{
-                  XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols/messages",
-                  La:    la,
-                  Signature: xml.Signature{
-                     SignedInfo:     signedInfo,
-                     SignatureValue: signature,
-                  },
-               },
-            },
-         },
-      },
-   }
-   return envelope.Marshal()
-}
-
-func wmrmPublicKey() *ecc.Point {
-   data, _ := hex.DecodeString("C8B6AF16EE941AADAA5389B4AF2C10E356BE42AF175EF3FACE93254E7B0B3D9B982B27B5CB2341326E56AA857DBFD5C634CE2CF9EA74FCA8F2AF5957EFEEA562")
-   return &ecc.Point{
-      X: new(big.Int).SetBytes(data[:32]),
-      Y: new(big.Int).SetBytes(data[32:]),
-   }
-}
-
-func sign(hashVal []byte, privK *big.Int) ([]byte, error) {
-   rs, err := p256().dsa().Sign(
-      new(big.Int).SetBytes(hashVal), privK, big.NewInt(1),
-   )
-   if err != nil {
-      return nil, err
-   }
-   return append(rs[0].Bytes(), rs[1].Bytes()...), nil
-}
+type xCoord [32]byte
