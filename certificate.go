@@ -7,7 +7,6 @@ import (
    "encoding/hex"
    "errors"
    "github.com/arnaucube/cryptofun/ecc"
-   "github.com/arnaucube/cryptofun/ecdsa"
    "math/big"
 )
 
@@ -15,16 +14,15 @@ func (c *Certificate) verify(pubK []byte) (bool, error) {
    if !bytes.Equal(c.Signature.IssuerKey, pubK) {
       return false, nil
    }
-   var dsa ecdsa.DSA
-   dsa.EC, dsa.G, dsa.N = p256()
-   hashVal := func() [32]byte {
+   hashVal := func() *big.Int {
       data := c.Append(nil)
       data = data[:c.LengthToSignature]
-      return sha256.Sum256(data)
+      sum := sha256.Sum256(data)
+      return new(big.Int).SetBytes(sum[:])
    }()
    sign := c.Signature.Signature
-   return dsa.Verify(
-      new(big.Int).SetBytes(hashVal[:]),
+   return p256().dsa().Verify(
+      hashVal,
       [2]*big.Int{
          new(big.Int).SetBytes(sign[:32]),
          new(big.Int).SetBytes(sign[32:]),
@@ -230,16 +228,6 @@ type License struct {
    Signature  *LicenseSignature // 4.11
 }
 
-///
-
-func (c *ContentKey) Key() []byte {
-   return c.Value[16:]
-}
-
-func (c *ContentKey) integrity() []byte {
-   return c.Value[:16]
-}
-
 func (c *ContentKey) decrypt(key *big.Int, aux *AuxKeys) error {
    switch c.CipherType {
    case 3:
@@ -297,4 +285,12 @@ func (c *ContentKey) scalable(key *big.Int, aux *AuxKeys) error {
       return err
    }
    return nil
+}
+
+func (c *ContentKey) Key() []byte {
+   return c.Value[16:]
+}
+
+func (c *ContentKey) integrity() []byte {
+   return c.Value[:16]
 }

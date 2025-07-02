@@ -18,169 +18,6 @@ import (
    "slices"
 )
 
-func sign(privK *big.Int, hashVal []byte) ([]byte, error) {
-   var dsa ecdsa.DSA
-   dsa.EC, dsa.G, dsa.N = p256()
-   rs, err := dsa.Sign(
-      new(big.Int).SetBytes(hashVal), privK, big.NewInt(1),
-   )
-   if err != nil {
-      return nil, err
-   }
-   return append(rs[0].Bytes(), rs[1].Bytes()...), nil
-}
-
-// nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-4.pdf
-func p256() (ec ecc.EC, g ecc.Point, n *big.Int) {
-   ec.A = big.NewInt(-3)
-   ec.Q, _ = new(big.Int).SetString("115792089210356248762697446949407573530086143415290314195533631308867097853951", 10)
-   g.X, _ = new(big.Int).SetString("6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296", 16)
-   g.Y, _ = new(big.Int).SetString("4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5", 16)
-   n, _ = new(big.Int).SetString("115792089210356248762697446949407573529996955224135760342422259061068512044369", 10)
-   return
-}
-
-func wmrmPublicKey() *ecc.Point {
-   data, _ := hex.DecodeString("C8B6AF16EE941AADAA5389B4AF2C10E356BE42AF175EF3FACE93254E7B0B3D9B982B27B5CB2341326E56AA857DBFD5C634CE2CF9EA74FCA8F2AF5957EFEEA562")
-   return &ecc.Point{
-      X: new(big.Int).SetBytes(data[:32]),
-      Y: new(big.Int).SetBytes(data[32:]),
-   }
-}
-
-func elGamalEncrypt(m, pubK *ecc.Point) ([]byte, error) {
-   var eg elgamal.EG
-   eg.EC, eg.G, eg.N = p256()
-   c, err := eg.Encrypt(*m, *pubK, big.NewInt(1))
-   if err != nil {
-      return nil, err
-   }
-   data := slices.Concat(
-      c[0].X.Bytes(), c[0].Y.Bytes(), c[1].X.Bytes(), c[1].Y.Bytes(),
-   )
-   return data, nil
-}
-
-func newLa(cipherData, kid []byte) (*xml.La, error) {
-   _, g, _ := p256()
-   key, err := elGamalEncrypt(&g, wmrmPublicKey())
-   if err != nil {
-      return nil, err
-   }
-   la := xml.La{
-      XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/protocols",
-      Id:      "SignedData",
-      Version: "1",
-      ContentHeader: xml.ContentHeader{
-         WrmHeader: xml.WrmHeader{
-            XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/PlayReadyHeader",
-            Version: "4.0.0.0",
-            Data: xml.WrmHeaderData{
-               ProtectInfo: xml.ProtectInfo{
-                  KeyLen: "16",
-                  AlgId:  "AESCTR",
-               },
-               Kid: kid,
-            },
-         },
-      },
-      EncryptedData: xml.EncryptedData{
-         XmlNs: "http://www.w3.org/2001/04/xmlenc#",
-         Type:  "http://www.w3.org/2001/04/xmlenc#Element",
-         EncryptionMethod: xml.Algorithm{
-            Algorithm: "http://www.w3.org/2001/04/xmlenc#aes128-cbc",
-         },
-         KeyInfo: xml.KeyInfo{
-            XmlNs: "http://www.w3.org/2000/09/xmldsig#",
-            EncryptedKey: xml.EncryptedKey{
-               XmlNs: "http://www.w3.org/2001/04/xmlenc#",
-               EncryptionMethod: xml.Algorithm{
-                  Algorithm: "http://schemas.microsoft.com/DRM/2007/03/protocols#ecc256",
-               },
-               KeyInfo: xml.EncryptedKeyInfo{
-                  XmlNs:   "http://www.w3.org/2000/09/xmldsig#",
-                  KeyName: "WMRMServer",
-               },
-               CipherData: xml.CipherData{
-                  CipherValue: key,
-               },
-            },
-         },
-         CipherData: xml.CipherData{
-            CipherValue: cipherData,
-         },
-      },
-   }
-   return &la, nil
-}
-
-func (c *Chain) RequestBody(signEncrypt *big.Int, kid []byte) ([]byte, error) {
-   cipherData, err := c.cipherData()
-   if err != nil {
-      return nil, err
-   }
-   la, err := newLa(cipherData, kid)
-   if err != nil {
-      return nil, err
-   }
-   laData, err := la.Marshal()
-   if err != nil {
-      return nil, err
-   }
-   laDigest := sha256.Sum256(laData)
-   signedInfo := xml.SignedInfo{
-      XmlNs: "http://www.w3.org/2000/09/xmldsig#",
-      Reference: xml.Reference{
-         Uri:         "#SignedData",
-         DigestValue: laDigest[:],
-      },
-   }
-   signedData, err := signedInfo.Marshal()
-   if err != nil {
-      return nil, err
-   }
-   hashVal := sha256.Sum256(signedData)
-   signature, err := sign(signEncrypt, hashVal[:])
-   if err != nil {
-      return nil, err
-   }
-   envelope := xml.Envelope{
-      Soap: "http://schemas.xmlsoap.org/soap/envelope/",
-      Body: xml.Body{
-         AcquireLicense: &xml.AcquireLicense{
-            XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols",
-            Challenge: xml.Challenge{
-               Challenge: xml.InnerChallenge{
-                  XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols/messages",
-                  La:    la,
-                  Signature: xml.Signature{
-                     SignedInfo:     signedInfo,
-                     SignatureValue: signature,
-                  },
-               },
-            },
-         },
-      },
-   }
-   return envelope.Marshal()
-}
-
-func elGamalDecrypt(data []byte, privK *big.Int) (ecc.Point, error) {
-   var eg elgamal.EG
-   eg.EC, eg.G, eg.N = p256()
-   // Unmarshal C1 component
-   c1 := ecc.Point{
-      X: new(big.Int).SetBytes(data[:32]),
-      Y: new(big.Int).SetBytes(data[32:64]),
-   }
-   // Unmarshal C2 component
-   c2 := ecc.Point{
-      X: new(big.Int).SetBytes(data[64:96]),
-      Y: new(big.Int).SetBytes(data[96:]),
-   }
-   return eg.Decrypt([2]ecc.Point{c1, c2}, privK)
-}
-
 // Decode decodes a byte slice into the Chain structure.
 func (c *Chain) Decode(data []byte) error {
    n := copy(c.Magic[:], data)
@@ -259,6 +96,100 @@ func (l *License) verify(data []byte) error {
    return nil
 }
 
+func (c *Chain) RequestBody(signEncrypt *big.Int, kid []byte) ([]byte, error) {
+   cipherData, err := c.cipherData()
+   if err != nil {
+      return nil, err
+   }
+   la, err := newLa(cipherData, kid)
+   if err != nil {
+      return nil, err
+   }
+   laData, err := la.Marshal()
+   if err != nil {
+      return nil, err
+   }
+   laDigest := sha256.Sum256(laData)
+   signedInfo := xml.SignedInfo{
+      XmlNs: "http://www.w3.org/2000/09/xmldsig#",
+      Reference: xml.Reference{
+         Uri:         "#SignedData",
+         DigestValue: laDigest[:],
+      },
+   }
+   signedData, err := signedInfo.Marshal()
+   if err != nil {
+      return nil, err
+   }
+   hashVal := sha256.Sum256(signedData)
+   signature, err := sign(signEncrypt, hashVal[:])
+   if err != nil {
+      return nil, err
+   }
+   envelope := xml.Envelope{
+      Soap: "http://schemas.xmlsoap.org/soap/envelope/",
+      Body: xml.Body{
+         AcquireLicense: &xml.AcquireLicense{
+            XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols",
+            Challenge: xml.Challenge{
+               Challenge: xml.InnerChallenge{
+                  XmlNs: "http://schemas.microsoft.com/DRM/2007/03/protocols/messages",
+                  La:    la,
+                  Signature: xml.Signature{
+                     SignedInfo:     signedInfo,
+                     SignatureValue: signature,
+                  },
+               },
+            },
+         },
+      },
+   }
+   return envelope.Marshal()
+}
+
+func wmrmPublicKey() *ecc.Point {
+   data, _ := hex.DecodeString("C8B6AF16EE941AADAA5389B4AF2C10E356BE42AF175EF3FACE93254E7B0B3D9B982B27B5CB2341326E56AA857DBFD5C634CE2CF9EA74FCA8F2AF5957EFEEA562")
+   return &ecc.Point{
+      X: new(big.Int).SetBytes(data[:32]),
+      Y: new(big.Int).SetBytes(data[32:]),
+   }
+}
+
+func sign(privK *big.Int, hashVal []byte) ([]byte, error) {
+   rs, err := p256().dsa().Sign(
+      new(big.Int).SetBytes(hashVal), privK, big.NewInt(1),
+   )
+   if err != nil {
+      return nil, err
+   }
+   return append(rs[0].Bytes(), rs[1].Bytes()...), nil
+}
+
+func elGamalEncrypt(m, pubK *ecc.Point) ([]byte, error) {
+   c, err := p256().eg().Encrypt(*m, *pubK, big.NewInt(1))
+   if err != nil {
+      return nil, err
+   }
+   data := slices.Concat(
+      c[0].X.Bytes(), c[0].Y.Bytes(), c[1].X.Bytes(), c[1].Y.Bytes(),
+   )
+   return data, nil
+}
+
+func elGamalDecrypt(data []byte, privK *big.Int) (ecc.Point, error) {
+   // Unmarshal C1 component
+   c1 := ecc.Point{
+      X: new(big.Int).SetBytes(data[:32]),
+      Y: new(big.Int).SetBytes(data[32:64]),
+   }
+   // Unmarshal C2 component
+   c2 := ecc.Point{
+      X: new(big.Int).SetBytes(data[64:96]),
+      Y: new(big.Int).SetBytes(data[96:]),
+   }
+   return p256().eg().Decrypt([2]ecc.Point{c1, c2}, privK)
+}
+
 func (l *License) Decrypt(data []byte, signEncrypt *big.Int) error {
    var envelope xml.EnvelopeResponse
    err := envelope.Unmarshal(data)
@@ -277,9 +208,7 @@ func (l *License) Decrypt(data []byte, signEncrypt *big.Int) error {
    if err != nil {
       return err
    }
-   var dsa ecdsa.DSA
-   dsa.EC, dsa.G, dsa.N = p256()
-   pubK, err := dsa.PubK(signEncrypt)
+   pubK, err := p256().dsa().PubK(signEncrypt)
    if err != nil {
       return err
    }
@@ -295,12 +224,61 @@ func (l *License) Decrypt(data []byte, signEncrypt *big.Int) error {
    return l.verify(data)
 }
 
-///
+func newLa(cipherData, kid []byte) (*xml.La, error) {
+   key, err := elGamalEncrypt(&p256().G, wmrmPublicKey())
+   if err != nil {
+      return nil, err
+   }
+   la := xml.La{
+      XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/protocols",
+      Id:      "SignedData",
+      Version: "1",
+      ContentHeader: xml.ContentHeader{
+         WrmHeader: xml.WrmHeader{
+            XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/PlayReadyHeader",
+            Version: "4.0.0.0",
+            Data: xml.WrmHeaderData{
+               ProtectInfo: xml.ProtectInfo{
+                  KeyLen: "16",
+                  AlgId:  "AESCTR",
+               },
+               Kid: kid,
+            },
+         },
+      },
+      EncryptedData: xml.EncryptedData{
+         XmlNs: "http://www.w3.org/2001/04/xmlenc#",
+         Type:  "http://www.w3.org/2001/04/xmlenc#Element",
+         EncryptionMethod: xml.Algorithm{
+            Algorithm: "http://www.w3.org/2001/04/xmlenc#aes128-cbc",
+         },
+         KeyInfo: xml.KeyInfo{
+            XmlNs: "http://www.w3.org/2000/09/xmldsig#",
+            EncryptedKey: xml.EncryptedKey{
+               XmlNs: "http://www.w3.org/2001/04/xmlenc#",
+               EncryptionMethod: xml.Algorithm{
+                  Algorithm: "http://schemas.microsoft.com/DRM/2007/03/protocols#ecc256",
+               },
+               KeyInfo: xml.EncryptedKeyInfo{
+                  XmlNs:   "http://www.w3.org/2000/09/xmldsig#",
+                  KeyName: "WMRMServer",
+               },
+               CipherData: xml.CipherData{
+                  CipherValue: key,
+               },
+            },
+         },
+         CipherData: xml.CipherData{
+            CipherValue: cipherData,
+         },
+      },
+   }
+   return &la, nil
+}
 
-func (c *Chain) Leaf(modelKey, signEncryptKey *big.Int) error {
-   var dsa ecdsa.DSA
-   dsa.EC, dsa.G, dsa.N = p256()
-   modelPub, err := dsa.PubK(modelKey)
+func (c *Chain) Leaf(modelPriv, signEncryptPriv *big.Int) error {
+   dsa := p256().dsa()
+   modelPub, err := dsa.PubK(modelPriv)
    if err != nil {
       return err
    }
@@ -326,7 +304,7 @@ func (c *Chain) Leaf(modelKey, signEncryptKey *big.Int) error {
       features.New(0xD)
       cert.Features = features.ftlv(0, 5)
    }
-   signEncryptPub, err := dsa.PubK(signEncryptKey)
+   signEncryptPub, err := dsa.PubK(signEncryptPriv)
    if err != nil {
       return err
    }
@@ -344,14 +322,13 @@ func (c *Chain) Leaf(modelKey, signEncryptKey *big.Int) error {
    {
       cert.LengthToSignature, cert.Length = cert.size()
       hashVal := sha256.Sum256(cert.Append(nil))
-      signature, err := sign(modelKey, hashVal[:])
+      signature, err := sign(modelPriv, hashVal[:])
       if err != nil {
          return err
       }
       cert.Signature = &CertSignature{}
       err = cert.Signature.New(
-         signature,
-         append(modelPub.X.Bytes(), modelPub.Y.Bytes()...),
+         signature, append(modelPub.X.Bytes(), modelPub.Y.Bytes()...),
       )
       if err != nil {
          return err
@@ -377,9 +354,9 @@ func (c *Chain) cipherData() ([]byte, error) {
       return nil, err
    }
    data = padding.NewPKCS7Padding(aes.BlockSize).Pad(data)
-   _, g, _ := p256()
-   xBytes := g.X.Bytes()
-   iv, key := xBytes[:16], xBytes[16:]
+   var coord xCoord
+   coord.New(p256().G.X)
+   iv, key := coord.lowHalf(), coord.highHalf()
    block, err := aes.NewCipher(key)
    if err != nil {
       return nil, err
@@ -387,3 +364,42 @@ func (c *Chain) cipherData() ([]byte, error) {
    cipher.NewCBCEncrypter(block, iv).CryptBlocks(data, data)
    return append(iv, data...), nil
 }
+
+func (xc *xCoord) New(x *big.Int) {
+   x.FillBytes(xc[:])
+}
+
+func (xc *xCoord) lowHalf() []byte {
+   return xc[:16]
+}
+
+func (xc *xCoord) highHalf() []byte {
+   return xc[16:]
+}
+
+func (c *curve) dsa() *ecdsa.DSA {
+   return (*ecdsa.DSA)(c)
+}
+
+func (c *curve) eg() *elgamal.EG {
+   return (*elgamal.EG)(c)
+}
+
+// nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-4.pdf
+func p256() *curve {
+   var c curve
+   c.EC.A = big.NewInt(-3)
+   c.EC.Q, _ = new(big.Int).SetString("115792089210356248762697446949407573530086143415290314195533631308867097853951", 10)
+   c.G.X, _ = new(big.Int).SetString("6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296", 16)
+   c.G.Y, _ = new(big.Int).SetString("4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5", 16)
+   c.N, _ = new(big.Int).SetString("115792089210356248762697446949407573529996955224135760342422259061068512044369", 10)
+   return &c
+}
+
+type curve struct {
+   EC ecc.EC
+   G  ecc.Point
+   N  *big.Int
+}
+
+type xCoord [32]byte
