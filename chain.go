@@ -18,18 +18,6 @@ import (
    "slices"
 )
 
-const wmrmPublicKey = "C8B6AF16EE941AADAA5389B4AF2C10E356BE42AF175EF3FACE93254E7B0B3D9B982B27B5CB2341326E56AA857DBFD5C634CE2CF9EA74FCA8F2AF5957EFEEA562"
-
-// nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-4.pdf
-func p256() (ec ecc.EC, g ecc.Point, n *big.Int) {
-   ec.A = big.NewInt(-3)
-   ec.Q, _ = new(big.Int).SetString("115792089210356248762697446949407573530086143415290314195533631308867097853951", 10)
-   g.X, _ = new(big.Int).SetString("6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296", 16)
-   g.Y, _ = new(big.Int).SetString("4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5", 16)
-   n, _ = new(big.Int).SetString("115792089210356248762697446949407573529996955224135760342422259061068512044369", 10)
-   return
-}
-
 func sign(privK *big.Int, hashVal []byte) ([]byte, error) {
    var dsa ecdsa.DSA
    dsa.EC, dsa.G, dsa.N = p256()
@@ -42,40 +30,44 @@ func sign(privK *big.Int, hashVal []byte) ([]byte, error) {
    return append(rs[0].Bytes(), rs[1].Bytes()...), nil
 }
 
-///
+// nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-4.pdf
+func p256() (ec ecc.EC, g ecc.Point, n *big.Int) {
+   ec.A = big.NewInt(-3)
+   ec.Q, _ = new(big.Int).SetString("115792089210356248762697446949407573530086143415290314195533631308867097853951", 10)
+   g.X, _ = new(big.Int).SetString("6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296", 16)
+   g.Y, _ = new(big.Int).SetString("4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5", 16)
+   n, _ = new(big.Int).SetString("115792089210356248762697446949407573529996955224135760342422259061068512044369", 10)
+   return
+}
 
-func (c *Chain) cipherData() ([]byte, error) {
-   xmlData := xml.Data{
-      CertificateChains: xml.CertificateChains{
-         CertificateChain: c.Encode(),
-      },
-      Features: xml.Features{
-         Feature: xml.Feature{"AESCBC"}, // SCALABLE
-      },
+func wmrmPublicKey() *ecc.Point {
+   data, _ := hex.DecodeString("C8B6AF16EE941AADAA5389B4AF2C10E356BE42AF175EF3FACE93254E7B0B3D9B982B27B5CB2341326E56AA857DBFD5C634CE2CF9EA74FCA8F2AF5957EFEEA562")
+   return &ecc.Point{
+      X: new(big.Int).SetBytes(data[:32]),
+      Y: new(big.Int).SetBytes(data[32:]),
    }
-   data, err := xmlData.Marshal()
+}
+
+func elGamalEncrypt(m, pubK *ecc.Point) ([]byte, error) {
+   var eg elgamal.EG
+   eg.EC, eg.G, eg.N = p256()
+   c, err := eg.Encrypt(*m, *pubK, big.NewInt(1))
    if err != nil {
       return nil, err
    }
-   data = padding.NewPKCS7Padding(aes.BlockSize).Pad(data)
-   _, g, _ := p256()
-   xBytes := g.X.Bytes()
-   iv, key := xBytes[:16], xBytes[16:]
-   block, err := aes.NewCipher(key)
-   if err != nil {
-      return nil, err
-   }
-   cipher.NewCBCEncrypter(block, iv).CryptBlocks(data, data)
-   return append(iv, data...), nil
+   data := slices.Concat(
+      c[0].X.Bytes(), c[0].Y.Bytes(), c[1].X.Bytes(), c[1].Y.Bytes(),
+   )
+   return data, nil
 }
 
 func newLa(cipherData, kid []byte) (*xml.La, error) {
    _, g, _ := p256()
-   data, err := elGamalEncrypt(&g, elGamalKeyGeneration())
+   key, err := elGamalEncrypt(&g, wmrmPublicKey())
    if err != nil {
       return nil, err
    }
-   return &xml.La{
+   la := xml.La{
       XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/protocols",
       Id:      "SignedData",
       Version: "1",
@@ -110,7 +102,7 @@ func newLa(cipherData, kid []byte) (*xml.La, error) {
                   KeyName: "WMRMServer",
                },
                CipherData: xml.CipherData{
-                  CipherValue: data,
+                  CipherValue: key,
                },
             },
          },
@@ -118,7 +110,8 @@ func newLa(cipherData, kid []byte) (*xml.La, error) {
             CipherValue: cipherData,
          },
       },
-   }, nil
+   }
+   return &la, nil
 }
 
 func (c *Chain) RequestBody(signEncrypt *big.Int, kid []byte) ([]byte, error) {
@@ -172,26 +165,6 @@ func (c *Chain) RequestBody(signEncrypt *big.Int, kid []byte) ([]byte, error) {
    return envelope.Marshal()
 }
 
-func elGamalKeyGeneration() *ecc.Point {
-   data, _ := hex.DecodeString(wmrmPublicKey)
-   return &ecc.Point{
-      X: new(big.Int).SetBytes(data[:32]),
-      Y: new(big.Int).SetBytes(data[32:]),
-   }
-}
-
-func elGamalEncrypt(m, pubK *ecc.Point) ([]byte, error) {
-   var eg elgamal.EG
-   eg.EC, eg.G, eg.N = p256()
-   c, err := eg.Encrypt(*m, *pubK, big.NewInt(1))
-   if err != nil {
-      return nil, err
-   }
-   return slices.Concat(
-      c[0].X.Bytes(), c[0].Y.Bytes(), c[1].X.Bytes(), c[1].Y.Bytes(),
-   ), nil
-}
-
 func elGamalDecrypt(data []byte, privK *big.Int) (ecc.Point, error) {
    var eg elgamal.EG
    eg.EC, eg.G, eg.N = p256()
@@ -206,6 +179,147 @@ func elGamalDecrypt(data []byte, privK *big.Int) (ecc.Point, error) {
       Y: new(big.Int).SetBytes(data[96:]),
    }
    return eg.Decrypt([2]ecc.Point{c1, c2}, privK)
+}
+
+// Decode decodes a byte slice into the Chain structure.
+func (c *Chain) Decode(data []byte) error {
+   n := copy(c.Magic[:], data)
+   if string(c.Magic[:]) != "CHAI" {
+      return errors.New("failed to find chain magic")
+   }
+   data = data[n:]
+   c.Version = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   c.Length = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   c.Flags = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   c.CertCount = binary.BigEndian.Uint32(data)
+   data = data[4:]
+   c.Certificates = make([]Certificate, c.CertCount)
+   for i := range c.CertCount {
+      var cert Certificate
+      n, err := cert.decode(data)
+      if err != nil {
+         return err
+      }
+      c.Certificates[i] = cert
+      data = data[n:]
+   }
+   return nil
+}
+
+type Chain struct {
+   Magic        [4]byte
+   Version      uint32
+   Length       uint32
+   Flags        uint32
+   CertCount    uint32
+   Certificates []Certificate
+}
+
+func (c *Chain) Encode() []byte {
+   data := c.Magic[:]
+   data = binary.BigEndian.AppendUint32(data, c.Version)
+   data = binary.BigEndian.AppendUint32(data, c.Length)
+   data = binary.BigEndian.AppendUint32(data, c.Flags)
+   data = binary.BigEndian.AppendUint32(data, c.CertCount)
+   for _, cert := range c.Certificates {
+      data = cert.Append(data)
+   }
+   return data
+}
+
+///
+
+func (c *Chain) verify() (bool, error) {
+   modelBase := c.Certificates[c.CertCount-1].Signature.IssuerKey
+   for i := len(c.Certificates) - 1; i >= 0; i-- {
+      ok, err := c.Certificates[i].verify(modelBase[:])
+      if err != nil {
+         return false, err
+      }
+      if !ok {
+         return false, nil
+      }
+      modelBase = c.Certificates[i].KeyInfo.Keys[0].PublicKey[:]
+   }
+   return true, nil
+}
+
+func (l *License) verify(data []byte) error {
+   signature := new(Ftlv).size() + l.Signature.size()
+   data = data[:len(data)-signature]
+   block, err := aes.NewCipher(l.ContentKey.integrity())
+   if err != nil {
+      return err
+   }
+   data = cbcmac.NewCMAC(block, aes.BlockSize).MAC(data)
+   if !bytes.Equal(data, l.Signature.Data) {
+      return errors.New("failed to decrypt the keys")
+   }
+   return nil
+}
+
+func (l *License) Decrypt(signEncrypt *big.Int, data []byte) error {
+   var envelope xml.EnvelopeResponse
+   err := envelope.Unmarshal(data)
+   if err != nil {
+      return err
+   }
+   data = envelope.
+      Body.
+      AcquireLicenseResponse.
+      AcquireLicenseResult.
+      Response.
+      LicenseResponse.
+      Licenses.
+      License
+   err = l.decode(data)
+   if err != nil {
+      return err
+   }
+   var dsa ecdsa.DSA
+   dsa.EC, dsa.G, dsa.N = p256()
+   pubK, err := dsa.PubK(signEncrypt)
+   if err != nil {
+      return err
+   }
+   if !bytes.Equal(
+      l.EccKey.Value,
+      append(pubK.X.Bytes(), pubK.Y.Bytes()...),
+   ) {
+      return errors.New("license response is not for this device")
+   }
+   err = l.ContentKey.decrypt(signEncrypt, l.AuxKeys)
+   if err != nil {
+      return err
+   }
+   return l.verify(data)
+}
+func (c *Chain) cipherData() ([]byte, error) {
+   xmlData := xml.Data{
+      CertificateChains: xml.CertificateChains{
+         CertificateChain: c.Encode(),
+      },
+      Features: xml.Features{
+         Feature: xml.Feature{"AESCBC"}, // SCALABLE
+      },
+   }
+   data, err := xmlData.Marshal()
+   if err != nil {
+      return nil, err
+   }
+   data = padding.NewPKCS7Padding(aes.BlockSize).Pad(data)
+   _, g, _ := p256()
+   xBytes := g.X.Bytes()
+   iv, key := xBytes[:16], xBytes[16:]
+   block, err := aes.NewCipher(key)
+   if err != nil {
+      return nil, err
+   }
+   cipher.NewCBCEncrypter(block, iv).CryptBlocks(data, data)
+   return append(iv, data...), nil
 }
 
 func (c *Chain) Leaf(modelKey, signEncryptKey *big.Int) error {
@@ -274,117 +388,3 @@ func (c *Chain) Leaf(modelKey, signEncryptKey *big.Int) error {
    return nil
 }
 
-func (c *Chain) verify() (bool, error) {
-   modelBase := c.Certificates[c.CertCount-1].Signature.IssuerKey
-   for i := len(c.Certificates) - 1; i >= 0; i-- {
-      ok, err := c.Certificates[i].verify(modelBase[:])
-      if err != nil {
-         return false, err
-      }
-      if !ok {
-         return false, nil
-      }
-      modelBase = c.Certificates[i].KeyInfo.Keys[0].PublicKey[:]
-   }
-   return true, nil
-}
-
-// Decode decodes a byte slice into the Chain structure.
-func (c *Chain) Decode(data []byte) error {
-   n := copy(c.Magic[:], data)
-   if string(c.Magic[:]) != "CHAI" {
-      return errors.New("failed to find chain magic")
-   }
-   data = data[n:]
-   c.Version = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   c.Length = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   c.Flags = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   c.CertCount = binary.BigEndian.Uint32(data)
-   data = data[4:]
-   c.Certificates = make([]Certificate, c.CertCount)
-   for i := range c.CertCount {
-      var cert Certificate
-      n, err := cert.decode(data)
-      if err != nil {
-         return err
-      }
-      c.Certificates[i] = cert
-      data = data[n:]
-   }
-   return nil
-}
-
-type Chain struct {
-   Magic        [4]byte
-   Version      uint32
-   Length       uint32
-   Flags        uint32
-   CertCount    uint32
-   Certificates []Certificate
-}
-
-func (c *Chain) Encode() []byte {
-   data := c.Magic[:]
-   data = binary.BigEndian.AppendUint32(data, c.Version)
-   data = binary.BigEndian.AppendUint32(data, c.Length)
-   data = binary.BigEndian.AppendUint32(data, c.Flags)
-   data = binary.BigEndian.AppendUint32(data, c.CertCount)
-   for _, cert := range c.Certificates {
-      data = cert.Append(data)
-   }
-   return data
-}
-
-func (l *License) verify(data []byte) error {
-   signature := new(Ftlv).size() + l.Signature.size()
-   data = data[:len(data)-signature]
-   block, err := aes.NewCipher(l.ContentKey.integrity())
-   if err != nil {
-      return err
-   }
-   data = cbcmac.NewCMAC(block, aes.BlockSize).MAC(data)
-   if !bytes.Equal(data, l.Signature.Data) {
-      return errors.New("failed to decrypt the keys")
-   }
-   return nil
-}
-
-func (l *License) Decrypt(signEncrypt *big.Int, data []byte) error {
-   var envelope xml.EnvelopeResponse
-   err := envelope.Unmarshal(data)
-   if err != nil {
-      return err
-   }
-   data = envelope.
-      Body.
-      AcquireLicenseResponse.
-      AcquireLicenseResult.
-      Response.
-      LicenseResponse.
-      Licenses.
-      License
-   err = l.decode(data)
-   if err != nil {
-      return err
-   }
-   var dsa ecdsa.DSA
-   dsa.EC, dsa.G, dsa.N = p256()
-   pubK, err := dsa.PubK(signEncrypt)
-   if err != nil {
-      return err
-   }
-   if !bytes.Equal(
-      l.EccKey.Value,
-      append(pubK.X.Bytes(), pubK.Y.Bytes()...),
-   ) {
-      return errors.New("license response is not for this device")
-   }
-   err = l.ContentKey.decrypt(signEncrypt, l.AuxKeys)
-   if err != nil {
-      return err
-   }
-   return l.verify(data)
-}
