@@ -18,6 +18,83 @@ import (
    "slices"
 )
 
+func elGamalDecrypt(data []byte, privK *big.Int) ([]byte, error) {
+   // Unmarshal C1 component
+   c1 := ecc.Point{
+      X: new(big.Int).SetBytes(data[:32]),
+      Y: new(big.Int).SetBytes(data[32:64]),
+   }
+   // Unmarshal C2 component
+   c2 := ecc.Point{
+      X: new(big.Int).SetBytes(data[64:96]),
+      Y: new(big.Int).SetBytes(data[96:]),
+   }
+   point, err := p256().eg().Decrypt([2]ecc.Point{c1, c2}, privK)
+   if err != nil {
+      return nil, err
+   }
+   return append(point.X.Bytes(), point.Y.Bytes()...), nil
+}
+
+func elGamalEncrypt(m, pubK *ecc.Point) ([2]ecc.Point, error) {
+   return p256().eg().Encrypt(*m, *pubK, big.NewInt(1))
+}
+
+func newLa(cipherData, kid []byte) (*xml.La, error) {
+   c, err := elGamalEncrypt(&p256().G, wmrmPublicKey())
+   if err != nil {
+      return nil, err
+   }
+   data := slices.Concat(
+      c[0].X.Bytes(), c[0].Y.Bytes(), c[1].X.Bytes(), c[1].Y.Bytes(),
+   )
+   la := xml.La{
+      XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/protocols",
+      Id:      "SignedData",
+      Version: "1",
+      ContentHeader: xml.ContentHeader{
+         WrmHeader: xml.WrmHeader{
+            XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/PlayReadyHeader",
+            Version: "4.0.0.0",
+            Data: xml.WrmHeaderData{
+               ProtectInfo: xml.ProtectInfo{
+                  KeyLen: "16",
+                  AlgId:  "AESCTR",
+               },
+               Kid: kid,
+            },
+         },
+      },
+      EncryptedData: xml.EncryptedData{
+         XmlNs: "http://www.w3.org/2001/04/xmlenc#",
+         Type:  "http://www.w3.org/2001/04/xmlenc#Element",
+         EncryptionMethod: xml.Algorithm{
+            Algorithm: "http://www.w3.org/2001/04/xmlenc#aes128-cbc",
+         },
+         KeyInfo: xml.KeyInfo{
+            XmlNs: "http://www.w3.org/2000/09/xmldsig#",
+            EncryptedKey: xml.EncryptedKey{
+               XmlNs: "http://www.w3.org/2001/04/xmlenc#",
+               EncryptionMethod: xml.Algorithm{
+                  Algorithm: "http://schemas.microsoft.com/DRM/2007/03/protocols#ecc256",
+               },
+               KeyInfo: xml.EncryptedKeyInfo{
+                  XmlNs:   "http://www.w3.org/2000/09/xmldsig#",
+                  KeyName: "WMRMServer",
+               },
+               CipherData: xml.CipherData{
+                  CipherValue: data,
+               },
+            },
+         },
+         CipherData: xml.CipherData{
+            CipherValue: cipherData,
+         },
+      },
+   }
+   return &la, nil
+}
+
 func (l *License) Decrypt(data []byte, signEncrypt *big.Int) (*xCoord, error) {
    var envelope xml.EnvelopeResponse
    err := envelope.Unmarshal(data)
@@ -68,58 +145,6 @@ func (l *License) verify(coord *xCoord, data []byte) error {
       return errors.New("failed to decrypt the keys")
    }
    return nil
-}
-
-func newLa(cipherData, kid []byte) (*xml.La, error) {
-   key, err := elGamalEncrypt(&p256().G, wmrmPublicKey())
-   if err != nil {
-      return nil, err
-   }
-   la := xml.La{
-      XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/protocols",
-      Id:      "SignedData",
-      Version: "1",
-      ContentHeader: xml.ContentHeader{
-         WrmHeader: xml.WrmHeader{
-            XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/PlayReadyHeader",
-            Version: "4.0.0.0",
-            Data: xml.WrmHeaderData{
-               ProtectInfo: xml.ProtectInfo{
-                  KeyLen: "16",
-                  AlgId:  "AESCTR",
-               },
-               Kid: kid,
-            },
-         },
-      },
-      EncryptedData: xml.EncryptedData{
-         XmlNs: "http://www.w3.org/2001/04/xmlenc#",
-         Type:  "http://www.w3.org/2001/04/xmlenc#Element",
-         EncryptionMethod: xml.Algorithm{
-            Algorithm: "http://www.w3.org/2001/04/xmlenc#aes128-cbc",
-         },
-         KeyInfo: xml.KeyInfo{
-            XmlNs: "http://www.w3.org/2000/09/xmldsig#",
-            EncryptedKey: xml.EncryptedKey{
-               XmlNs: "http://www.w3.org/2001/04/xmlenc#",
-               EncryptionMethod: xml.Algorithm{
-                  Algorithm: "http://schemas.microsoft.com/DRM/2007/03/protocols#ecc256",
-               },
-               KeyInfo: xml.EncryptedKeyInfo{
-                  XmlNs:   "http://www.w3.org/2000/09/xmldsig#",
-                  KeyName: "WMRMServer",
-               },
-               CipherData: xml.CipherData{
-                  CipherValue: key,
-               },
-            },
-         },
-         CipherData: xml.CipherData{
-            CipherValue: cipherData,
-         },
-      },
-   }
-   return &la, nil
 }
 
 func (c *Chain) Leaf(modelPriv, signEncryptPriv *big.Int) error {
@@ -251,21 +276,6 @@ func (x *xCoord) integrity() []byte {
 
 func (x *xCoord) key() []byte {
    return x[16:]
-}
-// input 128
-// output 64
-func elGamalDecrypt(data []byte, privK *big.Int) (ecc.Point, error) {
-   // Unmarshal C1 component
-   c1 := ecc.Point{
-      X: new(big.Int).SetBytes(data[:32]),
-      Y: new(big.Int).SetBytes(data[32:64]),
-   }
-   // Unmarshal C2 component
-   c2 := ecc.Point{
-      X: new(big.Int).SetBytes(data[64:96]),
-      Y: new(big.Int).SetBytes(data[96:]),
-   }
-   return p256().eg().Decrypt([2]ecc.Point{c1, c2}, privK)
 }
 
 // Decode decodes a byte slice into the Chain structure.
@@ -399,16 +409,5 @@ func sign(privK *big.Int, hashVal []byte) ([]byte, error) {
       return nil, err
    }
    return append(rs[0].Bytes(), rs[1].Bytes()...), nil
-}
-
-func elGamalEncrypt(m, pubK *ecc.Point) ([]byte, error) {
-   c, err := p256().eg().Encrypt(*m, *pubK, big.NewInt(1))
-   if err != nil {
-      return nil, err
-   }
-   data := slices.Concat(
-      c[0].X.Bytes(), c[0].Y.Bytes(), c[1].X.Bytes(), c[1].Y.Bytes(),
-   )
-   return data, nil
 }
 

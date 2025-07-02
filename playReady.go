@@ -28,20 +28,6 @@ const (
    objTypeSecurityVersion2 = 0x0011
 )
 
-const magicConstantZero = "7ee9ed4af773224f00b8ea7efb027cbb"
-
-// xorKey performs XOR operation on two byte slices.
-func xorKey(a, b []byte) []byte {
-   if len(a) != len(b) {
-      panic("slices have different lengths")
-   }
-   c := make([]byte, len(a))
-   for i := 0; i < len(a); i++ {
-      c[i] = a[i] ^ b[i]
-   }
-   return c
-}
-
 func UuidOrGuid(data []byte) {
    // Data1 (first 4 bytes) - swap endianness in place
    data[0], data[3] = data[3], data[0]

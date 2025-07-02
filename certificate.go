@@ -10,28 +10,40 @@ import (
    "math/big"
 )
 
-func (c *ContentKey) scalable(key *big.Int, aux *AuxKeys) (*xCoord, error) {
+func (c *ContentKey) decrypt(privK *big.Int, aux *AuxKeys) (*xCoord, error) {
+   switch c.CipherType {
+   case 3:
+      decrypt, err := elGamalDecrypt(c.Value, privK)
+      if err != nil {
+         return nil, err
+      }
+      return (*xCoord)(decrypt), nil
+   case 6:
+      return c.scalable(privK, aux)
+   }
+   return nil, errors.New("cannot decrypt key")
+}
+
+func (c *ContentKey) scalable(privK *big.Int, aux *AuxKeys) (*xCoord, error) {
    rootKeyInfo, leafKeys := c.Value[:144], c.Value[144:]
    rootKey := rootKeyInfo[128:]
-   decrypt, err := elGamalDecrypt(rootKeyInfo[:128], key)
+   decrypted, err := elGamalDecrypt(rootKeyInfo[:128], privK)
    if err != nil {
       return nil, err
    }
-   var coord xCoord
-   coord.New(decrypt.X)
    var (
       ci [16]byte
       ck [16]byte
    )
    for i := range 16 {
-      ci[i] = coord[i*2]
-      ck[i] = coord[i*2+1]
+      ci[i] = decrypted[i*2]
+      ck[i] = decrypted[i*2+1]
    }
-   constantZero, err := hex.DecodeString(magicConstantZero)
+   magicConstantZero, err := hex.DecodeString("7ee9ed4af773224f00b8ea7efb027cbb")
    if err != nil {
       return nil, err
    }
-   rgbUplinkXkey := xorKey(ck[:], constantZero)
+   rgbUplinkXkey := xorKey(magicConstantZero, ck[:])
    contentKeyPrime, err := aesEcbEncrypt(rgbUplinkXkey, ck[:])
    if err != nil {
       return nil, err
@@ -53,6 +65,17 @@ func (c *ContentKey) scalable(key *big.Int, aux *AuxKeys) (*xCoord, error) {
       return nil, err
    }
    return (*xCoord)(rgbKey), nil
+}
+
+func xorKey(a, b []byte) []byte {
+   if len(a) != len(b) {
+      panic("slices have different lengths")
+   }
+   c := make([]byte, len(a))
+   for i := 0; i < len(a); i++ {
+      c[i] = a[i] ^ b[i]
+   }
+   return c
 }
 
 func (c *Certificate) verify(pubK []byte) (bool, error) {
@@ -271,20 +294,4 @@ type License struct {
    EccKey     *EccKey           // 4.9.42
    AuxKeys    *AuxKeys          // 4.9.81
    Signature  *LicenseSignature // 4.11
-}
-
-func (c *ContentKey) decrypt(privK *big.Int, aux *AuxKeys) (*xCoord, error) {
-   switch c.CipherType {
-   case 3:
-      decrypt, err := elGamalDecrypt(c.Value, privK)
-      if err != nil {
-         return nil, err
-      }
-      var coord xCoord
-      coord.New(decrypt.X)
-      return &coord, nil
-   case 6:
-      return c.scalable(privK, aux)
-   }
-   return nil, errors.New("cannot decrypt key")
 }
