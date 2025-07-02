@@ -141,13 +141,22 @@ func (c *Chain) cipherData() ([]byte, error) {
    return append(coord.iv(), data...), nil
 }
 
+type Chain struct {
+   Magic        [4]byte
+   Version      uint32
+   Length       uint32
+   Flags        uint32
+   CertCount    uint32
+   Certificates []Certificate
+}
+
 // Decode decodes a byte slice into the Chain structure.
 func (c *Chain) Decode(data []byte) error {
-   n := copy(c.Magic[:], data)
+   c.Magic = [4]byte(data)
    if string(c.Magic[:]) != "CHAI" {
       return errors.New("failed to find chain magic")
    }
-   data = data[n:]
+   data = data[4:]
    c.Version = binary.BigEndian.Uint32(data)
    data = data[4:]
    c.Length = binary.BigEndian.Uint32(data)
@@ -167,15 +176,6 @@ func (c *Chain) Decode(data []byte) error {
       data = data[n:]
    }
    return nil
-}
-
-type Chain struct {
-   Magic        [4]byte
-   Version      uint32
-   Length       uint32
-   Flags        uint32
-   CertCount    uint32
-   Certificates []Certificate
 }
 
 func (c *Chain) Encode() []byte {

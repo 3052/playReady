@@ -184,29 +184,19 @@ func (c *CertSignature) size() int {
 }
 
 func (c *CertificateInfo) decode(data []byte) {
-   n := copy(c.CertificateId[:], data)
-   data = data[n:]
+   c.CertificateId = [16]byte(data)
+   data = data[16:]
    c.SecurityLevel = binary.BigEndian.Uint32(data)
    data = data[4:]
    c.Flags = binary.BigEndian.Uint32(data)
    data = data[4:]
    c.InfoType = binary.BigEndian.Uint32(data)
    data = data[4:]
-   n = copy(c.Digest[:], data)
-   data = data[n:]
+   c.Digest = [32]byte(data)
+   data = data[32:]
    c.Expiry = binary.BigEndian.Uint32(data)
    data = data[4:]
-   copy(c.ClientId[:], data)
-}
-
-type CertificateInfo struct {
-   CertificateId [16]byte
-   SecurityLevel uint32
-   Flags         uint32
-   InfoType      uint32
-   Digest        [32]byte
-   Expiry        uint32
-   ClientId      [16]byte // Client ID (can be used for license binding)
+   c.ClientId = [16]byte(data)
 }
 
 func (c *CertificateInfo) encode() []byte {
@@ -223,8 +213,18 @@ func (c *CertificateInfo) ftlv(Flag, Type uint16) *Ftlv {
    return newFtlv(Flag, Type, c.encode())
 }
 
+type CertificateInfo struct {
+   CertificateId [16]byte
+   SecurityLevel uint32
+   Flags         uint32
+   InfoType      uint32
+   Digest        [32]byte
+   Expiry        uint32
+   ClientId      [16]byte // Client ID (can be used for license binding)
+}
+
 func (c *CertificateInfo) New(securityLevel uint32, digest []byte) {
-   copy(c.Digest[:], digest)
+   c.Digest = [32]byte(digest)
    // required, Max uint32, effectively never expires
    c.Expiry = 4294967295
    // required

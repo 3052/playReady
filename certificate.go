@@ -10,6 +10,18 @@ import (
    "math/big"
 )
 
+type Certificate struct {
+   Magic             [4]byte          // bytes 0 - 3
+   Version           uint32           // bytes 4 - 7
+   Length            uint32           // bytes 8 - 11
+   LengthToSignature uint32           // bytes 12 - 15
+   Info              *CertificateInfo // type 1
+   Features          *Ftlv            // type 5
+   KeyInfo           *KeyInfo         // type 6
+   Manufacturer      *Ftlv            // type 7
+   Signature         *CertSignature   // type 8
+}
+
 func xorKey(a, b []byte) []byte {
    if len(a) != len(b) {
       panic("slices have different lengths")
@@ -43,62 +55,6 @@ func (c *Certificate) verify(pubK []byte) (bool, error) {
          Y: new(big.Int).SetBytes(pubK[32:]),
       },
    )
-}
-
-func (c *Certificate) decode(data []byte) (int, error) {
-   // Copy the magic bytes and check for "CERT" signature.
-   n := copy(c.Magic[:], data)
-   if string(c.Magic[:]) != "CERT" {
-      return 0, errors.New("failed to find cert magic")
-   }
-   // Decode Version, Length, and LengthToSignature fields.
-   c.Version = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   c.Length = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   c.LengthToSignature = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   for n < int(c.Length) {
-      var value Ftlv
-      bytesReadFromFtlv, err := value.decode(data[n:])
-      if err != nil {
-         return 0, err
-      }
-      switch value.Type {
-      case objTypeBasic: // 0x0001
-         c.Info = &CertificateInfo{}
-         c.Info.decode(value.Value)
-      case objTypeFeature: // 0x0005
-         c.Features = &value
-      case objTypeKey: // 0x0006
-         c.KeyInfo = &KeyInfo{}
-         c.KeyInfo.decode(value.Value)
-      case objTypeManufacturer: // 0x0007
-         c.Manufacturer = &value
-      case objTypeSignature: // 0x0008
-         c.Signature = &CertSignature{}
-         err := c.Signature.decode(value.Value)
-         if err != nil {
-            return 0, err
-         }
-      default:
-         return 0, errors.New("Ftlv.Type")
-      }
-      n += bytesReadFromFtlv
-   }
-   return n, nil // Return total bytes consumed and nil for no error
-}
-
-type Certificate struct {
-   Magic             [4]byte          // bytes 0 - 3
-   Version           uint32           // bytes 4 - 7
-   Length            uint32           // bytes 8 - 11
-   LengthToSignature uint32           // bytes 12 - 15
-   Info              *CertificateInfo // type 1
-   Features          *Ftlv            // type 5
-   KeyInfo           *KeyInfo         // type 6
-   Manufacturer      *Ftlv            // type 7
-   Signature         *CertSignature   // type 8
 }
 
 func (c *Certificate) Append(data []byte) []byte {
@@ -216,8 +172,8 @@ type ContentKey struct {
 
 // decode decodes a byte slice into a ContentKey structure.
 func (c *ContentKey) decode(data []byte) {
-   n := copy(c.KeyId[:], data)
-   data = data[n:]
+   c.KeyId = [16]byte(data)
+   data = data[16:]
    c.KeyType = binary.BigEndian.Uint16(data)
    data = data[2:]
    c.CipherType = binary.BigEndian.Uint16(data)
@@ -227,15 +183,70 @@ func (c *ContentKey) decode(data []byte) {
    c.Value = data
 }
 
+func (c *Certificate) decode(data []byte) (int, error) {
+   // Copy the magic bytes and check for "CERT" signature.
+   n := copy(c.Magic[:], data)
+   if string(c.Magic[:]) != "CERT" {
+      return 0, errors.New("failed to find cert magic")
+   }
+   // Decode Version, Length, and LengthToSignature fields.
+   c.Version = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   c.Length = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   c.LengthToSignature = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   for n < int(c.Length) {
+      var value Ftlv
+      bytesReadFromFtlv, err := value.decode(data[n:])
+      if err != nil {
+         return 0, err
+      }
+      switch value.Type {
+      case objTypeBasic: // 0x0001
+         c.Info = &CertificateInfo{}
+         c.Info.decode(value.Value)
+      case objTypeFeature: // 0x0005
+         c.Features = &value
+      case objTypeKey: // 0x0006
+         c.KeyInfo = &KeyInfo{}
+         c.KeyInfo.decode(value.Value)
+      case objTypeManufacturer: // 0x0007
+         c.Manufacturer = &value
+      case objTypeSignature: // 0x0008
+         c.Signature = &CertSignature{}
+         err := c.Signature.decode(value.Value)
+         if err != nil {
+            return 0, err
+         }
+      default:
+         return 0, errors.New("Ftlv.Type")
+      }
+      n += bytesReadFromFtlv
+   }
+   return n, nil // Return total bytes consumed and nil for no error
+}
+
+type License struct {
+   Magic      [4]byte           // 0
+   Offset     uint16            // 1
+   Version    uint16            // 2
+   RightsId   [16]byte          // 3
+   ContentKey *ContentKey       // 4.9.10
+   EccKey     *EccKey           // 4.9.42
+   AuxKeys    *AuxKeys          // 4.9.81
+   Signature  *LicenseSignature // 4.11
+}
+
 func (l *License) decode(data []byte) error {
-   n := copy(l.Magic[:], data)
-   data = data[n:]
+   l.Magic = [4]byte(data)
+   data = data[4:]
    l.Offset = binary.BigEndian.Uint16(data)
    data = data[2:]
    l.Version = binary.BigEndian.Uint16(data)
    data = data[2:]
-   n = copy(l.RightsId[:], data)
-   data = data[n:]
+   l.RightsId = [16]byte(data)
+   data = data[16:]
    var value1 Ftlv
    _, err := value1.decode(data) // Type 1
    if err != nil {
@@ -243,7 +254,7 @@ func (l *License) decode(data []byte) error {
    }
    for len(value1.Value) >= 1 {
       var value2 Ftlv
-      n, err = value2.decode(value1.Value)
+      n, err := value2.decode(value1.Value)
       if err != nil {
          return err
       }
@@ -283,15 +294,4 @@ func (l *License) decode(data []byte) error {
       }
    }
    return nil
-}
-
-type License struct {
-   Magic      [4]byte           // 0
-   Offset     uint16            // 1
-   Version    uint16            // 2
-   RightsId   [16]byte          // 3
-   ContentKey *ContentKey       // 4.9.10
-   EccKey     *EccKey           // 4.9.42
-   AuxKeys    *AuxKeys          // 4.9.81
-   Signature  *LicenseSignature // 4.11
 }
