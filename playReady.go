@@ -246,9 +246,9 @@ type EccKey struct {
    Value  []byte
 }
 
-type Filler byte
+type Fill byte
 
-func (f Filler) Read(data []byte) (int, error) {
+func (f Fill) Read(data []byte) (int, error) {
    for index := range data {
       data[index] = byte(f)
    }

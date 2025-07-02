@@ -43,7 +43,7 @@ func TestKey(t *testing.T) {
          t.Fatal(err)
       }
       UuidOrGuid(kid)
-      data, err = certificate.RequestBody(signEncryptKey, kid)
+      data, err = certificate.RequestBody(kid, signEncryptKey)
       if err != nil {
          t.Fatal(err)
       }
@@ -60,7 +60,7 @@ func TestKey(t *testing.T) {
       if hex.EncodeToString(lic.ContentKey.KeyId[:]) != test.kid_wv {
          t.Fatal(".KeyId")
       }
-      if hex.EncodeToString(coord.key()) != test.key {
+      if hex.EncodeToString(coord.Key()) != test.key {
          t.Fatal(".Key")
       }
    }
@@ -161,7 +161,7 @@ func TestLeaf(t *testing.T) {
    }
    z1 := new(big.Int).SetBytes(data)
    // they downgrade certs from the cert digest (hash of the signing key)
-   Filler('B').Read(data)
+   Fill('B').Read(data)
    signEncryptKey := new(big.Int).SetBytes(data)
    err = certificate.Leaf(z1, signEncryptKey)
    if err != nil {

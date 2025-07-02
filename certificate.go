@@ -149,21 +149,21 @@ func (c *Certificate) size() (uint32, uint32) {
    return uint32(n), uint32(n1)
 }
 
-func (c *ContentKey) decrypt(privK *big.Int, aux *AuxKeys) (*xCoord, error) {
+func (c *ContentKey) decrypt(privK *big.Int, aux *AuxKeys) (*CoordX, error) {
    switch c.CipherType {
    case 3:
       decrypt, err := elGamalDecrypt(c.Value, privK)
       if err != nil {
          return nil, err
       }
-      return (*xCoord)(decrypt), nil
+      return (*CoordX)(decrypt), nil
    case 6:
       return c.scalable(privK, aux)
    }
    return nil, errors.New("cannot decrypt key")
 }
 
-func (c *ContentKey) scalable(privK *big.Int, aux *AuxKeys) (*xCoord, error) {
+func (c *ContentKey) scalable(privK *big.Int, aux *AuxKeys) (*CoordX, error) {
    rootKeyInfo, leafKeys := c.Value[:144], c.Value[144:]
    rootKey := rootKeyInfo[128:]
    decrypted, err := elGamalDecrypt(rootKeyInfo[:128], privK)
@@ -203,7 +203,7 @@ func (c *ContentKey) scalable(privK *big.Int, aux *AuxKeys) (*xCoord, error) {
    if err != nil {
       return nil, err
    }
-   return (*xCoord)(rgbKey), nil
+   return (*CoordX)(rgbKey), nil
 }
 
 type ContentKey struct {
