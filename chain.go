@@ -36,18 +36,22 @@ func elGamalDecrypt(data []byte, privK *big.Int) ([]byte, error) {
    return append(point.X.Bytes(), point.Y.Bytes()...), nil
 }
 
-func elGamalEncrypt(m, pubK *ecc.Point) ([2]ecc.Point, error) {
-   return p256().eg().Encrypt(*m, *pubK, big.NewInt(1))
-}
-
-func newLa(cipherData, kid []byte) (*xml.La, error) {
-   c, err := elGamalEncrypt(&p256().G, wmrmPublicKey())
+func elGamalEncrypt(m, pubK *ecc.Point) ([]byte, error) {
+   c, err := p256().eg().Encrypt(*m, *pubK, big.NewInt(1))
    if err != nil {
       return nil, err
    }
    data := slices.Concat(
       c[0].X.Bytes(), c[0].Y.Bytes(), c[1].X.Bytes(), c[1].Y.Bytes(),
    )
+   return data, nil
+}
+
+func newLa(cipherData, kid []byte) (*xml.La, error) {
+   data, err := elGamalEncrypt(&p256().G, wmrmPublicKey())
+   if err != nil {
+      return nil, err
+   }
    la := xml.La{
       XmlNs:   "http://schemas.microsoft.com/DRM/2007/03/protocols",
       Id:      "SignedData",
@@ -93,58 +97,6 @@ func newLa(cipherData, kid []byte) (*xml.La, error) {
       },
    }
    return &la, nil
-}
-
-func (l *License) Decrypt(data []byte, signEncrypt *big.Int) (*xCoord, error) {
-   var envelope xml.EnvelopeResponse
-   err := envelope.Unmarshal(data)
-   if err != nil {
-      return nil, err
-   }
-   data = envelope.
-      Body.
-      AcquireLicenseResponse.
-      AcquireLicenseResult.
-      Response.
-      LicenseResponse.
-      Licenses.
-      License
-   err = l.decode(data)
-   if err != nil {
-      return nil, err
-   }
-   pubK, err := p256().dsa().PubK(signEncrypt)
-   if err != nil {
-      return nil, err
-   }
-   if !bytes.Equal(
-      l.EccKey.Value, append(pubK.X.Bytes(), pubK.Y.Bytes()...),
-   ) {
-      return nil, errors.New("license response is not for this device")
-   }
-   coord, err := l.ContentKey.decrypt(signEncrypt, l.AuxKeys)
-   if err != nil {
-      return nil, err
-   }
-   err = l.verify(coord, data)
-   if err != nil {
-      return nil, err
-   }
-   return coord, nil
-}
-
-func (l *License) verify(coord *xCoord, data []byte) error {
-   signature := new(Ftlv).size() + l.Signature.size()
-   data = data[:len(data)-signature]
-   block, err := aes.NewCipher(coord.integrity())
-   if err != nil {
-      return err
-   }
-   data = cbcmac.NewCMAC(block, aes.BlockSize).MAC(data)
-   if !bytes.Equal(data, l.Signature.Data) {
-      return errors.New("failed to decrypt the keys")
-   }
-   return nil
 }
 
 func (c *Chain) Leaf(modelPriv, signEncryptPriv *big.Int) error {
@@ -193,7 +145,7 @@ func (c *Chain) Leaf(modelPriv, signEncryptPriv *big.Int) error {
    {
       cert.LengthToSignature, cert.Length = cert.size()
       hashVal := sha256.Sum256(cert.Append(nil))
-      signature, err := sign(modelPriv, hashVal[:])
+      signature, err := sign(hashVal[:], modelPriv)
       if err != nil {
          return err
       }
@@ -210,6 +162,60 @@ func (c *Chain) Leaf(modelPriv, signEncryptPriv *big.Int) error {
    c.Length += cert.Length
    return nil
 }
+
+func (l *License) Decrypt(data []byte, privK *big.Int) (*xCoord, error) {
+   var envelope xml.EnvelopeResponse
+   err := envelope.Unmarshal(data)
+   if err != nil {
+      return nil, err
+   }
+   data = envelope.
+      Body.
+      AcquireLicenseResponse.
+      AcquireLicenseResult.
+      Response.
+      LicenseResponse.
+      Licenses.
+      License
+   err = l.decode(data)
+   if err != nil {
+      return nil, err
+   }
+   pubK, err := p256().dsa().PubK(privK)
+   if err != nil {
+      return nil, err
+   }
+   if !bytes.Equal(
+      l.EccKey.Value, append(pubK.X.Bytes(), pubK.Y.Bytes()...),
+   ) {
+      return nil, errors.New("license response is not for this device")
+   }
+   coord, err := l.ContentKey.decrypt(privK, l.AuxKeys)
+   if err != nil {
+      return nil, err
+   }
+   err = l.verify(coord, data)
+   if err != nil {
+      return nil, err
+   }
+   return coord, nil
+}
+
+func (l *License) verify(coord *xCoord, data []byte) error {
+   signature := new(Ftlv).size() + l.Signature.size()
+   data = data[:len(data)-signature]
+   block, err := aes.NewCipher(coord.integrity())
+   if err != nil {
+      return err
+   }
+   data = cbcmac.NewCMAC(block, aes.BlockSize).MAC(data)
+   if !bytes.Equal(data, l.Signature.Data) {
+      return errors.New("failed to decrypt the keys")
+   }
+   return nil
+}
+
+///
 
 func (c *curve) dsa() *ecdsa.DSA {
    return (*ecdsa.DSA)(c)
@@ -342,7 +348,7 @@ func (c *Chain) verify() (bool, error) {
    return true, nil
 }
 
-func (c *Chain) RequestBody(signEncrypt *big.Int, kid []byte) ([]byte, error) {
+func (c *Chain) RequestBody(privK *big.Int, kid []byte) ([]byte, error) {
    cipherData, err := c.cipherData()
    if err != nil {
       return nil, err
@@ -368,7 +374,7 @@ func (c *Chain) RequestBody(signEncrypt *big.Int, kid []byte) ([]byte, error) {
       return nil, err
    }
    hashVal := sha256.Sum256(signedData)
-   signature, err := sign(signEncrypt, hashVal[:])
+   signature, err := sign(hashVal[:], privK)
    if err != nil {
       return nil, err
    }
@@ -401,7 +407,7 @@ func wmrmPublicKey() *ecc.Point {
    }
 }
 
-func sign(privK *big.Int, hashVal []byte) ([]byte, error) {
+func sign(hashVal []byte, privK *big.Int) ([]byte, error) {
    rs, err := p256().dsa().Sign(
       new(big.Int).SetBytes(hashVal), privK, big.NewInt(1),
    )
@@ -410,4 +416,3 @@ func sign(privK *big.Int, hashVal []byte) ([]byte, error) {
    }
    return append(rs[0].Bytes(), rs[1].Bytes()...), nil
 }
-
