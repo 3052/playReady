@@ -230,8 +230,6 @@ func (c *Chain) Encode() []byte {
    return data
 }
 
-///
-
 func (c *Chain) verify() (bool, error) {
    modelBase := c.Certificates[c.CertCount-1].Signature.IssuerKey
    for i := len(c.Certificates) - 1; i >= 0; i-- {
@@ -261,7 +259,7 @@ func (l *License) verify(data []byte) error {
    return nil
 }
 
-func (l *License) Decrypt(signEncrypt *big.Int, data []byte) error {
+func (l *License) Decrypt(data []byte, signEncrypt *big.Int) error {
    var envelope xml.EnvelopeResponse
    err := envelope.Unmarshal(data)
    if err != nil {
@@ -286,8 +284,7 @@ func (l *License) Decrypt(signEncrypt *big.Int, data []byte) error {
       return err
    }
    if !bytes.Equal(
-      l.EccKey.Value,
-      append(pubK.X.Bytes(), pubK.Y.Bytes()...),
+      l.EccKey.Value, append(pubK.X.Bytes(), pubK.Y.Bytes()...),
    ) {
       return errors.New("license response is not for this device")
    }
@@ -297,30 +294,8 @@ func (l *License) Decrypt(signEncrypt *big.Int, data []byte) error {
    }
    return l.verify(data)
 }
-func (c *Chain) cipherData() ([]byte, error) {
-   xmlData := xml.Data{
-      CertificateChains: xml.CertificateChains{
-         CertificateChain: c.Encode(),
-      },
-      Features: xml.Features{
-         Feature: xml.Feature{"AESCBC"}, // SCALABLE
-      },
-   }
-   data, err := xmlData.Marshal()
-   if err != nil {
-      return nil, err
-   }
-   data = padding.NewPKCS7Padding(aes.BlockSize).Pad(data)
-   _, g, _ := p256()
-   xBytes := g.X.Bytes()
-   iv, key := xBytes[:16], xBytes[16:]
-   block, err := aes.NewCipher(key)
-   if err != nil {
-      return nil, err
-   }
-   cipher.NewCBCEncrypter(block, iv).CryptBlocks(data, data)
-   return append(iv, data...), nil
-}
+
+///
 
 func (c *Chain) Leaf(modelKey, signEncryptKey *big.Int) error {
    var dsa ecdsa.DSA
@@ -388,3 +363,27 @@ func (c *Chain) Leaf(modelKey, signEncryptKey *big.Int) error {
    return nil
 }
 
+func (c *Chain) cipherData() ([]byte, error) {
+   xmlData := xml.Data{
+      CertificateChains: xml.CertificateChains{
+         CertificateChain: c.Encode(),
+      },
+      Features: xml.Features{
+         Feature: xml.Feature{"AESCBC"}, // SCALABLE
+      },
+   }
+   data, err := xmlData.Marshal()
+   if err != nil {
+      return nil, err
+   }
+   data = padding.NewPKCS7Padding(aes.BlockSize).Pad(data)
+   _, g, _ := p256()
+   xBytes := g.X.Bytes()
+   iv, key := xBytes[:16], xBytes[16:]
+   block, err := aes.NewCipher(key)
+   if err != nil {
+      return nil, err
+   }
+   cipher.NewCBCEncrypter(block, iv).CryptBlocks(data, data)
+   return append(iv, data...), nil
+}
