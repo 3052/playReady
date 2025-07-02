@@ -131,9 +131,9 @@ func (c *Chain) cipherData() ([]byte, error) {
       return nil, err
    }
    data = padding.NewPKCS7Padding(aes.BlockSize).Pad(data)
-   var coord xCoord
+   var coord CoordX
    coord.New(p256().G.X)
-   block, err := aes.NewCipher(coord.key())
+   block, err := aes.NewCipher(coord.Key())
    if err != nil {
       return nil, err
    }
@@ -320,7 +320,7 @@ func (c *Chain) Leaf(modelPriv, signEncryptPriv *big.Int) error {
    return nil
 }
 
-func (l *License) Decrypt(data []byte, privK *big.Int) (*xCoord, error) {
+func (l *License) Decrypt(data []byte, privK *big.Int) (*CoordX, error) {
    var envelope xml.EnvelopeResponse
    err := envelope.Unmarshal(data)
    if err != nil {
@@ -351,14 +351,14 @@ func (l *License) Decrypt(data []byte, privK *big.Int) (*xCoord, error) {
    if err != nil {
       return nil, err
    }
-   err = l.verify(coord, data)
+   err = l.verify(data, coord)
    if err != nil {
       return nil, err
    }
    return coord, nil
 }
 
-func (l *License) verify(coord *xCoord, data []byte) error {
+func (l *License) verify(data []byte, coord *CoordX) error {
    signature := new(Ftlv).size() + l.Signature.size()
    data = data[:len(data)-signature]
    block, err := aes.NewCipher(coord.integrity())
@@ -397,20 +397,20 @@ type curve struct {
    N  *big.Int
 }
 
-func (x *xCoord) iv() []byte {
-   return x[:16]
+func (c *CoordX) iv() []byte {
+   return c[:16]
 }
 
-func (x *xCoord) integrity() []byte {
-   return x[:16]
+func (c *CoordX) integrity() []byte {
+   return c[:16]
 }
 
-func (x *xCoord) key() []byte {
-   return x[16:]
+func (c *CoordX) Key() []byte {
+   return c[16:]
 }
 
-func (xc *xCoord) New(x *big.Int) {
-   x.FillBytes(xc[:])
+func (c *CoordX) New(x *big.Int) {
+   x.FillBytes(c[:])
 }
 
-type xCoord [32]byte
+type CoordX [32]byte
