@@ -10,6 +10,17 @@ import (
    "math/big"
 )
 
+func xorKey(a, b []byte) []byte {
+   if len(a) != len(b) {
+      panic("slices have different lengths")
+   }
+   c := make([]byte, len(a))
+   for i := 0; i < len(a); i++ {
+      c[i] = a[i] ^ b[i]
+   }
+   return c
+}
+
 type Certificate struct {
    Magic             [4]byte          // bytes 0 - 3
    Version           uint32           // bytes 4 - 7
@@ -22,16 +33,7 @@ type Certificate struct {
    Signature         *CertSignature   // type 8
 }
 
-func xorKey(a, b []byte) []byte {
-   if len(a) != len(b) {
-      panic("slices have different lengths")
-   }
-   c := make([]byte, len(a))
-   for i := 0; i < len(a); i++ {
-      c[i] = a[i] ^ b[i]
-   }
-   return c
-}
+///
 
 func (c *Certificate) verify(pubK []byte) (bool, error) {
    if !bytes.Equal(c.Signature.IssuerKey, pubK) {
