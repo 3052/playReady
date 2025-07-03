@@ -12,6 +12,36 @@ import (
    "math/big"
 )
 
+func TestLeaf(t *testing.T) {
+   data, err := os.ReadFile(SL2000.dir + SL2000.g1)
+   if err != nil {
+      t.Fatal(err)
+   }
+   var certificate Chain
+   err = certificate.Decode(data)
+   if err != nil {
+      t.Fatal(err)
+   }
+   data, err = os.ReadFile(SL2000.dir + SL2000.z1)
+   if err != nil {
+      t.Fatal(err)
+   }
+   z1 := new(big.Int).SetBytes(data)
+   signEncryptKey := big.NewInt(1)
+   err = certificate.Leaf(z1, signEncryptKey)
+   if err != nil {
+      t.Fatal(err)
+   }
+   err = write_file(SL2000.dir+"certificate", certificate.Encode())
+   if err != nil {
+      t.Fatal(err)
+   }
+   err = write_file(SL2000.dir+"signEncryptKey", signEncryptKey.Bytes())
+   if err != nil {
+      t.Fatal(err)
+   }
+}
+
 var key_tests = []struct {
    key    string
    kid_wv string
@@ -154,36 +184,4 @@ var SL2000 = struct {
    dir: "ignore/",
    g1:  "g1",
    z1:  "z1",
-}
-
-func TestLeaf(t *testing.T) {
-   data, err := os.ReadFile(SL2000.dir + SL2000.g1)
-   if err != nil {
-      t.Fatal(err)
-   }
-   var certificate Chain
-   err = certificate.Decode(data)
-   if err != nil {
-      t.Fatal(err)
-   }
-   data, err = os.ReadFile(SL2000.dir + SL2000.z1)
-   if err != nil {
-      t.Fatal(err)
-   }
-   z1 := new(big.Int).SetBytes(data)
-   // they downgrade certs from the cert digest (hash of the signing key)
-   Fill('B').Read(data)
-   signEncryptKey := new(big.Int).SetBytes(data)
-   err = certificate.Leaf(z1, signEncryptKey)
-   if err != nil {
-      t.Fatal(err)
-   }
-   err = write_file(SL2000.dir+"certificate", certificate.Encode())
-   if err != nil {
-      t.Fatal(err)
-   }
-   err = write_file(SL2000.dir+"signEncryptKey", signEncryptKey.Bytes())
-   if err != nil {
-      t.Fatal(err)
-   }
 }

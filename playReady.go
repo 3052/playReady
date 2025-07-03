@@ -246,15 +246,6 @@ type EccKey struct {
    Value  []byte
 }
 
-type Fill byte
-
-func (f Fill) Read(data []byte) (int, error) {
-   for index := range data {
-      data[index] = byte(f)
-   }
-   return len(data), nil
-}
-
 func newFtlv(Flag, Type uint16, Value []byte) *Ftlv {
    return &Ftlv{
       Flag:   Flag,

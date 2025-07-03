@@ -18,6 +18,165 @@ import (
    "slices"
 )
 
+// they downgrade certs from the cert digest (hash of the signing key)
+func (c *Chain) Leaf(modelPriv, signEncryptPriv *big.Int) error {
+   dsa := p256().dsa()
+   modelPub, err := dsa.PubK(modelPriv)
+   if err != nil {
+      return err
+   }
+   if !bytes.Equal(
+      c.Certificates[0].KeyInfo.Keys[0].PublicKey[:],
+      append(modelPub.X.Bytes(), modelPub.Y.Bytes()...),
+   ) {
+      return errors.New("zgpriv not for cert")
+   }
+   ok, err := c.verify()
+   if err != nil {
+      return err
+   }
+   if !ok {
+      return errors.New("cert is not valid")
+   }
+   var cert Certificate
+   copy(cert.Magic[:], "CERT")
+   cert.Version = 1 // required
+   {
+      // SCALABLE with SL2000, SUPPORTS_PR3_FEATURES
+      var features CertFeatures
+      features.New(0xD)
+      cert.Features = features.ftlv(0, 5)
+   }
+   signEncryptPub, err := dsa.PubK(signEncryptPriv)
+   if err != nil {
+      return err
+   }
+   {
+      sum := sha256.Sum256(
+         append(signEncryptPub.X.Bytes(), signEncryptPub.Y.Bytes()...),
+      )
+      cert.Info = &CertificateInfo{}
+      cert.Info.New(c.Certificates[0].Info.SecurityLevel, sum[:])
+   }
+   cert.KeyInfo = &KeyInfo{}
+   cert.KeyInfo.New(
+      append(signEncryptPub.X.Bytes(), signEncryptPub.Y.Bytes()...),
+   )
+   {
+      cert.LengthToSignature, cert.Length = cert.size()
+      hashVal := sha256.Sum256(cert.Append(nil))
+      signature, err := sign(hashVal[:], modelPriv)
+      if err != nil {
+         return err
+      }
+      cert.Signature = &CertSignature{}
+      err = cert.Signature.New(
+         signature, append(modelPub.X.Bytes(), modelPub.Y.Bytes()...),
+      )
+      if err != nil {
+         return err
+      }
+   }
+   c.CertCount += 1
+   c.Certificates = slices.Insert(c.Certificates, 0, cert)
+   c.Length += cert.Length
+   return nil
+}
+
+func (l *License) Decrypt(data []byte, privK *big.Int) (*CoordX, error) {
+   var envelope xml.EnvelopeResponse
+   err := envelope.Unmarshal(data)
+   if err != nil {
+      return nil, err
+   }
+   data = envelope.
+      Body.
+      AcquireLicenseResponse.
+      AcquireLicenseResult.
+      Response.
+      LicenseResponse.
+      Licenses.
+      License
+   err = l.decode(data)
+   if err != nil {
+      return nil, err
+   }
+   pubK, err := p256().dsa().PubK(privK)
+   if err != nil {
+      return nil, err
+   }
+   if !bytes.Equal(
+      l.EccKey.Value, append(pubK.X.Bytes(), pubK.Y.Bytes()...),
+   ) {
+      return nil, errors.New("license response is not for this device")
+   }
+   coord, err := l.ContentKey.decrypt(privK, l.AuxKeys)
+   if err != nil {
+      return nil, err
+   }
+   err = l.verify(data, coord)
+   if err != nil {
+      return nil, err
+   }
+   return coord, nil
+}
+
+func (l *License) verify(data []byte, coord *CoordX) error {
+   signature := new(Ftlv).size() + l.Signature.size()
+   data = data[:len(data)-signature]
+   block, err := aes.NewCipher(coord.integrity())
+   if err != nil {
+      return err
+   }
+   data = cbcmac.NewCMAC(block, aes.BlockSize).MAC(data)
+   if !bytes.Equal(data, l.Signature.Data) {
+      return errors.New("failed to decrypt the keys")
+   }
+   return nil
+}
+
+func (c *curve) dsa() *ecdsa.DSA {
+   return (*ecdsa.DSA)(c)
+}
+
+func (c *curve) eg() *elgamal.EG {
+   return (*elgamal.EG)(c)
+}
+
+// nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-4.pdf
+func p256() *curve {
+   var c curve
+   c.EC.A = big.NewInt(-3)
+   c.EC.Q, _ = new(big.Int).SetString("115792089210356248762697446949407573530086143415290314195533631308867097853951", 10)
+   c.G.X, _ = new(big.Int).SetString("6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296", 16)
+   c.G.Y, _ = new(big.Int).SetString("4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5", 16)
+   c.N, _ = new(big.Int).SetString("115792089210356248762697446949407573529996955224135760342422259061068512044369", 10)
+   return &c
+}
+
+type curve struct {
+   EC ecc.EC
+   G  ecc.Point
+   N  *big.Int
+}
+
+func (c *CoordX) iv() []byte {
+   return c[:16]
+}
+
+func (c *CoordX) integrity() []byte {
+   return c[:16]
+}
+
+func (c *CoordX) Key() []byte {
+   return c[16:]
+}
+
+func (c *CoordX) New(x *big.Int) {
+   x.FillBytes(c[:])
+}
+
+type CoordX [32]byte
 func wmrmPublicKey() *ecc.Point {
    data, _ := hex.DecodeString("C8B6AF16EE941AADAA5389B4AF2C10E356BE42AF175EF3FACE93254E7B0B3D9B982B27B5CB2341326E56AA857DBFD5C634CE2CF9EA74FCA8F2AF5957EFEEA562")
    return &ecc.Point{
@@ -256,161 +415,3 @@ func (c *Chain) RequestBody(kid []byte, privK *big.Int) ([]byte, error) {
    return envelope.Marshal()
 }
 
-func (c *Chain) Leaf(modelPriv, signEncryptPriv *big.Int) error {
-   dsa := p256().dsa()
-   modelPub, err := dsa.PubK(modelPriv)
-   if err != nil {
-      return err
-   }
-   if !bytes.Equal(
-      c.Certificates[0].KeyInfo.Keys[0].PublicKey[:],
-      append(modelPub.X.Bytes(), modelPub.Y.Bytes()...),
-   ) {
-      return errors.New("zgpriv not for cert")
-   }
-   ok, err := c.verify()
-   if err != nil {
-      return err
-   }
-   if !ok {
-      return errors.New("cert is not valid")
-   }
-   var cert Certificate
-   copy(cert.Magic[:], "CERT")
-   cert.Version = 1 // required
-   {
-      // SCALABLE with SL2000, SUPPORTS_PR3_FEATURES
-      var features CertFeatures
-      features.New(0xD)
-      cert.Features = features.ftlv(0, 5)
-   }
-   signEncryptPub, err := dsa.PubK(signEncryptPriv)
-   if err != nil {
-      return err
-   }
-   {
-      sum := sha256.Sum256(
-         append(signEncryptPub.X.Bytes(), signEncryptPub.Y.Bytes()...),
-      )
-      cert.Info = &CertificateInfo{}
-      cert.Info.New(c.Certificates[0].Info.SecurityLevel, sum[:])
-   }
-   cert.KeyInfo = &KeyInfo{}
-   cert.KeyInfo.New(
-      append(signEncryptPub.X.Bytes(), signEncryptPub.Y.Bytes()...),
-   )
-   {
-      cert.LengthToSignature, cert.Length = cert.size()
-      hashVal := sha256.Sum256(cert.Append(nil))
-      signature, err := sign(hashVal[:], modelPriv)
-      if err != nil {
-         return err
-      }
-      cert.Signature = &CertSignature{}
-      err = cert.Signature.New(
-         signature, append(modelPub.X.Bytes(), modelPub.Y.Bytes()...),
-      )
-      if err != nil {
-         return err
-      }
-   }
-   c.CertCount += 1
-   c.Certificates = slices.Insert(c.Certificates, 0, cert)
-   c.Length += cert.Length
-   return nil
-}
-
-func (l *License) Decrypt(data []byte, privK *big.Int) (*CoordX, error) {
-   var envelope xml.EnvelopeResponse
-   err := envelope.Unmarshal(data)
-   if err != nil {
-      return nil, err
-   }
-   data = envelope.
-      Body.
-      AcquireLicenseResponse.
-      AcquireLicenseResult.
-      Response.
-      LicenseResponse.
-      Licenses.
-      License
-   err = l.decode(data)
-   if err != nil {
-      return nil, err
-   }
-   pubK, err := p256().dsa().PubK(privK)
-   if err != nil {
-      return nil, err
-   }
-   if !bytes.Equal(
-      l.EccKey.Value, append(pubK.X.Bytes(), pubK.Y.Bytes()...),
-   ) {
-      return nil, errors.New("license response is not for this device")
-   }
-   coord, err := l.ContentKey.decrypt(privK, l.AuxKeys)
-   if err != nil {
-      return nil, err
-   }
-   err = l.verify(data, coord)
-   if err != nil {
-      return nil, err
-   }
-   return coord, nil
-}
-
-func (l *License) verify(data []byte, coord *CoordX) error {
-   signature := new(Ftlv).size() + l.Signature.size()
-   data = data[:len(data)-signature]
-   block, err := aes.NewCipher(coord.integrity())
-   if err != nil {
-      return err
-   }
-   data = cbcmac.NewCMAC(block, aes.BlockSize).MAC(data)
-   if !bytes.Equal(data, l.Signature.Data) {
-      return errors.New("failed to decrypt the keys")
-   }
-   return nil
-}
-
-func (c *curve) dsa() *ecdsa.DSA {
-   return (*ecdsa.DSA)(c)
-}
-
-func (c *curve) eg() *elgamal.EG {
-   return (*elgamal.EG)(c)
-}
-
-// nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-4.pdf
-func p256() *curve {
-   var c curve
-   c.EC.A = big.NewInt(-3)
-   c.EC.Q, _ = new(big.Int).SetString("115792089210356248762697446949407573530086143415290314195533631308867097853951", 10)
-   c.G.X, _ = new(big.Int).SetString("6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296", 16)
-   c.G.Y, _ = new(big.Int).SetString("4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5", 16)
-   c.N, _ = new(big.Int).SetString("115792089210356248762697446949407573529996955224135760342422259061068512044369", 10)
-   return &c
-}
-
-type curve struct {
-   EC ecc.EC
-   G  ecc.Point
-   N  *big.Int
-}
-
-func (c *CoordX) iv() []byte {
-   return c[:16]
-}
-
-func (c *CoordX) integrity() []byte {
-   return c[:16]
-}
-
-func (c *CoordX) Key() []byte {
-   return c[16:]
-}
-
-func (c *CoordX) New(x *big.Int) {
-   x.FillBytes(c[:])
-}
-
-type CoordX [32]byte

@@ -31,21 +31,21 @@ var Details = map[string][]app{
       },
    },
    "10M+ Downloads": {
-/////////////////////////////////////////////////////////////////////////////////
       {
-         playReady: "register",
-         title:     "CANAL+, Live and catch-up TV",
-         url:       "play.google.com/store/apps/details?id=com.canal.android.canal",
+         playReady: "login",
+         title:     "The NBC App - Stream TV Shows",
+         url:       "play.google.com/store/apps/details?id=com.nbcuni.nbc",
       },
+/////////////////////////////////////////////////////////////////////////////////
       {
          playReady: "sign in",
          title:     "Paramount+",
          url:       "play.google.com/store/apps/details?id=com.cbs.app",
       },
       {
-         playReady: "login",
-         title:     "The NBC App - Stream TV Shows",
-         url:       "play.google.com/store/apps/details?id=com.nbcuni.nbc",
+         playReady: "register",
+         title:     "CANAL+, Live and catch-up TV",
+         url:       "play.google.com/store/apps/details?id=com.canal.android.canal",
       },
       {
          playReady: "log in",
