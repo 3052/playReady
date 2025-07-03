@@ -7,13 +7,6 @@ import (
    "net/http"
 )
 
-type verify struct {
-   Response struct {
-      Status string
-      SubStatus string `json:"sub_status"`
-   }
-}
-
 func (v *verify) New() error {
    data, err := json.Marshal(map[string]string{
       "address": address,
@@ -22,6 +15,7 @@ func (v *verify) New() error {
       return err
    }
    resp, err := http.Post(
+      // github.com/disposable-email-domains/disposable-email-domains
       "https://ss.nbc.co/pontoon/verify", "", bytes.NewReader(data),
    )
    if err != nil {
@@ -29,6 +23,13 @@ func (v *verify) New() error {
    }
    defer resp.Body.Close()
    return json.NewDecoder(resp.Body).Decode(v)
+}
+
+type verify struct {
+   Response struct {
+      Status string
+      SubStatus string `json:"sub_status"`
+   }
 }
 
 func main() {
@@ -40,10 +41,8 @@ func main() {
    fmt.Printf("%+v\n", pontoon)
 }
 
-// github.com/disposable-email-domains/disposable-email-domains
-
 //{Response:{Status:valid SubStatus:alternate}}
-//const address = "367@tuta.io"
+const address = "367@tuta.io"
 
 //url: "tempmail.best",
 //const address = "darkened.firefighter@linkmail.info"

@@ -12,6 +12,65 @@ import (
    "math/big"
 )
 
+var key_tests = []struct {
+   key    string
+   kid_wv string
+   url    func(string) (string, error)
+}{
+   {
+      key:    "12b5853e5a54a79ab84aae29d8079283",
+      kid_wv: "20613c35d9cc4c1fa9b668182eb8fc77",
+      url: func(home string) (string, error) {
+         data, err := os.ReadFile(home + "/media/hulu/PlayReady")
+         if err != nil {
+            return "", err
+         }
+         return string(data), nil
+      },
+   },
+   {
+      key:    "67376174a357f3ec9c1466055de9551d",
+      // below is FHD (1920x1080), UHD needs SL3000
+      kid_wv: "010521b274da1acbbd3c6f124a238c67",
+      url: func(home string) (string, error) {
+         data, err := os.ReadFile(home + "/media/max/PlayReady")
+         if err != nil {
+            return "", err
+         }
+         return string(data), nil
+      },
+   },
+   {
+      kid_wv: "77890254eb7247ed9cc5680790b50a27",
+      key:    "98b703d07129b5f34136cec75954a8de",
+      url: func(home string) (string, error) {
+         data, err := os.ReadFile(home + "/media/nbc/PlayReady")
+         if err != nil {
+            return "", err
+         }
+         return string(data), nil
+      },
+   },
+   {
+      key:    "ab82952e8b567a2359393201e4dde4b4",
+      kid_wv: "318f7ece69afcfe3e96de31be6b77272",
+      url: func(home string) (string, error) {
+         data, err := os.ReadFile(home + "/media/rakuten/PlayReady")
+         if err != nil {
+            return "", err
+         }
+         return string(data), nil
+      },
+   },
+   {
+      key:    "00000000000000000000000000000000",
+      kid_wv: "10000000000000000000000000000000",
+      url: func(string) (string, error) {
+         return "https://test.playready.microsoft.com/service/rightsmanager.asmx?cfg=ck:AAAAAAAAAAAAAAAAAAAAAA==,ckt:aescbc", nil
+      },
+   },
+}
+
 func TestKey(t *testing.T) {
    log.SetFlags(log.Ltime)
    data, err := os.ReadFile(SL2000.dir + "certificate")
@@ -95,54 +154,6 @@ var SL2000 = struct {
    dir: "ignore/",
    g1:  "g1",
    z1:  "z1",
-}
-
-var key_tests = []struct {
-   key    string
-   kid_wv string
-   url    func(string) (string, error)
-}{
-   {
-      key:    "67376174a357f3ec9c1466055de9551d",
-      // below is FHD (1920x1080), UHD needs SL3000
-      kid_wv: "010521b274da1acbbd3c6f124a238c67",
-      url: func(home string) (string, error) {
-         data, err := os.ReadFile(home + "/media/max/PlayReady")
-         if err != nil {
-            return "", err
-         }
-         return string(data), nil
-      },
-   },
-   {
-      key:    "12b5853e5a54a79ab84aae29d8079283",
-      kid_wv: "20613c35d9cc4c1fa9b668182eb8fc77",
-      url: func(home string) (string, error) {
-         data, err := os.ReadFile(home + "/media/hulu/DashPrServer")
-         if err != nil {
-            return "", err
-         }
-         return string(data), nil
-      },
-   },
-   {
-      key:    "ab82952e8b567a2359393201e4dde4b4",
-      kid_wv: "318f7ece69afcfe3e96de31be6b77272",
-      url: func(home string) (string, error) {
-         data, err := os.ReadFile(home + "/media/rakuten/Pr")
-         if err != nil {
-            return "", err
-         }
-         return string(data), nil
-      },
-   },
-   {
-      key:    "00000000000000000000000000000000",
-      kid_wv: "10000000000000000000000000000000",
-      url: func(string) (string, error) {
-         return "https://test.playready.microsoft.com/service/rightsmanager.asmx?cfg=ck:AAAAAAAAAAAAAAAAAAAAAA==,ckt:aescbc", nil
-      },
-   },
 }
 
 func TestLeaf(t *testing.T) {
