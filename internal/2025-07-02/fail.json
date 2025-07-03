@@ -1,0 +1,23 @@
+{
+  "response": {
+    "address": "hello@mailsac.com",
+    "status": "do_not_mail",
+    "sub_status": "disposable",
+    "free_email": true,
+    "did_you_mean": null,
+    "account": "hello",
+    "domain": "mailsac.com",
+    "domain_age_days": "4450",
+    "smtp_provider": "",
+    "mx_found": "true",
+    "mx_record": "in.mailsac.com",
+    "firstname": null,
+    "lastname": null,
+    "gender": null,
+    "country": null,
+    "region": null,
+    "city": null,
+    "zipcode": null,
+    "processed_at": "2025-07-03 01:24:56.694"
+  }
+}

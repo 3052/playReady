@@ -1,4 +1,4 @@
-package apps
+package playReady
 
 var Details = map[string][]app{
    "100M+ Downloads": {
@@ -24,7 +24,6 @@ var Details = map[string][]app{
          title:     "Plex: Stream Movies & TV",
          url:       "play.google.com/store/apps/details?id=com.plexapp.android",
       },
-      /////////////////////////////////////////////////////////////////////////////////
       {
          playReady: "sign up now",
          title:     "Hulu: Stream TV shows & movies",
@@ -32,6 +31,7 @@ var Details = map[string][]app{
       },
    },
    "10M+ Downloads": {
+/////////////////////////////////////////////////////////////////////////////////
       {
          playReady: "register",
          title:     "CANAL+, Live and catch-up TV",
