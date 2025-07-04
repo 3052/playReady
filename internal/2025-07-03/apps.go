@@ -36,31 +36,31 @@ var Details = map[string][]app{
          title:     "The NBC App - Stream TV Shows",
          url:       "play.google.com/store/apps/details?id=com.nbcuni.nbc",
       },
-/////////////////////////////////////////////////////////////////////////////////
       {
          playReady: "sign in",
          title:     "Paramount+",
          url:       "play.google.com/store/apps/details?id=com.cbs.app",
       },
+/////////////////////////////////////////////////////////////////////////////////
       {
-         playReady: "register",
-         title:     "CANAL+, Live and catch-up TV",
-         url:       "play.google.com/store/apps/details?id=com.canal.android.canal",
-      },
-      {
-         playReady: "log in",
-         title:     "Movistar Plus+",
-         url:       "play.google.com/store/apps/details?id=es.plus.yomvi",
-      },
-      {
-         playReady: "available in a fee-paying option",
-         title:     "Molotov - TV en direct, replay",
-         url:       "play.google.com/store/apps/details?id=tv.molotov.app",
-      },
-      {
-         playReady: "sign in",
          title:     "ITVX",
          url:       "play.google.com/store/apps/details?id=air.ITVMobilePlayer",
+         playReady: "sign in",
+      },
+      {
+         title:     "CANAL+, Live and catch-up TV",
+         url:       "play.google.com/store/apps/details?id=com.canal.android.canal",
+         playReady: "register",
+      },
+      {
+         title:     "Molotov - TV en direct, replay",
+         url:       "play.google.com/store/apps/details?id=tv.molotov.app",
+         playReady: "available in a fee-paying option",
+      },
+      {
+         title:     "Movistar Plus+",
+         url:       "play.google.com/store/apps/details?id=es.plus.yomvi",
+         playReady: "log in",
       },
    },
    "5M+ Downloads": {

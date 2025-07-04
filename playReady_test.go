@@ -31,6 +31,27 @@ var key_tests = []struct {
       },
    },
    {
+      kid_wv: "154978ca206a4910b58a63896e1d7ba2",
+      key:    "88733937eb60a9620586c7b1024a1e98",
+      req: func(req *http.Request, home string) error {
+         data, err := os.ReadFile(home + "/media/itv/PlayReady")
+         if err != nil {
+            return err
+         }
+         req.Header.Set("authorization", "Bearer " + string(data))
+         req.URL = &url.URL{
+            Scheme: "https",
+            Path: "/playready/rightsmanager.asmx",
+            Host: "itvpnp.live.ott.irdeto.com",
+            RawQuery: url.Values{
+               "ContentId": {"10-5503-0001-001_22"},
+               "AccountId": {"itvpnp"},
+            }.Encode(),
+         }
+         return nil
+      },
+   },
+   {
       key:    "67376174a357f3ec9c1466055de9551d",
       // below is FHD (1920x1080), UHD needs SL3000
       kid_wv: "010521b274da1acbbd3c6f124a238c67",
@@ -177,6 +198,7 @@ func post(req *http.Request) ([]byte, error) {
    }
    return data, nil
 }
+
 func write_file(name string, data []byte) error {
    log.Println("WriteFile", name)
    return os.WriteFile(name, data, os.ModePerm)
@@ -191,7 +213,6 @@ var SL2000 = struct {
    g1:  "g1",
    z1:  "z1",
 }
-
 func TestLeaf(t *testing.T) {
    data, err := os.ReadFile(SL2000.dir + SL2000.g1)
    if err != nil {
@@ -221,4 +242,3 @@ func TestLeaf(t *testing.T) {
       t.Fatal(err)
    }
 }
-
