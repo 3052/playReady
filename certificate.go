@@ -21,6 +21,50 @@ func xorKey(a, b []byte) []byte {
    return c
 }
 
+func (c *Certificate) decode(data []byte) (int, error) {
+   // Copy the magic bytes and check for "CERT" signature.
+   n := copy(c.Magic[:], data)
+   if string(c.Magic[:]) != "CERT" {
+      return 0, errors.New("failed to find cert magic")
+   }
+   // Decode Version, Length, and LengthToSignature fields.
+   c.Version = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   c.Length = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   c.LengthToSignature = binary.BigEndian.Uint32(data[n:])
+   n += 4
+   for n < int(c.Length) {
+      var value Ftlv
+      bytesReadFromFtlv, err := value.decode(data[n:])
+      if err != nil {
+         return 0, err
+      }
+      switch value.Type {
+      case objTypeBasic: // 0x0001
+         c.Info = &CertificateInfo{}
+         c.Info.decode(value.Value)
+      case objTypeFeature: // 0x0005
+         c.Features = &value
+      case objTypeKey: // 0x0006
+         c.KeyInfo = &KeyInfo{}
+         c.KeyInfo.decode(value.Value)
+      case objTypeManufacturer: // 0x0007
+         c.Manufacturer = &value
+      case objTypeSignature: // 0x0008
+         c.Signature = &CertSignature{}
+         err := c.Signature.decode(value.Value)
+         if err != nil {
+            return 0, err
+         }
+      default:
+         return 0, errors.New("Ftlv.Type")
+      }
+      n += bytesReadFromFtlv
+   }
+   return n, nil // Return total bytes consumed and nil for no error
+}
+
 type Certificate struct {
    Magic             [4]byte          // bytes 0 - 3
    Version           uint32           // bytes 4 - 7
@@ -32,8 +76,6 @@ type Certificate struct {
    Manufacturer      *Ftlv            // type 7
    Signature         *CertSignature   // type 8
 }
-
-///
 
 func (c *Certificate) verify(pubK []byte) (bool, error) {
    if !bytes.Equal(c.Signature.IssuerKey, pubK) {
@@ -183,50 +225,6 @@ func (c *ContentKey) decode(data []byte) {
    c.Length = binary.BigEndian.Uint16(data)
    data = data[2:]
    c.Value = data
-}
-
-func (c *Certificate) decode(data []byte) (int, error) {
-   // Copy the magic bytes and check for "CERT" signature.
-   n := copy(c.Magic[:], data)
-   if string(c.Magic[:]) != "CERT" {
-      return 0, errors.New("failed to find cert magic")
-   }
-   // Decode Version, Length, and LengthToSignature fields.
-   c.Version = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   c.Length = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   c.LengthToSignature = binary.BigEndian.Uint32(data[n:])
-   n += 4
-   for n < int(c.Length) {
-      var value Ftlv
-      bytesReadFromFtlv, err := value.decode(data[n:])
-      if err != nil {
-         return 0, err
-      }
-      switch value.Type {
-      case objTypeBasic: // 0x0001
-         c.Info = &CertificateInfo{}
-         c.Info.decode(value.Value)
-      case objTypeFeature: // 0x0005
-         c.Features = &value
-      case objTypeKey: // 0x0006
-         c.KeyInfo = &KeyInfo{}
-         c.KeyInfo.decode(value.Value)
-      case objTypeManufacturer: // 0x0007
-         c.Manufacturer = &value
-      case objTypeSignature: // 0x0008
-         c.Signature = &CertSignature{}
-         err := c.Signature.decode(value.Value)
-         if err != nil {
-            return 0, err
-         }
-      default:
-         return 0, errors.New("Ftlv.Type")
-      }
-      n += bytesReadFromFtlv
-   }
-   return n, nil // Return total bytes consumed and nil for no error
 }
 
 type License struct {
