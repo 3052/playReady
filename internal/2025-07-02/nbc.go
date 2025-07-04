@@ -27,7 +27,7 @@ func (v *verify) New() error {
 
 type verify struct {
    Response struct {
-      Status string
+      Status    string
       SubStatus string `json:"sub_status"`
    }
 }
@@ -41,7 +41,7 @@ func main() {
    fmt.Printf("%+v\n", pontoon)
 }
 
-//{Response:{Status:valid SubStatus:alternate}}
+// {Response:{Status:valid SubStatus:alternate}}
 const address = "367@tuta.io"
 
 //url: "tempmail.best",
@@ -144,4 +144,3 @@ const address = "367@tuta.io"
 //https://ihotmails.com/ 可自定义前缀，按钮设计有待优化.
 //
 //igdux.com/tempmail)
-

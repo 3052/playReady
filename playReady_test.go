@@ -6,21 +6,21 @@ import (
    "errors"
    "io"
    "log"
+   "math/big"
    "net/http"
    "net/url"
    "os"
    "testing"
-   "math/big"
 )
 
 var key_tests = []struct {
-   key    string
-   kid_wv string
-   req func(*http.Request, string) error
+   key      string
+   kid_uuid string
+   req      func(*http.Request, string) error
 }{
    {
-      key:    "12b5853e5a54a79ab84aae29d8079283",
-      kid_wv: "20613c35d9cc4c1fa9b668182eb8fc77",
+      key:      "12b5853e5a54a79ab84aae29d8079283",
+      kid_uuid: "20613c35d9cc4c1fa9b668182eb8fc77",
       req: func(req *http.Request, home string) error {
          data, err := os.ReadFile(home + "/media/hulu/PlayReady")
          if err != nil {
@@ -31,8 +31,8 @@ var key_tests = []struct {
       },
    },
    {
-      kid_wv: "154978ca206a4910b58a63896e1d7ba2",
-      key:    "88733937eb60a9620586c7b1024a1e98",
+      kid_uuid: "154978ca206a4910b58a63896e1d7ba2",
+      key:      "88733937eb60a9620586c7b1024a1e98",
       req: func(req *http.Request, home string) error {
          data, err := os.ReadFile(home + "/media/itv/PlayReady")
          if err != nil {
@@ -43,9 +43,9 @@ var key_tests = []struct {
       },
    },
    {
-      key:    "67376174a357f3ec9c1466055de9551d",
+      key: "67376174a357f3ec9c1466055de9551d",
       // below is FHD (1920x1080), UHD needs SL3000
-      kid_wv: "010521b274da1acbbd3c6f124a238c67",
+      kid_uuid: "010521b274da1acbbd3c6f124a238c67",
       req: func(req *http.Request, home string) error {
          data, err := os.ReadFile(home + "/media/max/PlayReady")
          if err != nil {
@@ -56,8 +56,8 @@ var key_tests = []struct {
       },
    },
    {
-      kid_wv: "77890254eb7247ed9cc5680790b50a27",
-      key:    "98b703d07129b5f34136cec75954a8de",
+      kid_uuid: "77890254eb7247ed9cc5680790b50a27",
+      key:      "98b703d07129b5f34136cec75954a8de",
       req: func(req *http.Request, home string) error {
          data, err := os.ReadFile(home + "/media/nbc/PlayReady")
          if err != nil {
@@ -68,18 +68,18 @@ var key_tests = []struct {
       },
    },
    {
-      kid_wv: "5539d31134714041b4c1d362381b32d9",
-      key:    "9d948d2068ba795618f5e374e41b483f",
+      kid_uuid: "5539d31134714041b4c1d362381b32d9",
+      key:      "9d948d2068ba795618f5e374e41b483f",
       req: func(req *http.Request, home string) error {
          data, err := os.ReadFile(home + "/media/paramount/PlayReady")
          if err != nil {
             return err
          }
-         req.Header.Set("authorization", "Bearer " + string(data))
+         req.Header.Set("authorization", "Bearer "+string(data))
          req.URL = &url.URL{
             Scheme: "https",
-            Host: "cbsi.live.ott.irdeto.com",
-            Path: "/playready/rightsmanager.asmx",
+            Host:   "cbsi.live.ott.irdeto.com",
+            Path:   "/playready/rightsmanager.asmx",
             RawQuery: url.Values{
                "AccountId": {"cbsi"},
                "ContentId": {"tOeI0WHG3icuPhCk5nkLXNmi5c4Jfx41"},
@@ -89,8 +89,8 @@ var key_tests = []struct {
       },
    },
    {
-      key:    "ab82952e8b567a2359393201e4dde4b4",
-      kid_wv: "318f7ece69afcfe3e96de31be6b77272",
+      key:      "ab82952e8b567a2359393201e4dde4b4",
+      kid_uuid: "318f7ece69afcfe3e96de31be6b77272",
       req: func(req *http.Request, home string) error {
          data, err := os.ReadFile(home + "/media/rakuten/PlayReady")
          if err != nil {
@@ -101,13 +101,13 @@ var key_tests = []struct {
       },
    },
    {
-      key:    "00000000000000000000000000000000",
-      kid_wv: "10000000000000000000000000000000",
+      key:      "00000000000000000000000000000000",
+      kid_uuid: "10000000000000000000000000000000",
       req: func(req *http.Request, _ string) error {
          req.URL = &url.URL{
-            Scheme: "https",
-            Host: "test.playready.microsoft.com",
-            Path: "/service/rightsmanager.asmx",
+            Scheme:   "https",
+            Host:     "test.playready.microsoft.com",
+            Path:     "/service/rightsmanager.asmx",
             RawQuery: "cfg=ck:AAAAAAAAAAAAAAAAAAAAAA==,ckt:aescbc",
          }
          return nil
@@ -136,7 +136,7 @@ func TestKey(t *testing.T) {
    }
    signEncryptKey := new(big.Int).SetBytes(data)
    for _, test := range key_tests {
-      kid, err := hex.DecodeString(test.kid_wv)
+      kid, err := hex.DecodeString(test.kid_uuid)
       if err != nil {
          t.Fatal(err)
       }
@@ -164,7 +164,7 @@ func TestKey(t *testing.T) {
          t.Fatal(err)
       }
       UuidOrGuid(lic.ContentKey.KeyId[:])
-      if hex.EncodeToString(lic.ContentKey.KeyId[:]) != test.kid_wv {
+      if hex.EncodeToString(lic.ContentKey.KeyId[:]) != test.kid_uuid {
          t.Fatal(".KeyId")
       }
       if hex.EncodeToString(coord.Key()) != test.key {
@@ -204,6 +204,7 @@ var SL2000 = struct {
    g1:  "g1",
    z1:  "z1",
 }
+
 func TestLeaf(t *testing.T) {
    data, err := os.ReadFile(SL2000.dir + SL2000.g1)
    if err != nil {
