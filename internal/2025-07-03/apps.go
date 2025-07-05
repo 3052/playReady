@@ -41,12 +41,12 @@ var Details = map[string][]app{
          title:     "Paramount+",
          url:       "play.google.com/store/apps/details?id=com.cbs.app",
       },
-      /////////////////////////////////////////////////////////////////////////////////
       {
          title:     "ITVX",
          url:       "play.google.com/store/apps/details?id=air.ITVMobilePlayer",
          playReady: "sign in",
       },
+      /////////////////////////////////////////////////////////////////////////////////
       {
          title:     "CANAL+, Live and catch-up TV",
          url:       "play.google.com/store/apps/details?id=com.canal.android.canal",
