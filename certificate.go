@@ -5,8 +5,8 @@ import (
    "crypto/sha256"
    "encoding/binary"
    "encoding/hex"
-   "fmt"
    "errors"
+   "fmt"
    "github.com/arnaucube/cryptofun/ecc"
    "math/big"
 )
@@ -201,6 +201,7 @@ func (l *License) decode(data []byte) error {
    }
    return nil
 }
+
 // Constants for object types within the certificate structure.
 const (
    objTypeBasic            = 0x0001
@@ -317,10 +318,9 @@ type Certificate struct {
    Length            uint32           // 8:12
    LengthToSignature uint32           // 12:16
    Info              *CertificateInfo // 0x1
-   Security *Ftlv // 0x11
+   Security          *Ftlv            // 0x11
    Features          *Ftlv            // 0x5
    KeyInfo           *KeyInfo         // 0x6
    Manufacturer      *Ftlv            // 0x7
    Signature         *CertSignature   // 0x8
 }
-

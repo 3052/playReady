@@ -229,18 +229,18 @@ func TestLeaf(t *testing.T) {
 
 type device_config struct {
    folder string
-   g1  string
-   z1  string
+   g1     string
+   z1     string
 }
 
 var SL2000 = device_config{
    folder: "ignore/",
-   g1:  "g1",
-   z1:  "z1",
+   g1:     "g1",
+   z1:     "z1",
 }
 
 var SL3000 = device_config{
    folder: "ignore/",
-   g1:  "bgroupcert.dat",
-   z1:  "zgpriv.dat",
+   g1:     "bgroupcert.dat",
+   z1:     "zgpriv.dat",
 }
