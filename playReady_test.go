@@ -13,7 +13,7 @@ import (
    "testing"
 )
 
-var device = SL3000
+var device = SL2000
 
 var key_tests = []struct {
    key      string
