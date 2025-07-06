@@ -5,29 +5,17 @@ import (
    "crypto/sha256"
    "encoding/binary"
    "encoding/hex"
+   "fmt"
    "errors"
    "github.com/arnaucube/cryptofun/ecc"
    "math/big"
 )
 
-func xorKey(a, b []byte) []byte {
-   if len(a) != len(b) {
-      panic("slices have different lengths")
-   }
-   c := make([]byte, len(a))
-   for i := 0; i < len(a); i++ {
-      c[i] = a[i] ^ b[i]
-   }
-   return c
-}
-
 func (c *Certificate) decode(data []byte) (int, error) {
-   // Copy the magic bytes and check for "CERT" signature.
    n := copy(c.Magic[:], data)
    if string(c.Magic[:]) != "CERT" {
       return 0, errors.New("failed to find cert magic")
    }
-   // Decode Version, Length, and LengthToSignature fields.
    c.Version = binary.BigEndian.Uint32(data[n:])
    n += 4
    c.Length = binary.BigEndian.Uint32(data[n:])
@@ -58,7 +46,7 @@ func (c *Certificate) decode(data []byte) (int, error) {
             return 0, err
          }
       default:
-         return 0, errors.New("Ftlv.Type")
+         return 0, fmt.Errorf("unknown certificate object type: 0x%X", value.Type)
       }
       n += bytesReadFromFtlv
    }
@@ -237,7 +225,6 @@ type License struct {
    AuxKeys    *AuxKeys          // 4.9.81
    Signature  *LicenseSignature // 4.11
 }
-
 func (l *License) decode(data []byte) error {
    l.Magic = [4]byte(data)
    data = data[4:]
@@ -283,15 +270,26 @@ func (l *License) decode(data []byte) error {
                l.AuxKeys = &AuxKeys{}
                l.AuxKeys.decode(value3.Value)
             default:
-               return errors.New("Ftlv.type")
+               return fmt.Errorf("unknown key material entry type: %d", value3.Type)
             }
          }
       case signatureEntryType: // 11
          l.Signature = &LicenseSignature{}
          l.Signature.decode(value2.Value)
       default:
-         return errors.New("Ftlv.type")
+         return fmt.Errorf("unknown license container entry type: %d", value2.Type)
       }
    }
    return nil
+}
+
+func xorKey(a, b []byte) []byte {
+   if len(a) != len(b) {
+      panic("slices have different lengths")
+   }
+   c := make([]byte, len(a))
+   for i := 0; i < len(a); i++ {
+      c[i] = a[i] ^ b[i]
+   }
+   return c
 }

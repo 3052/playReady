@@ -28,4 +28,9 @@ then:
 
 ## contact
 
-367@tuta.io
+<dl>
+   <dt>email</dt>
+      <dd>367@tuta.io</dd>
+   <dt>Discord username</dt>
+      <dd>10308</dd>
+</dl>

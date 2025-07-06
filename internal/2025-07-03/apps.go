@@ -1,103 +1,112 @@
 package playReady
 
+type app struct {
+   url   string
+   title string
+   rank  string
+   drm   string
+}
+
 var Details = map[string][]app{
    "100M+ Downloads": {
       {
-         playReady: "clearKey",
-         title:     "Tubi: Free Movies & Live TV",
-         url:       "play.google.com/store/apps/details?id=com.tubitv",
+         url:   "play.google.com/store/apps/details?id=com.tubitv",
+         title: "Tubi: Free Movies & Live TV",
+         rank:  "#4 top free entertainment",
+         drm:   "clearKey",
       },
       {
-         playReady: "there is an error with this content",
-         title:     "PlutoTV: Live TV & Free Movies",
-         url:       "play.google.com/store/apps/details?id=tv.pluto.android",
+         url:   "play.google.com/store/apps/details?id=tv.pluto.android",
+         title: "PlutoTV: Live TV & Free Movies",
+         rank:  "#9 top free entertainment",
+         drm:   "there is an error with this content",
       },
       {
-         playReady: "sign up now",
-         title:     "Max: Stream HBO, TV, & Movies",
-         url:       "play.google.com/store/apps/details?id=com.wbd.stream",
+         url:   "play.google.com/store/apps/details?id=com.wbd.stream",
+         title: "Max: Stream HBO, TV, & Movies",
+         rank:  "#1 top grossing entertainment",
       },
    },
    "50M+ Downloads": {
       {
-         playReady: "there was an error loading the video",
-         title:     "Plex: Stream Movies & TV",
-         url:       "play.google.com/store/apps/details?id=com.plexapp.android",
+         drm:   "there was an error loading the video",
+         title: "Plex: Stream Movies & TV",
+         url:   "play.google.com/store/apps/details?id=com.plexapp.android",
       },
       {
-         playReady: "sign up now",
-         title:     "Hulu: Stream TV shows & movies",
-         url:       "play.google.com/store/apps/details?id=com.hulu.plus",
+         drm:   "sign up now",
+         title: "Hulu: Stream TV shows & movies",
+         url:   "play.google.com/store/apps/details?id=com.hulu.plus",
       },
    },
    "10M+ Downloads": {
       {
-         playReady: "login",
-         title:     "The NBC App - Stream TV Shows",
-         url:       "play.google.com/store/apps/details?id=com.nbcuni.nbc",
+         drm:   "login",
+         title: "The NBC App - Stream TV Shows",
+         url:   "play.google.com/store/apps/details?id=com.nbcuni.nbc",
       },
       {
-         playReady: "sign in",
-         title:     "Paramount+",
-         url:       "play.google.com/store/apps/details?id=com.cbs.app",
+         drm:   "sign in",
+         title: "Paramount+",
+         url:   "play.google.com/store/apps/details?id=com.cbs.app",
       },
       {
-         title:     "ITVX",
-         url:       "play.google.com/store/apps/details?id=air.ITVMobilePlayer",
-         playReady: "sign in",
+         title: "ITVX",
+         url:   "play.google.com/store/apps/details?id=air.ITVMobilePlayer",
+         drm:   "sign in",
       },
       /////////////////////////////////////////////////////////////////////////////////
       {
-         title:     "CANAL+, Live and catch-up TV",
-         url:       "play.google.com/store/apps/details?id=com.canal.android.canal",
-         playReady: "register",
+         title: "CANAL+, Live and catch-up TV",
+         url:   "play.google.com/store/apps/details?id=com.canal.android.canal",
+         drm:   "register",
       },
       {
-         title:     "Molotov - TV en direct, replay",
-         url:       "play.google.com/store/apps/details?id=tv.molotov.app",
-         playReady: "available in a fee-paying option",
+         title: "Molotov - TV en direct, replay",
+         url:   "play.google.com/store/apps/details?id=tv.molotov.app",
+         drm:   "available in a fee-paying option",
       },
       {
-         title:     "Movistar Plus+",
-         url:       "play.google.com/store/apps/details?id=es.plus.yomvi",
-         playReady: "log in",
+         title: "Movistar Plus+",
+         url:   "play.google.com/store/apps/details?id=es.plus.yomvi",
+         drm:   "log in",
       },
    },
    "5M+ Downloads": {
       {
-         playReady: "log in",
-         title:     "MUBI: Curated Cinema",
-         url:       "play.google.com/store/apps/details?id=com.mubi",
+         drm:   "log in",
+         title: "MUBI: Curated Cinema",
+         url:   "play.google.com/store/apps/details?id=com.mubi",
       },
       {
-         playReady: "web client need residential proxy, license does not",
-         title:     "Rakuten TV -Movies & TV Series",
-         url:       "play.google.com/store/apps/details?id=tv.wuaki",
+         drm:   "web client need residential proxy, license does not",
+         title: "Rakuten TV -Movies & TV Series",
+         url:   "play.google.com/store/apps/details?id=tv.wuaki",
       },
    },
    "1M+ Downloads": {
       {
-         playReady: "to see this content, log in",
-         title:     "RTBF Auvio : direct et replay",
-         url:       "play.google.com/store/apps/details?id=be.rtbf.auvio",
+         drm:   "to see this content, log in",
+         title: "RTBF Auvio : direct et replay",
+         url:   "play.google.com/store/apps/details?id=be.rtbf.auvio",
       },
       {
-         playReady: "sign up now",
-         title:     "AMC+",
-         url:       "play.google.com/store/apps/details?id=com.amcplus.amcfullepisodes",
+         drm:   "sign up now",
+         title: "AMC+",
+         url:   "play.google.com/store/apps/details?id=com.amcplus.amcfullepisodes",
       },
       {
-         playReady: "log in",
-         title:     "Kanopy",
-         url:       "play.google.com/store/apps/details?id=com.kanopy",
+         drm:   "log in",
+         title: "Kanopy",
+         url:   "play.google.com/store/apps/details?id=com.kanopy",
       },
       {
-         playReady: "failed to load response data",
-         title:     "The Roku Channel",
-         url:       "play.google.com/store/apps/details?id=com.roku.web.trc",
+         drm:   "failed to load response data",
+         title: "The Roku Channel",
+         url:   "play.google.com/store/apps/details?id=com.roku.web.trc",
       },
       {
-         playReady: `they keep two copies of all content, so PR key is different
+         drm: `they keep two copies of all content, so PR key is different
          from WV key`,
          title: "CTV",
          url:   "play.google.com/store/apps/details?id=ca.ctv.ctvgo",
@@ -105,27 +114,21 @@ var Details = map[string][]app{
    },
    "100K+ Downloads": {
       {
-         playReady: "subscribe",
-         title:     "The Criterion Channel",
-         url:       "play.google.com/store/apps/details?id=com.criterionchannel",
+         drm:   "subscribe",
+         title: "The Criterion Channel",
+         url:   "play.google.com/store/apps/details?id=com.criterionchannel",
       },
    },
    "10K+ Downloads": {
       {
-         playReady: "log in",
-         title:     "CineMember",
-         url:       "play.google.com/store/apps/details?id=nl.peoplesplayground.audienceplayer.cinemember",
+         drm:   "log in",
+         title: "CineMember",
+         url:   "play.google.com/store/apps/details?id=nl.peoplesplayground.audienceplayer.cinemember",
       },
       {
-         playReady: "join",
-         title:     "Draken Film",
-         url:       "play.google.com/store/apps/details?id=com.draken.android",
+         drm:   "join",
+         title: "Draken Film",
+         url:   "play.google.com/store/apps/details?id=com.draken.android",
       },
    },
-}
-
-type app struct {
-   playReady string
-   title     string
-   url       string
 }

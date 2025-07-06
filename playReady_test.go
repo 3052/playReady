@@ -13,6 +13,8 @@ import (
    "testing"
 )
 
+var device = SL3000
+
 var key_tests = []struct {
    key      string
    kid_uuid string
@@ -117,7 +119,7 @@ var key_tests = []struct {
 
 func TestKey(t *testing.T) {
    log.SetFlags(log.Ltime)
-   data, err := os.ReadFile(SL2000.dir + "certificate")
+   data, err := os.ReadFile(device.folder + "certificate")
    if err != nil {
       t.Fatal(err)
    }
@@ -130,7 +132,7 @@ func TestKey(t *testing.T) {
    if err != nil {
       t.Fatal(err)
    }
-   data, err = os.ReadFile(SL2000.dir + "signEncryptKey")
+   data, err = os.ReadFile(device.folder + "signEncryptKey")
    if err != nil {
       t.Fatal(err)
    }
@@ -158,13 +160,13 @@ func TestKey(t *testing.T) {
       if err != nil {
          t.Fatal(err)
       }
-      var lic License
-      coord, err := lic.Decrypt(data, signEncryptKey)
+      var newLicense License
+      coord, err := newLicense.Decrypt(data, signEncryptKey)
       if err != nil {
          t.Fatal(err)
       }
-      UuidOrGuid(lic.ContentKey.KeyId[:])
-      if hex.EncodeToString(lic.ContentKey.KeyId[:]) != test.kid_uuid {
+      UuidOrGuid(newLicense.ContentKey.KeyId[:])
+      if hex.EncodeToString(newLicense.ContentKey.KeyId[:]) != test.kid_uuid {
          t.Fatal(".KeyId")
       }
       if hex.EncodeToString(coord.Key()) != test.key {
@@ -195,18 +197,8 @@ func write_file(name string, data []byte) error {
    return os.WriteFile(name, data, os.ModePerm)
 }
 
-var SL2000 = struct {
-   dir string
-   g1  string
-   z1  string
-}{
-   dir: "ignore/",
-   g1:  "g1",
-   z1:  "z1",
-}
-
 func TestLeaf(t *testing.T) {
-   data, err := os.ReadFile(SL2000.dir + SL2000.g1)
+   data, err := os.ReadFile(device.folder + device.g1)
    if err != nil {
       t.Fatal(err)
    }
@@ -215,7 +207,7 @@ func TestLeaf(t *testing.T) {
    if err != nil {
       t.Fatal(err)
    }
-   data, err = os.ReadFile(SL2000.dir + SL2000.z1)
+   data, err = os.ReadFile(device.folder + device.z1)
    if err != nil {
       t.Fatal(err)
    }
@@ -225,12 +217,30 @@ func TestLeaf(t *testing.T) {
    if err != nil {
       t.Fatal(err)
    }
-   err = write_file(SL2000.dir+"certificate", certificate.Encode())
+   err = write_file(device.folder+"certificate", certificate.Encode())
    if err != nil {
       t.Fatal(err)
    }
-   err = write_file(SL2000.dir+"signEncryptKey", signEncryptKey.Bytes())
+   err = write_file(device.folder+"signEncryptKey", signEncryptKey.Bytes())
    if err != nil {
       t.Fatal(err)
    }
+}
+
+type device_config struct {
+   folder string
+   g1  string
+   z1  string
+}
+
+var SL2000 = device_config{
+   folder: "ignore/",
+   g1:  "g1",
+   z1:  "z1",
+}
+
+var SL3000 = device_config{
+   folder: "ignore/",
+   g1:  "bgroupcert.dat",
+   z1:  "zgpriv.dat",
 }
