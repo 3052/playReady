@@ -11,6 +11,19 @@ import (
    "math/big"
 )
 
+type Certificate struct {
+   Magic             [4]byte          // 0:4
+   Version           uint32           // 4:8
+   Length            uint32           // 8:12
+   LengthToSignature uint32           // 12:16
+   Info              *CertificateInfo // 0x1
+   Security          *Ftlv            // 0x11
+   Features          *Ftlv            // 0x5
+   KeyInfo           *KeyInfo         // 0x6
+   Manufacturer      *Ftlv            // 0x7
+   Signature         *CertSignature   // 0x8
+}
+
 func (c *Certificate) decode(data []byte) (int, error) {
    n := copy(c.Magic[:], data)
    if string(c.Magic[:]) != "CERT" {
@@ -310,17 +323,4 @@ func (c *Certificate) Append(data []byte) []byte {
       data = c.Signature.ftlv(0, 8).Append(data)
    }
    return data
-}
-
-type Certificate struct {
-   Magic             [4]byte          // 0:4
-   Version           uint32           // 4:8
-   Length            uint32           // 8:12
-   LengthToSignature uint32           // 12:16
-   Info              *CertificateInfo // 0x1
-   Security          *Ftlv            // 0x11
-   Features          *Ftlv            // 0x5
-   KeyInfo           *KeyInfo         // 0x6
-   Manufacturer      *Ftlv            // 0x7
-   Signature         *CertSignature   // 0x8
 }
