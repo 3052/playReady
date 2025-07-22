@@ -32,6 +32,17 @@ const (
    objTypeSecurityVersion2 = 0x0011
 )
 
+func xorKey(a, b []byte) []byte {
+   if len(a) != len(b) {
+      panic("slices have different lengths")
+   }
+   c := make([]byte, len(a))
+   for i := 0; i < len(a); i++ {
+      c[i] = a[i] ^ b[i]
+   }
+   return c
+}
+
 type Certificate struct {
    Magic             [4]byte          // 0:4
    Version           uint32           // 4:8
@@ -237,17 +248,6 @@ func (l *License) decode(data []byte) error {
 }
 
 ///
-
-func xorKey(a, b []byte) []byte {
-   if len(a) != len(b) {
-      panic("slices have different lengths")
-   }
-   c := make([]byte, len(a))
-   for i := 0; i < len(a); i++ {
-      c[i] = a[i] ^ b[i]
-   }
-   return c
-}
 
 func (c *Certificate) verify(pubK []byte) (bool, error) {
    if !bytes.Equal(c.Signature.IssuerKey, pubK) {
