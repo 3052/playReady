@@ -43,6 +43,84 @@ func xorKey(a, b []byte) []byte {
    return c
 }
 
+func (c *Certificate) verify(pubK []byte) (bool, error) {
+   if !bytes.Equal(c.Signature.IssuerKey, pubK) {
+      return false, nil
+   }
+   hashVal := func() *big.Int {
+      data := c.Append(nil)
+      data = data[:c.LengthToSignature]
+      sum := sha256.Sum256(data)
+      return new(big.Int).SetBytes(sum[:])
+   }()
+   sign := c.Signature.Signature
+   return p256().dsa().Verify(
+      hashVal,
+      [2]*big.Int{
+         new(big.Int).SetBytes(sign[:32]),
+         new(big.Int).SetBytes(sign[32:]),
+      },
+      ecc.Point{
+         X: new(big.Int).SetBytes(pubK[:32]),
+         Y: new(big.Int).SetBytes(pubK[32:]),
+      },
+   )
+}
+
+func (c *Certificate) size() (uint32, uint32) {
+   n := len(c.Magic)
+   n += 4 // Version
+   n += 4 // Length
+   n += 4 // LengthToSignature
+   if c.Info != nil {
+      n += new(Ftlv).size()
+      n += binary.Size(c.Info)
+   }
+   if c.Security != nil {
+      n += c.Security.size()
+   }
+   if c.Features != nil {
+      n += c.Features.size()
+   }
+   if c.KeyInfo != nil {
+      n += new(Ftlv).size()
+      n += c.KeyInfo.size()
+   }
+   if c.Manufacturer != nil {
+      n += c.Manufacturer.size()
+   }
+   n1 := n
+   n1 += new(Ftlv).size()
+   n1 += c.Signature.size()
+   return uint32(n), uint32(n1)
+}
+
+func (c *Certificate) Append(data []byte) []byte {
+   data = append(data, c.Magic[:]...)
+   data = binary.BigEndian.AppendUint32(data, c.Version)
+   data = binary.BigEndian.AppendUint32(data, c.Length)
+   data = binary.BigEndian.AppendUint32(data, c.LengthToSignature)
+   if c.Info != nil {
+      data = c.Info.ftlv(1, 1).Append(data)
+   }
+   if c.Security != nil {
+      data = c.Security.Append(data)
+   }
+   if c.Features != nil {
+      data = c.Features.Append(data)
+   }
+   if c.KeyInfo != nil {
+      data = c.KeyInfo.ftlv(1, 6).Append(data)
+   }
+   if c.Manufacturer != nil {
+      data = c.Manufacturer.Append(data)
+   }
+   if c.Signature != nil {
+      data = c.Signature.ftlv(0, 8).Append(data)
+   }
+   return data
+}
+
 type Certificate struct {
    Magic             [4]byte          // 0:4
    Version           uint32           // 4:8
@@ -245,84 +323,4 @@ func (l *License) decode(data []byte) error {
       }
    }
    return nil
-}
-
-///
-
-func (c *Certificate) verify(pubK []byte) (bool, error) {
-   if !bytes.Equal(c.Signature.IssuerKey, pubK) {
-      return false, nil
-   }
-   hashVal := func() *big.Int {
-      data := c.Append(nil)
-      data = data[:c.LengthToSignature]
-      sum := sha256.Sum256(data)
-      return new(big.Int).SetBytes(sum[:])
-   }()
-   sign := c.Signature.Signature
-   return p256().dsa().Verify(
-      hashVal,
-      [2]*big.Int{
-         new(big.Int).SetBytes(sign[:32]),
-         new(big.Int).SetBytes(sign[32:]),
-      },
-      ecc.Point{
-         X: new(big.Int).SetBytes(pubK[:32]),
-         Y: new(big.Int).SetBytes(pubK[32:]),
-      },
-   )
-}
-
-func (c *Certificate) size() (uint32, uint32) {
-   n := len(c.Magic)
-   n += 4 // Version
-   n += 4 // Length
-   n += 4 // LengthToSignature
-   if c.Info != nil {
-      n += new(Ftlv).size()
-      n += binary.Size(c.Info)
-   }
-   if c.Security != nil {
-      n += c.Security.size()
-   }
-   if c.Features != nil {
-      n += c.Features.size()
-   }
-   if c.KeyInfo != nil {
-      n += new(Ftlv).size()
-      n += c.KeyInfo.size()
-   }
-   if c.Manufacturer != nil {
-      n += c.Manufacturer.size()
-   }
-   n1 := n
-   n1 += new(Ftlv).size()
-   n1 += c.Signature.size()
-   return uint32(n), uint32(n1)
-}
-
-func (c *Certificate) Append(data []byte) []byte {
-   data = append(data, c.Magic[:]...)
-   data = binary.BigEndian.AppendUint32(data, c.Version)
-   data = binary.BigEndian.AppendUint32(data, c.Length)
-   data = binary.BigEndian.AppendUint32(data, c.LengthToSignature)
-   if c.Info != nil {
-      data = c.Info.ftlv(1, 1).Append(data)
-   }
-   if c.Security != nil {
-      data = c.Security.Append(data)
-   }
-   if c.Features != nil {
-      data = c.Features.Append(data)
-   }
-   if c.KeyInfo != nil {
-      data = c.KeyInfo.ftlv(1, 6).Append(data)
-   }
-   if c.Manufacturer != nil {
-      data = c.Manufacturer.Append(data)
-   }
-   if c.Signature != nil {
-      data = c.Signature.ftlv(0, 8).Append(data)
-   }
-   return data
 }
