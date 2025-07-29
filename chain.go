@@ -24,6 +24,16 @@ func wmrmPublicKey() *ecc.Point {
    return &p
 }
 
+func sign(hashVal []byte, privK *big.Int) ([]byte, error) {
+   rs, err := p256().dsa().Sign(
+      new(big.Int).SetBytes(hashVal), privK, big.NewInt(1),
+   )
+   if err != nil {
+      return nil, err
+   }
+   return append(rs[0].Bytes(), rs[1].Bytes()...), nil
+}
+
 // nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-4.pdf
 func p256() *curve {
    var c curve
@@ -35,15 +45,7 @@ func p256() *curve {
    return &c
 }
 
-func sign(hashVal []byte, privK *big.Int) ([]byte, error) {
-   rs, err := p256().dsa().Sign(
-      new(big.Int).SetBytes(hashVal), privK, big.NewInt(1),
-   )
-   if err != nil {
-      return nil, err
-   }
-   return append(rs[0].Bytes(), rs[1].Bytes()...), nil
-}
+///
 
 func elGamalDecrypt(data []byte, privK *big.Int) ([]byte, error) {
    // Unmarshal C1 component
