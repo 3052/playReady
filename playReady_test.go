@@ -21,6 +21,27 @@ var key_tests = []struct {
    req      func(*http.Request, string) error
 }{
    {
+      kid_uuid: "b70c0730222846d6884befdc96186cf4",
+      key:      "3bc167f72090d429d8f3f987686f1127",
+      req: func(req *http.Request, home string) error {
+         data, err := os.ReadFile(home + "/media/paramount/PlayReady")
+         if err != nil {
+            return err
+         }
+         req.Header.Set("authorization", "Bearer "+string(data))
+         req.URL = &url.URL{
+            Scheme: "https",
+            Host:   "cbsi.live.ott.irdeto.com",
+            Path:   "/playready/rightsmanager.asmx",
+            RawQuery: url.Values{
+               "AccountId": {"cbsi"},
+               "ContentId": {"wjQ4RChi6BHHu4MVTncppVuCwu44uq2Q"},
+            }.Encode(),
+         }
+         return nil
+      },
+   },
+   {
       key:      "12b5853e5a54a79ab84aae29d8079283",
       kid_uuid: "20613c35d9cc4c1fa9b668182eb8fc77",
       req: func(req *http.Request, home string) error {
@@ -67,27 +88,6 @@ var key_tests = []struct {
          }
          req.URL, err = url.Parse(string(data))
          return err
-      },
-   },
-   {
-      kid_uuid: "5539d31134714041b4c1d362381b32d9",
-      key:      "9d948d2068ba795618f5e374e41b483f",
-      req: func(req *http.Request, home string) error {
-         data, err := os.ReadFile(home + "/media/paramount/PlayReady")
-         if err != nil {
-            return err
-         }
-         req.Header.Set("authorization", "Bearer "+string(data))
-         req.URL = &url.URL{
-            Scheme: "https",
-            Host:   "cbsi.live.ott.irdeto.com",
-            Path:   "/playready/rightsmanager.asmx",
-            RawQuery: url.Values{
-               "AccountId": {"cbsi"},
-               "ContentId": {"tOeI0WHG3icuPhCk5nkLXNmi5c4Jfx41"},
-            }.Encode(),
-         }
-         return nil
       },
    },
    {
