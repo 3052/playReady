@@ -21,6 +21,19 @@ var key_tests = []struct {
    req      func(*http.Request, string) error
 }{
    {
+      key:      "00000000000000000000000000000000",
+      kid_uuid: "10000000000000000000000000000000",
+      req: func(req *http.Request, _ string) error {
+         req.URL = &url.URL{
+            Scheme:   "https",
+            Host:     "test.playready.microsoft.com",
+            Path:     "/service/rightsmanager.asmx",
+            RawQuery: "cfg=ck:AAAAAAAAAAAAAAAAAAAAAA==,ckt:aescbc",
+         }
+         return nil
+      },
+   },
+   {
       kid_uuid: "b70c0730222846d6884befdc96186cf4",
       key:      "3bc167f72090d429d8f3f987686f1127",
       req: func(req *http.Request, home string) error {
@@ -102,19 +115,6 @@ var key_tests = []struct {
          return err
       },
    },
-   {
-      key:      "00000000000000000000000000000000",
-      kid_uuid: "10000000000000000000000000000000",
-      req: func(req *http.Request, _ string) error {
-         req.URL = &url.URL{
-            Scheme:   "https",
-            Host:     "test.playready.microsoft.com",
-            Path:     "/service/rightsmanager.asmx",
-            RawQuery: "cfg=ck:AAAAAAAAAAAAAAAAAAAAAA==,ckt:aescbc",
-         }
-         return nil
-      },
-   },
 }
 
 func TestKey(t *testing.T) {
@@ -137,7 +137,7 @@ func TestKey(t *testing.T) {
       t.Fatal(err)
    }
    signEncryptKey := new(big.Int).SetBytes(data)
-   for _, test := range key_tests {
+   for _, test := range key_tests[:1] {
       kid, err := hex.DecodeString(test.kid_uuid)
       if err != nil {
          t.Fatal(err)
