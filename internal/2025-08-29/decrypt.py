@@ -55,8 +55,8 @@ def oem_aes_128_kdf_ctr(deriver_key_hex: str, label_key_hex: str, context_hex: s
     return cmac.digest()
 
 # # Read the ciphertext
-#with open('zgpriv_protected.dat', 'rb') as f:
-with open('stage-1.dat', 'rb') as f:
+with open('zgpriv_protected.dat', 'rb') as f:
+#with open('stage-1.dat', 'rb') as f:
    ciphertext = f.read()
    # FOR 176 ONLY
    # DO ECB FIRST
