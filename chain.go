@@ -45,8 +45,6 @@ func p256() *curve {
    return &c
 }
 
-///
-
 func elGamalDecrypt(data []byte, privK *big.Int) ([]byte, error) {
    // Unmarshal C1 component
    c1 := ecc.Point{
