@@ -24,34 +24,6 @@ func wmrmPublicKey() *ecc.Point {
    return &p
 }
 
-func sign(hashVal []byte, privK *big.Int) ([]byte, error) {
-   rs, err := p256().dsa().Sign(
-      new(big.Int).SetBytes(hashVal), privK, big.NewInt(1),
-   )
-   if err != nil {
-      return nil, err
-   }
-   return append(rs[0].Bytes(), rs[1].Bytes()...), nil
-}
-
-func elGamalDecrypt(data []byte, privK *big.Int) ([]byte, error) {
-   // Unmarshal C1 component
-   c1 := ecc.Point{
-      X: new(big.Int).SetBytes(data[:32]),
-      Y: new(big.Int).SetBytes(data[32:64]),
-   }
-   // Unmarshal C2 component
-   c2 := ecc.Point{
-      X: new(big.Int).SetBytes(data[64:96]),
-      Y: new(big.Int).SetBytes(data[96:]),
-   }
-   point, err := p256().eg().Decrypt([2]ecc.Point{c1, c2}, privK)
-   if err != nil {
-      return nil, err
-   }
-   return append(point.X.Bytes(), point.Y.Bytes()...), nil
-}
-
 // nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-4.pdf
 func p256() *curve {
    var c curve
@@ -63,7 +35,11 @@ func p256() *curve {
    return &c
 }
 
-///
+type curve struct {
+   EC ecc.EC
+   G  ecc.Point
+   N  *big.Int
+}
 
 func elGamalEncrypt(m, pubK *ecc.Point) ([]byte, error) {
    c, err := p256().eg().Encrypt(*m, *pubK, big.NewInt(1))
@@ -410,8 +386,30 @@ func (c *curve) eg() *elgamal.EG {
    return (*elgamal.EG)(c)
 }
 
-type curve struct {
-   EC ecc.EC
-   G  ecc.Point
-   N  *big.Int
+func sign(hashVal []byte, privK *big.Int) ([]byte, error) {
+   rs, err := p256().dsa().Sign(
+      new(big.Int).SetBytes(hashVal), privK, big.NewInt(1),
+   )
+   if err != nil {
+      return nil, err
+   }
+   return append(rs[0].Bytes(), rs[1].Bytes()...), nil
+}
+
+func elGamalDecrypt(data []byte, privK *big.Int) ([]byte, error) {
+   // Unmarshal C1 component
+   c1 := ecc.Point{
+      X: new(big.Int).SetBytes(data[:32]),
+      Y: new(big.Int).SetBytes(data[32:64]),
+   }
+   // Unmarshal C2 component
+   c2 := ecc.Point{
+      X: new(big.Int).SetBytes(data[64:96]),
+      Y: new(big.Int).SetBytes(data[96:]),
+   }
+   point, err := p256().eg().Decrypt([2]ecc.Point{c1, c2}, privK)
+   if err != nil {
+      return nil, err
+   }
+   return append(point.X.Bytes(), point.Y.Bytes()...), nil
 }

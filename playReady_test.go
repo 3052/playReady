@@ -10,8 +10,24 @@ import (
    "net/http"
    "net/url"
    "os"
+   "slices"
    "testing"
 )
+
+func TestWmrm(t *testing.T) {
+   c, err := p256().eg().Encrypt(
+      p256().G,
+      *wmrmPublicKey(),
+      big.NewInt(1),
+   )
+   if err != nil {
+      t.Fatal(err)
+   }
+   data := slices.Concat(
+      c[0].X.Bytes(), c[0].Y.Bytes(), c[1].X.Bytes(), c[1].Y.Bytes(),
+   )
+   log.Printf("%x\n", data)
+}
 
 var device = SL2000
 
