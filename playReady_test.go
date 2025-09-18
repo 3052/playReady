@@ -14,19 +14,62 @@ import (
    "testing"
 )
 
-func TestWmrm(t *testing.T) {
-   c, err := p256().eg().Encrypt(
-      p256().G,
-      *wmrmPublicKey(),
-      big.NewInt(1),
-   )
+func TestKey(t *testing.T) {
+   log.SetFlags(log.Ltime)
+   data, err := os.ReadFile(device.folder + "certificate")
    if err != nil {
       t.Fatal(err)
    }
-   data := slices.Concat(
-      c[0].X.Bytes(), c[0].Y.Bytes(), c[1].X.Bytes(), c[1].Y.Bytes(),
-   )
-   log.Printf("%x\n", data)
+   var certificate Chain
+   err = certificate.Decode(data)
+   if err != nil {
+      t.Fatal(err)
+   }
+   home, err := os.UserHomeDir()
+   if err != nil {
+      t.Fatal(err)
+   }
+   data, err = os.ReadFile(device.folder + "signEncryptKey")
+   if err != nil {
+      t.Fatal(err)
+   }
+   signEncryptKey := new(big.Int).SetBytes(data)
+   for _, test := range key_tests[:1] {
+      kid, err := hex.DecodeString(test.kid_uuid)
+      if err != nil {
+         t.Fatal(err)
+      }
+      UuidOrGuid(kid)
+      data, err = certificate.RequestBody(kid, signEncryptKey)
+      if err != nil {
+         t.Fatal(err)
+      }
+      req, err := http.NewRequest("POST", "", bytes.NewReader(data))
+      if err != nil {
+         t.Fatal(err)
+      }
+      err = test.req(req, home)
+      if err != nil {
+         t.Fatal(err)
+      }
+      log.Print(req.URL)
+      data, err = post(req)
+      if err != nil {
+         t.Fatal(err)
+      }
+      var licenseVar License
+      coord, err := licenseVar.Decrypt(data, signEncryptKey)
+      if err != nil {
+         t.Fatal(err)
+      }
+      UuidOrGuid(licenseVar.ContentKey.KeyId[:])
+      if hex.EncodeToString(licenseVar.ContentKey.KeyId[:]) != test.kid_uuid {
+         t.Fatal(".KeyId")
+      }
+      if hex.EncodeToString(coord.Key()) != test.key {
+         t.Fatal(".Key")
+      }
+   }
 }
 
 var device = SL2000
@@ -131,64 +174,6 @@ var key_tests = []struct {
          return err
       },
    },
-}
-
-func TestKey(t *testing.T) {
-   log.SetFlags(log.Ltime)
-   data, err := os.ReadFile(device.folder + "certificate")
-   if err != nil {
-      t.Fatal(err)
-   }
-   var certificate Chain
-   err = certificate.Decode(data)
-   if err != nil {
-      t.Fatal(err)
-   }
-   home, err := os.UserHomeDir()
-   if err != nil {
-      t.Fatal(err)
-   }
-   data, err = os.ReadFile(device.folder + "signEncryptKey")
-   if err != nil {
-      t.Fatal(err)
-   }
-   signEncryptKey := new(big.Int).SetBytes(data)
-   for _, test := range key_tests[:1] {
-      kid, err := hex.DecodeString(test.kid_uuid)
-      if err != nil {
-         t.Fatal(err)
-      }
-      UuidOrGuid(kid)
-      data, err = certificate.RequestBody(kid, signEncryptKey)
-      if err != nil {
-         t.Fatal(err)
-      }
-      req, err := http.NewRequest("POST", "", bytes.NewReader(data))
-      if err != nil {
-         t.Fatal(err)
-      }
-      err = test.req(req, home)
-      if err != nil {
-         t.Fatal(err)
-      }
-      log.Print(req.URL)
-      data, err = post(req)
-      if err != nil {
-         t.Fatal(err)
-      }
-      var licenseVar License
-      coord, err := licenseVar.Decrypt(data, signEncryptKey)
-      if err != nil {
-         t.Fatal(err)
-      }
-      UuidOrGuid(licenseVar.ContentKey.KeyId[:])
-      if hex.EncodeToString(licenseVar.ContentKey.KeyId[:]) != test.kid_uuid {
-         t.Fatal(".KeyId")
-      }
-      if hex.EncodeToString(coord.Key()) != test.key {
-         t.Fatal(".Key")
-      }
-   }
 }
 
 func post(req *http.Request) ([]byte, error) {
