@@ -13,115 +13,6 @@ import (
    "testing"
 )
 
-//var device = SL2000
-var device = SL3000
-
-func TestLeaf(t *testing.T) {
-   data, err := os.ReadFile(device.folder + device.g1)
-   if err != nil {
-      t.Fatal(err)
-   }
-   var certificate Chain
-   err = certificate.Decode(data)
-   if err != nil {
-      t.Fatal(err)
-   }
-   data, err = os.ReadFile(device.folder + device.z1)
-   if err != nil {
-      t.Fatal(err)
-   }
-   z1 := new(big.Int).SetBytes(data)
-   signEncryptKey := big.NewInt('!')
-   err = certificate.Leaf(z1, signEncryptKey)
-   if err != nil {
-      t.Fatal(err)
-   }
-   err = write_file(device.folder+"certificate", certificate.Encode())
-   if err != nil {
-      t.Fatal(err)
-   }
-   err = write_file(device.folder+"signEncryptKey", signEncryptKey.Bytes())
-   if err != nil {
-      t.Fatal(err)
-   }
-}
-
-type device_config struct {
-   folder string
-   g1     string
-   z1     string
-}
-
-var SL2000 = device_config{
-   folder: "ignore/",
-   g1:     "g1",
-   z1:     "z1",
-}
-
-var SL3000 = device_config{
-   folder: "ignore/",
-   g1:     "bgroupcert.dat",
-   z1:     "zgpriv.dat",
-}
-
-func TestKey(t *testing.T) {
-   log.SetFlags(log.Ltime)
-   data, err := os.ReadFile(device.folder + "certificate")
-   if err != nil {
-      t.Fatal(err)
-   }
-   var certificate Chain
-   err = certificate.Decode(data)
-   if err != nil {
-      t.Fatal(err)
-   }
-   home, err := os.UserHomeDir()
-   if err != nil {
-      t.Fatal(err)
-   }
-   data, err = os.ReadFile(device.folder + "signEncryptKey")
-   if err != nil {
-      t.Fatal(err)
-   }
-   signEncryptKey := new(big.Int).SetBytes(data)
-   for _, test := range key_tests[:1] {
-      kid, err := hex.DecodeString(test.kid_uuid)
-      if err != nil {
-         t.Fatal(err)
-      }
-      UuidOrGuid(kid)
-      data, err = certificate.RequestBody(kid, signEncryptKey)
-      if err != nil {
-         t.Fatal(err)
-      }
-      req, err := http.NewRequest("POST", "", bytes.NewReader(data))
-      if err != nil {
-         t.Fatal(err)
-      }
-      err = test.req(req, home)
-      if err != nil {
-         t.Fatal(err)
-      }
-      log.Print(req.URL)
-      data, err = post(req)
-      if err != nil {
-         t.Fatal(err)
-      }
-      var licenseVar License
-      coord, err := licenseVar.Decrypt(data, signEncryptKey)
-      if err != nil {
-         t.Fatal(err)
-      }
-      UuidOrGuid(licenseVar.ContentKey.KeyId[:])
-      if hex.EncodeToString(licenseVar.ContentKey.KeyId[:]) != test.kid_uuid {
-         t.Fatal(".KeyId")
-      }
-      if hex.EncodeToString(coord.Key()) != test.key {
-         t.Fatal(".Key")
-      }
-   }
-}
-
 var key_tests = []struct {
    key      string
    kid_uuid string
@@ -244,4 +135,112 @@ func post(req *http.Request) ([]byte, error) {
 func write_file(name string, data []byte) error {
    log.Println("WriteFile", name)
    return os.WriteFile(name, data, os.ModePerm)
+}
+//var device = SL2000
+var device = SL3000
+
+func TestLeaf(t *testing.T) {
+   data, err := os.ReadFile(device.folder + device.g1)
+   if err != nil {
+      t.Fatal(err)
+   }
+   var certificate Chain
+   err = certificate.Decode(data)
+   if err != nil {
+      t.Fatal(err)
+   }
+   data, err = os.ReadFile(device.folder + device.z1)
+   if err != nil {
+      t.Fatal(err)
+   }
+   z1 := new(big.Int).SetBytes(data)
+   signEncryptKey := big.NewInt('!')
+   err = certificate.Leaf(z1, signEncryptKey)
+   if err != nil {
+      t.Fatal(err)
+   }
+   err = write_file(device.folder+"certificate", certificate.Encode())
+   if err != nil {
+      t.Fatal(err)
+   }
+   err = write_file(device.folder+"signEncryptKey", signEncryptKey.Bytes())
+   if err != nil {
+      t.Fatal(err)
+   }
+}
+
+type device_config struct {
+   folder string
+   g1     string
+   z1     string
+}
+
+var SL2000 = device_config{
+   folder: "ignore/",
+   g1:     "g1",
+   z1:     "z1",
+}
+
+var SL3000 = device_config{
+   folder: "ignore/",
+   g1:     "bgroupcert.dat",
+   z1:     "zgpriv.dat",
+}
+
+func TestKey(t *testing.T) {
+   log.SetFlags(log.Ltime)
+   data, err := os.ReadFile(device.folder + "certificate")
+   if err != nil {
+      t.Fatal(err)
+   }
+   var certificate Chain
+   err = certificate.Decode(data)
+   if err != nil {
+      t.Fatal(err)
+   }
+   home, err := os.UserHomeDir()
+   if err != nil {
+      t.Fatal(err)
+   }
+   data, err = os.ReadFile(device.folder + "signEncryptKey")
+   if err != nil {
+      t.Fatal(err)
+   }
+   signEncryptKey := new(big.Int).SetBytes(data)
+   for _, test := range key_tests[:1] {
+      kid, err := hex.DecodeString(test.kid_uuid)
+      if err != nil {
+         t.Fatal(err)
+      }
+      UuidOrGuid(kid)
+      data, err = certificate.RequestBody(kid, signEncryptKey)
+      if err != nil {
+         t.Fatal(err)
+      }
+      req, err := http.NewRequest("POST", "", bytes.NewReader(data))
+      if err != nil {
+         t.Fatal(err)
+      }
+      err = test.req(req, home)
+      if err != nil {
+         t.Fatal(err)
+      }
+      log.Print(req.URL)
+      data, err = post(req)
+      if err != nil {
+         t.Fatal(err)
+      }
+      var licenseVar License
+      coord, err := licenseVar.Decrypt(data, signEncryptKey)
+      if err != nil {
+         t.Fatal(err)
+      }
+      UuidOrGuid(licenseVar.ContentKey.KeyId[:])
+      if hex.EncodeToString(licenseVar.ContentKey.KeyId[:]) != test.kid_uuid {
+         t.Fatal(".KeyId")
+      }
+      if hex.EncodeToString(coord.Key()) != test.key {
+         t.Fatal(".Key")
+      }
+   }
 }
